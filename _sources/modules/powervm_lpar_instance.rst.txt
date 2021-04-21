@@ -111,17 +111,19 @@ Parameters
 
     Give implicit preference to redundancy in case if the identified/provided disk visible to two VIOSes
 
+    User need to provide either *volume_name* and *vios_name* or *volume_size* to identify the physical volume.
+
 
     volume_name (optional, str, None)
       Physical volume name visible through VIOS. This option is mutually exclusive with *volume_size*
 
 
-    volume_size (optional, int, None)
-      Physical volume size in MB
-
-
     vios_name (optional, str, None)
       VIOS name to which mentioned *volume_name* is present. This option is mutually exclusive with *volume_size*
+
+
+    volume_size (optional, int, None)
+      Physical volume size in MB
 
 
 

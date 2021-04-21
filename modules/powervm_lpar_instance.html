@@ -269,12 +269,13 @@
 <dt>volume_config (optional, dict, None)</dt><dd><p>Storage volume configurations of partition</p>
 <p>Attaches the virtual SCSI backing physical volume provided by the Virtual IO Server Partition</p>
 <p>Give implicit preference to redundancy in case if the identified/provided disk visible to two VIOSes</p>
+<p>User need to provide either <em>volume_name</em> and <em>vios_name</em> or <em>volume_size</em> to identify the physical volume.</p>
 <dl class="simple">
 <dt>volume_name (optional, str, None)</dt><dd><p>Physical volume name visible through VIOS. This option is mutually exclusive with <em>volume_size</em></p>
 </dd>
-<dt>volume_size (optional, int, None)</dt><dd><p>Physical volume size in MB</p>
-</dd>
 <dt>vios_name (optional, str, None)</dt><dd><p>VIOS name to which mentioned <em>volume_name</em> is present. This option is mutually exclusive with <em>volume_size</em></p>
+</dd>
+<dt>volume_size (optional, int, None)</dt><dd><p>Physical volume size in MB</p>
 </dd>
 </dl>
 </dd>
