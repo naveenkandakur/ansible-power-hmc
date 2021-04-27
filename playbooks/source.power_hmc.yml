@@ -1,11 +1,9 @@
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
-  "hmc_host_name":
-    user: user
-    password: password
-  "hmc_host_name2":
-    user: user
-    password: password
+  "9.3.147.114":
+    user: hscroot
+    password: '"{{  lookup('env','HMC_PASS') }}"'
+
 filters:
     PartitionState: 'running'
 groups:
