@@ -2,7 +2,7 @@ plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   "9.3.147.114":
     user: hscroot
-    password: '"{{  lookup('env','HMC_PASS') }}"'
+    password: '"{{ lookup('env','HMC_PASS') }}"'
 
 filters:
     PartitionState: 'running'
