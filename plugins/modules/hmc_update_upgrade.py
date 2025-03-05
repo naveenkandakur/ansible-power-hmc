@@ -140,7 +140,7 @@ options:
 '''
 
 EXAMPLES = '''
-- name: List the HMC current build level
+- name: List the Power HMC current build level
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -148,7 +148,7 @@ EXAMPLES = '''
           password: '{{ hmc_password }}'
       state: facts
 
-- name: Update the HMC to the V10R2M1040 build level from nfs location
+- name: Update the Power HMC to the V10R2M1040 build level from nfs location
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -161,7 +161,7 @@ EXAMPLES = '''
           mount_location: /HMCImages
       state: updated
 
-- name: Update the HMC to the V10R2M1041 build level from sftp location
+- name: Update the Power HMC to the V10R2M1041 build level from sftp location
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -183,7 +183,7 @@ EXAMPLES = '''
           password: '{{ hmc_password }}'
       action: listptf
 
-- name: Update the HMC to the V10R2M1041(ifix) build level from ibmwebsite
+- name: Update the Power HMC to the V10R2M1041(ifix) build level from ibmwebsite
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -194,7 +194,7 @@ EXAMPLES = '''
           ptf: vMF71409
       state: updated
 
-- name: Upgrade the HMC from ibmwebsite
+- name: Upgrade Power HMC to the mentioned PTF level using the image obtained from ibmwebsite
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: '{{ curr_hmc_auth }}'
@@ -203,7 +203,7 @@ EXAMPLES = '''
           ptf: <ptf>
       state: upgraded
 
-- name: Upgrade the HMC using NFS server
+- name: Upgrade the Power HMC using NFS server
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: '{{ curr_hmc_auth }}'
@@ -214,7 +214,7 @@ EXAMPLES = '''
           build_file: <build_file_path>
       state: upgraded
 
-- name: Upgrade the HMC using SFTP server
+- name: Upgrade the Power HMC using SFTP server
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: '{{ curr_hmc_auth }}'
@@ -226,7 +226,7 @@ EXAMPLES = '''
           build_file: <build_file>
       state: upgraded
 
-- name: List all the available upgrade files
+- name: Provide a list of all available image files in ibmwebsite for upgrading Power HMC
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
