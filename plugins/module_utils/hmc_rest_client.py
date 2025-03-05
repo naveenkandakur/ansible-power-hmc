@@ -1928,7 +1928,7 @@ class HmcRestClient:
             )
             if not exists:
                 for vios_npiv_dict in vios_npiv_dict_list:
-                    if (npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']) and not exists:
+                    if (npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']):
                         if int(vios_npiv_dict['AvailablePorts']) > 0:
                             payload = self.build_FC_MappingPayload(vios_npiv_dict['LocationCode'], npiv_settings, lpar_UUID, lpar_id, vios_id)
                             FCMappingsTag = vios_dom.xpath("//VirtualFibreChannelMappings")[0]
