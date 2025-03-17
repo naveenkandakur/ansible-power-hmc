@@ -145,6 +145,15 @@ class Hmc():
         if numOfMin != 'now':
             time.sleep(int(numOfMin) * 60)
 
+    def listUpgradeFiles(self, locationType, configDict=None):
+        hmcCmd = self.CMD['LSUPGFILES'] + \
+            self.OPT['LSUPGFILES']['-R'][locationType.upper()]
+
+        result = self.hmcconn.execute(hmcCmd)
+        if 'No results were found.' in result:
+            return 'No upgrade files available'
+        return self.cmdClass.parseMultiLineCSV(result)
+
     def getHMCUpgradeFiles(self, serverType, configDict=None):
         hmcCmd = self.CMD['GETUPGFILES'] + \
             self.OPT['GETUPGFILES']['-R'][serverType.upper()] + \
