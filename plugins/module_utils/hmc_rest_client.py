@@ -1908,19 +1908,40 @@ class HmcRestClient:
         vios_npiv_dict_list = self.fetchVIOSFcDetails(vios_dom)
         lpar_id = partition_dom.xpath("//PartitionID")[0].text
         vios_id = vios_dom.xpath("//PartitionID")[0].text
+        vfc_dom = vios_dom.xpath(".//VirtualFibreChannelMapping")
+        mappings_list = []
+        for mapping in vfc_dom:
+            server_virtual_slot = mapping.xpath(".//ServerAdapter/VirtualSlotNumber/text()")
+            client_virtual_slot = mapping.xpath(".//ClientAdapter/VirtualSlotNumber/text()")
+            mapping_dict = {
+                "server_virtual_slot": server_virtual_slot[0] if server_virtual_slot else None,
+                "client_virtual_slot": client_virtual_slot[0] if client_virtual_slot else None,
+            }
+            mappings_list.append(mapping_dict)
         for npiv_settings in npiv_settings_list:
-            for vios_npiv_dict in vios_npiv_dict_list:
-                if npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']:
-                    if int(vios_npiv_dict['AvailablePorts']) > 0:
-                        payload = self.build_FC_MappingPayload(vios_npiv_dict['LocationCode'], npiv_settings, lpar_UUID, lpar_id, vios_id)
-                        FCMappingsTag = vios_dom.xpath("//VirtualFibreChannelMappings")[0]
-                        FCMappingsTag.append(etree.XML(payload))
-                        flag = True
-                        break
-                    raise HmcError("There are only {0} available ports in the fc_port_name: {1}"
-                                   .format(vios_npiv_dict['AvailablePorts'], npiv_settings['fc_port_name']))
-            else:
-                raise HmcError("fc_port_name: {0} provided is not found in the vios: {1}".format(npiv_settings['fc_port_name'], vios_name, ))
+            exists = any(
+                (
+                    str(mapping["server_virtual_slot"]) == str(npiv_settings['server_adapter_id'])
+                    and str(mapping["client_virtual_slot"]) == str(npiv_settings['client_adapter_id'])
+                )
+                for mapping in mappings_list
+            )
+            if not exists:
+                for vios_npiv_dict in vios_npiv_dict_list:
+                    if (npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']):
+                        if int(vios_npiv_dict['AvailablePorts']) > 0:
+                            payload = self.build_FC_MappingPayload(vios_npiv_dict['LocationCode'], npiv_settings, lpar_UUID, lpar_id, vios_id)
+                            FCMappingsTag = vios_dom.xpath("//VirtualFibreChannelMappings")[0]
+                            FCMappingsTag.append(etree.XML(payload))
+                            flag = True
+                            break
+                        raise HmcError(
+                            "There are only {0} available ports in the fc_port_name: {1}".format(
+                                vios_npiv_dict['AvailablePorts'], npiv_settings['fc_port_name']
+                            )
+                        )
+                else:
+                    raise HmcError("fc_port_name: {0} provided is not found in the vios: {1}".format(npiv_settings['fc_port_name'], vios_name, ))
         if flag:
             self.updateVirtualIOServer(vios_dom, timeout)
         return flag
