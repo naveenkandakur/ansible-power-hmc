@@ -77,7 +77,7 @@ options:
         elements: str
     disk_size_policy:
         description:
-            - When I(action=copy), specifies how to choose the alternate disk if I(targets) is not specified.
+            - When I(state=copy), specifies how to choose the alternate disk if I(targets) is not specified.
             - C(minimize) smallest disk that can be selected.
             - C(upper) first disk found bigger than the rootvg disk.
             - C(lower) disk size less than rootvg disk size but big enough to contain the used physical partitions.
