@@ -1346,7 +1346,6 @@ class HmcRestClient:
         return spp_id
 
     def check_vnic_condition(self, params):
-        logger.debug("Ethi mone")
         msg = ""
         for each in params['vnic_config']:
             if each['port_vlan_id'] is not None and (each['port_vlan_id'] < 2 or each['port_vlan_id'] > 4094) and each['port_vlan_id'] == 1:
