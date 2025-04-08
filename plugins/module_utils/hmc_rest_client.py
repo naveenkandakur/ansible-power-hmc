@@ -1376,7 +1376,7 @@ class HmcRestClient:
             else:
                 each['allowed_vlanids'] = 'all'
             if each['allowed_macaddr'] is not None:
-                if each['allowed_macaddr'] in ['all', 'none']:
+                if each['allowed_macaddr'].strip().lower() in ['all', 'none']:
                     pass
                 elif re.fullmatch(r'(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2}))(,\s*(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})))*', each['allowed_macaddr'].strip()):
                     mac_list = each['allowed_macaddr'].strip().split(',')
