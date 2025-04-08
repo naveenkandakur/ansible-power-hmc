@@ -1391,9 +1391,6 @@ class HmcRestClient:
             if (each['allowed_vlanids'].lower() == 'all') != (each['allowed_macaddr'].lower() == 'all'):
                 msg = "If allowed VLAN IDs is set to allow all, then allowed OS MAC addresses must also be set to allow all and vice versa."
                 return msg
-            elif (each['allowed_vlanids'].lower() == 'none') != (each['allowed_macaddr'].lower() == 'none'):
-                msg = "If allowed VLAN IDs is set to deny all, then allowed OS MAC addresses must also be set to deny all and vice versa."
-                return msg
         return msg
 
     def add_vnic_payload(self, lpar_template_dom, vnic_tup, sriov_dvc_col, vios_name_list):
