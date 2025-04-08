@@ -1316,6 +1316,12 @@ def create_partition(module, params):
     except Exception as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+        try:
+            partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            if partition_dom:
+                hmc.deletePartition(system_name, vm_name, False, False)
+        except:
+            logger.debug("The lpar is not yet created")
         module.fail_json(msg=error_msg)
     finally:
         if temp_copied:
