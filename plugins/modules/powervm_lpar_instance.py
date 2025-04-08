@@ -1320,7 +1320,7 @@ def create_partition(module, params):
             partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
             if partition_dom:
                 hmc.deletePartition(system_name, vm_name, False, False)
-        except:
+        except Exception:
             logger.debug("The lpar is not yet created")
         module.fail_json(msg=error_msg)
     finally:
