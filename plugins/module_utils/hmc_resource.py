@@ -581,11 +581,15 @@ class Hmc():
 
         return res
 
-    def runCommandOnVIOS(self, system_name, name, cmd):
+    def runCommandOnVIOS(self, system_name, name, cmd, flag=None):
         viosvrcmd = self.CMD['VIOSVRCMD'] +\
             self.OPT['VIOSVRCMD']['-M'] + system_name +\
-            self.OPT['VIOSVRCMD']['-P'] + name +\
-            self.OPT['VIOSVRCMD']['-C'] + '"' + cmd + '"'
+            self.OPT['VIOSVRCMD']['-P'] + name
+        if flag is True:
+            viosvrcmd += self.OPT['VIOSVRCMD']['--ADMIN']
+        viosvrcmd += self.OPT['VIOSVRCMD']['-C'] + '"' + cmd + '"'
+        if flag is not None:
+            return self.hmcconn.execute(viosvrcmd)
         self.hmcconn.execute(viosvrcmd)
 
     def authenticateHMCs(self, remote_hmc, username=None, passwd=None, test=False):
