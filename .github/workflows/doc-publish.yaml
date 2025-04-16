@@ -53,19 +53,19 @@ jobs:
       pages: write
 
     steps:
-    - uses: actions/download-artifact@v4
-      with:
-        name: hmc-doc-artifact
-        path: .
-    - uses: actions/configure-pages@v4
-      with:
-        #User need to set this secret on github actions
-        token: ${{ secrets.TOKEN_PAM }}
-        enablement: true
-    - uses: actions/upload-pages-artifact@v1
-      with:
-        path: .
-    - id: deployment
-      uses: actions/deploy-pages@v3
-      with:
-        token: ${{ secrets.TOKEN_PAM }}
+      - uses: actions/download-artifact@4
+        with:
+          name: hmc-doc-artifact
+          path: .
+      - uses: actions/configure-pages@v4
+        with:
+          # User need to set this secret on github actions
+          token: ${{ secrets.TOKEN_PAM }}
+          enablement: true
+      - uses: actions/upload-pages-artifact@v1
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.TOKEN_PAM }}
