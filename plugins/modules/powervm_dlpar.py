@@ -477,11 +477,11 @@ Setting proc units is not supported")
     prevProcValue = rest_conn.getProcs(isDedicated, partition_dom)
     if not isDedicated:
         prevProcUnitValue = rest_conn.getProcUnits(partition_dom)
-    if (proc is not None and prevProcValue != proc):
+    if (proc is not None and prevProcValue != str(proc)):
         logger.debug("prevProcValue: %s", prevProcValue)
         partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc=str(proc))
         difference = True
-    if (proc_unit is not None and prevProcUnitValue != proc_unit):
+    if (proc_unit is not None and prevProcUnitValue != str(proc_unit)):
         logger.debug("prevProcUnitValue: %s", prevProcUnitValue)
         partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc_unit=str(proc_unit))
         difference = True
@@ -492,14 +492,14 @@ Setting proc units is not supported")
         else:
             prevPoolID = rest_conn.getProcPool(partition_dom)
             logger.debug("prevPoolID: %s", prevPoolID)
-            if prevPoolID != pool_id:
+            if prevPoolID != str(pool_id):
                 partition_dom = rest_conn.updateProcPool(partition_dom, str(pool_id))
                 difference = True
 
     if mem:
         prevMem = rest_conn.getMem(partition_dom)
         logger.debug("prevMem: %s", prevMem)
-        if prevMem != mem:
+        if prevMem != str(mem):
             partition_dom = rest_conn.updateMem(partition_dom, str(mem))
             difference = True
 
@@ -512,7 +512,7 @@ Setting proc units is not supported")
         else:
             if sharing_mode not in ['capped', 'uncapped']:
                 module.fail_json(msg="Given sharing mode is not supported with shared processor configuration")
-        if prevSharingMode != sharing_mode:
+        if prevSharingMode != str(sharing_mode):
             logger.debug("sharing_mode: %s", sharing_mode)
             partition_dom = rest_conn.updateProcSharingMode(partition_dom, sharing_mode)
             difference = True
@@ -525,7 +525,7 @@ Setting proc units is not supported")
             if rest_conn.getProcSharingMode(partition_dom) == 'capped' and \
                     (sharing_mode is None or sharing_mode == 'capped'):
                 module.fail_json(msg="Uncapped weight is not supported in case sharing mode is not uncapped")
-        if prevUncappedWeight != uncapped_weight:
+        if prevUncappedWeight != str(uncapped_weight):
             partition_dom = rest_conn.updateProcUncappedWeight(partition_dom, str(uncapped_weight))
             difference = True
 

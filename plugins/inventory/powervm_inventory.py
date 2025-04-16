@@ -523,7 +523,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                     reraise(HmcError, "Error logging off HMC REST Service: %s" % error_msg, traceback)
             except Exception as error:
                 error_msg = parse_error_response(error)
-                msg = ("Unable to connect to HMC host %s: %s" % (hmc_host, error_msg))
+                msg = ("Unable to connect to HMC host %s: %s" % (hmc_host['hmc'], error_msg))
                 display.warning(msg=msg)
                 logger.debug(msg)
                 continue

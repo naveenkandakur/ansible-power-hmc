@@ -19,6 +19,7 @@ module: powervm_lpar_instance
 author:
     - Anil Vijayan (@AnilVijayan)
     - Navinakumar Kandakur (@nkandak1)
+    - Sreenidhi (@SreenidhiS1)
 short_description: Create, Delete, Shutdown, Activate, Restart, Facts and Install of PowerVM Partitions
 notes:
     - The network configuration currently will not support SRIOV configurations.
@@ -367,6 +368,38 @@ options:
                 description:
                     - VNIC Adapter ID to be configured while creating a partition.
                     - Optional, if not provided, next available value will be assigned.
+                type: int
+            allowed_vlanids:
+                description:
+                    - Setting controls whether the virtual NIC accepts packets with any VLAN ID.
+                    - Value can be All, None, comma-sepearted VLAN IDs.
+                    - For comma-seperated VLAN IDs values should be between 2 and 4094.
+                    - Maximum number of VLAN IDs that can be provided is 20.
+                    - Default value is All.
+                    - If the value is set to All, then allowed_macaddr should also be All.
+                    - If the value is set to None, then allowed_macaddr should also be None.
+                type: str
+            allowed_macaddr:
+                description:
+                    - Setting controls whether the virtual NIC accepts packets with any valid MAC Address.
+                    - Value can be All, None, comma-sepearted MAC Addresses.
+                    - Maximum number of MAC Addresses that can be provided is 4.
+                    - Default value is All.
+                    - If the value is set to All, then allowed_vlanids should also be All.
+                    - If the value is set to None, then allowed_vlanids should also be None.
+                type: str
+            port_vlan_id:
+                description:
+                    - Specify a Port VLAN ID that is within the valid range for the SR-IOV physical port that is selected for the backing device.
+                    - The Port VLAN ID field is displayed only if the SR-IOV physical port supports a port VLAN ID.
+                    - Value should be 0 or should range between 2 and 4094.
+                    - Default value is 0.
+                type: int
+            port_vlan_priority:
+                description:
+                    - Specified to prioritize the frames in a VLAN network.
+                    - Value can be between 0 and 7.
+                    - Default vale is 0.
                 type: int
             backing_devices:
                 description:
@@ -1062,6 +1095,7 @@ def create_partition(module, params):
     temp_template_name = "ansible_powervm_create_{0}".format(str(randint(1000, 9999)))
     temp_copied = False
     fcports_config = None
+
     cli_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(cli_conn)
 
@@ -1264,6 +1298,9 @@ def create_partition(module, params):
                     vios_name_list.append(vios['PartitionName'])
             if not vios_name_list:
                 module.fail_json(msg="There are no RMC Active VIOS available in the managed system")
+            error_msg = rest_conn.check_vnic_condition(params)
+            if error_msg != "":
+                module.fail_json(msg=error_msg)
             sriov_adapters_dom = server_dom.xpath("//SRIOVAdapters//SRIOVAdapter")
             sriov_dvc_col = rest_conn.create_sriov_collection(sriov_adapters_dom)
             if not sriov_dvc_col:
@@ -1279,6 +1316,12 @@ def create_partition(module, params):
     except Exception as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+        try:
+            partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            if partition_dom:
+                hmc.deletePartition(system_name, vm_name, False, False)
+        except Exception:
+            logger.debug("The lpar is not yet created")
         module.fail_json(msg=error_msg)
     finally:
         if temp_copied:
@@ -1808,6 +1851,10 @@ def run_module():
                         hosting_partition=dict(type='str')
                         )
     vnic_args = dict(vnic_adapter_id=dict(type='int'),
+                     port_vlan_id=dict(type='int'),
+                     allowed_vlanids=dict(type='str'),
+                     allowed_macaddr=dict(type='str'),
+                     port_vlan_priority=dict(type='int'),
                      backing_devices=dict(type='list',
                                           elements='dict',
                                           options=bck_dvc_args)

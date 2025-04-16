@@ -1345,6 +1345,54 @@ class HmcRestClient:
                     spp_id = key
         return spp_id
 
+    def check_vnic_condition(self, params):
+        msg = ""
+        for each in params['vnic_config']:
+            if each['port_vlan_id'] is not None and (each['port_vlan_id'] < 2 or each['port_vlan_id'] > 4094) and each['port_vlan_id'] == 1:
+                msg = "The valid values for port_vlan_id are 0 and 2 to 4094."
+                return msg
+            elif each['port_vlan_id'] is None:
+                each['port_vlan_id'] = 0
+            if each['port_vlan_priority'] is not None and each['port_vlan_priority'] > 7:
+                msg = "The valid values for port_vlan_priority is 0 to 7."
+                return msg
+            elif each['port_vlan_priority'] is None:
+                each['port_vlan_priority'] = 0
+            if each['allowed_vlanids'] is not None:
+                vlanids = each['allowed_vlanids'].strip().lower()
+                if vlanids in ['all', 'none']:
+                    pass
+                elif re.fullmatch(r'(\d+)(,\d+)*', each['allowed_vlanids'].strip()):
+                    vlan_list = each['allowed_vlanids'].strip().split(',')
+                    if len(vlan_list) > 20:
+                        msg = "The maximum number of allowed vlan id is 20."
+                        return msg
+                    if [vlan for vlan in vlan_list if not (vlan.isdigit() and 2 <= int(vlan) <= 4094)]:
+                        msg = "The allowed vlan values can be only between 2 and 4094."
+                        return msg
+                else:
+                    msg = "The valid values for allowed_vlanids are 'All', 'None', 'Comma-separated vlan ids'."
+                    return msg
+            else:
+                each['allowed_vlanids'] = 'all'
+            if each['allowed_macaddr'] is not None:
+                if each['allowed_macaddr'].strip().lower() in ['all', 'none']:
+                    pass
+                elif re.fullmatch(r'(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2}))(,\s*(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})))*', each['allowed_macaddr'].strip()):
+                    mac_list = each['allowed_macaddr'].strip().split(',')
+                    if len(mac_list) > 4:
+                        msg = "The maximum number of allowed vlan id is 4."
+                        return msg
+                else:
+                    msg = "The valid values for allowed_macaddr are 'All', 'None', 'Comma-separated mac address'."
+                    return msg
+            else:
+                each['allowed_macaddr'] = 'all'
+            if (each['allowed_vlanids'].lower() == 'all') != (each['allowed_macaddr'].lower() == 'all'):
+                msg = "If allowed VLAN IDs is set to allow all, then allowed OS MAC addresses must also be set to allow all and vice versa."
+                return msg
+        return msg
+
     def add_vnic_payload(self, lpar_template_dom, vnic_tup, sriov_dvc_col, vios_name_list):
         payload = ''
         default_vnic_no = 65535
@@ -1353,6 +1401,26 @@ class HmcRestClient:
             vnic_id = vnic['vnic_adapter_id'] if vnic['vnic_adapter_id'] else str(default_vnic_no - count)
             use_nxt_slot = "false" if vnic['vnic_adapter_id'] else "true"
             backing_devices = vnic['backing_devices']
+            vlan_port_id = vnic['port_vlan_id']
+            vlan_port_priority = vnic['port_vlan_priority']
+            allowed_vlan_ids = 'ALL'
+            allowed_mac_addr = 'ALL'
+            if vnic['allowed_vlanids'] is not None:
+                vlanids = vnic['allowed_vlanids'].strip().lower()
+                if vlanids == 'all':
+                    allowed_vlan_ids = 'ALL'
+                elif vlanids == 'none':
+                    allowed_vlan_ids = 'NONE'
+                elif re.fullmatch(r'(\d+)(,\d+)*', vlanids):
+                    allowed_vlan_ids = vlanids.replace(',', ' ')
+            if vnic['allowed_macaddr'] is not None:
+                mac = vnic['allowed_macaddr'].strip().lower()
+                if mac == 'all':
+                    allowed_mac_addr = 'ALL'
+                elif mac == 'none':
+                    allowed_mac_addr = 'NONE'
+                elif re.fullmatch(r'(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2}))(,\s*(([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})))*', mac):
+                    allowed_mac_addr = mac.replace(',', ' ')
             backing_devices_payload = self.get_vnic_backing_devices_payload(backing_devices, sriov_dvc_col, vios_name_list)
             payload += '''
             <VirtualNICDedicated schemaVersion="V1_0">
@@ -1366,11 +1434,11 @@ class HmcRestClient:
                             <Metadata>
                                     <Atom/>
                             </Metadata>
-                            <PortVLANID kxe="false" kb="CUD">0</PortVLANID>
-                            <PortVLANIDPriority kxe="false" kb="CUD">0</PortVLANIDPriority>
-                            <AllowedVLANIDs kxe="false" kb="CUD">ALL</AllowedVLANIDs>
+                            <PortVLANID kxe="false" kb="CUD">{4}</PortVLANID>
+                            <PortVLANIDPriority kxe="false" kb="CUD">{5}</PortVLANIDPriority>
+                            <AllowedVLANIDs kxe="false" kb="CUD">{6}</AllowedVLANIDs>
                             <MACAddress kxe="false" kb="COD">HMC-ASSIGNED</MACAddress>
-                            <AllowedOperatingSystemMACAddresses kxe="false" kb="CUD">ALL</AllowedOperatingSystemMACAddresses>
+                            <AllowedOperatingSystemMACAddresses kxe="false" kb="CUD">{7}</AllowedOperatingSystemMACAddresses>
                             <DesiredMode kxe="false" kb="CUD">DEDICATED</DesiredMode>
                             <AutoPriorityFailover kxe="false" kb="CUD">true</AutoPriorityFailover>
                     </Details>
@@ -1380,7 +1448,8 @@ class HmcRestClient:
                             </Metadata>
                                     {3}
                     </AssociatedBackingDevices>
-            </VirtualNICDedicated>'''.format(vnic_id, str(default_vnic_no - count), use_nxt_slot, backing_devices_payload)
+            </VirtualNICDedicated>'''.format(vnic_id, str(default_vnic_no - count), use_nxt_slot, backing_devices_payload,
+                                             str(vlan_port_id), str(vlan_port_priority), str(allowed_vlan_ids), str(allowed_mac_addr))
             count += 1
 
         vnic_payload = '''
@@ -1908,19 +1977,40 @@ class HmcRestClient:
         vios_npiv_dict_list = self.fetchVIOSFcDetails(vios_dom)
         lpar_id = partition_dom.xpath("//PartitionID")[0].text
         vios_id = vios_dom.xpath("//PartitionID")[0].text
+        vfc_dom = vios_dom.xpath(".//VirtualFibreChannelMapping")
+        mappings_list = []
+        for mapping in vfc_dom:
+            server_virtual_slot = mapping.xpath(".//ServerAdapter/VirtualSlotNumber/text()")
+            client_virtual_slot = mapping.xpath(".//ClientAdapter/VirtualSlotNumber/text()")
+            mapping_dict = {
+                "server_virtual_slot": server_virtual_slot[0] if server_virtual_slot else None,
+                "client_virtual_slot": client_virtual_slot[0] if client_virtual_slot else None,
+            }
+            mappings_list.append(mapping_dict)
         for npiv_settings in npiv_settings_list:
-            for vios_npiv_dict in vios_npiv_dict_list:
-                if npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']:
-                    if int(vios_npiv_dict['AvailablePorts']) > 0:
-                        payload = self.build_FC_MappingPayload(vios_npiv_dict['LocationCode'], npiv_settings, lpar_UUID, lpar_id, vios_id)
-                        FCMappingsTag = vios_dom.xpath("//VirtualFibreChannelMappings")[0]
-                        FCMappingsTag.append(etree.XML(payload))
-                        flag = True
-                        break
-                    raise HmcError("There are only {0} available ports in the fc_port_name: {1}"
-                                   .format(vios_npiv_dict['AvailablePorts'], npiv_settings['fc_port_name']))
-            else:
-                raise HmcError("fc_port_name: {0} provided is not found in the vios: {1}".format(npiv_settings['fc_port_name'], vios_name, ))
+            exists = any(
+                (
+                    str(mapping["server_virtual_slot"]) == str(npiv_settings['server_adapter_id'])
+                    and str(mapping["client_virtual_slot"]) == str(npiv_settings['client_adapter_id'])
+                )
+                for mapping in mappings_list
+            )
+            if not exists:
+                for vios_npiv_dict in vios_npiv_dict_list:
+                    if (npiv_settings['fc_port_name'] == vios_npiv_dict['PortName']):
+                        if int(vios_npiv_dict['AvailablePorts']) > 0:
+                            payload = self.build_FC_MappingPayload(vios_npiv_dict['LocationCode'], npiv_settings, lpar_UUID, lpar_id, vios_id)
+                            FCMappingsTag = vios_dom.xpath("//VirtualFibreChannelMappings")[0]
+                            FCMappingsTag.append(etree.XML(payload))
+                            flag = True
+                            break
+                        raise HmcError(
+                            "There are only {0} available ports in the fc_port_name: {1}".format(
+                                vios_npiv_dict['AvailablePorts'], npiv_settings['fc_port_name']
+                            )
+                        )
+                else:
+                    raise HmcError("fc_port_name: {0} provided is not found in the vios: {1}".format(npiv_settings['fc_port_name'], vios_name, ))
         if flag:
             self.updateVirtualIOServer(vios_dom, timeout)
         return flag
