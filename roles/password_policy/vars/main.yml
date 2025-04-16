@@ -1,0 +1,23 @@
+---
+# vars file
+
+# username of HMC that the password policy role is using
+password_policy_hmc_username: hscroot
+
+# password policy configurations for a new policy or password policy to be modified
+password_policy_configs:
+      min_pwage: None
+      pwage: None
+      min_length: None
+      hist_size: None
+      warn_pwage: None
+      min_digits: None
+      min_uppercase_chars: None
+      min_lowercase_chars: None
+      min_special_chars: None
+
+# password policy name for which we want the role to execute
+password_policy_name: <policy_name>
+
+# boolean option for the users to choose if they want to change the password of the users present in the power HMC or not
+password_policy_password_change: true

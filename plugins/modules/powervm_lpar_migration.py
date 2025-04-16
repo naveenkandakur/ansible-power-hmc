@@ -140,8 +140,8 @@ EXAMPLES = '''
   powervm_lpar_migration:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     src_system: <managed_system_name>
     dest_system: <destination_managed_system>
     vm_names:
@@ -153,8 +153,8 @@ EXAMPLES = '''
   powervm_lpar_migration:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     src_system: <managed_system_name>
     vm_ids:
       - <id1>
@@ -164,8 +164,8 @@ EXAMPLES = '''
   powervm_lpar_migration:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     src_system: <managed_system_name>
     dest_system: <destination_system_name>
     remote_ip: <ipaddress of the remote HMC>
@@ -176,26 +176,26 @@ EXAMPLES = '''
   powervm_lpar_migration:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     src_system: <managed_system_name>
     dest_system: <destination_system_name>
     vm_ids:
       - <id1>
       - <id2>
     shared_proc_pool:
-         - lpar_id: <id1>
-           pool_id: <poolid1>
-         - lpar_id: <id2>
-           pool_id: <poolid2>
+      - lpar_id: <id1>
+        pool_id: <poolid1>
+      - lpar_id: <id2>
+        pool_id: <poolid2>
     action: migrate
 
 - name: Adds SSH authentication key of remote HMC.
   powervm_lpar_migration:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     remote_ip: <IP Address of the remote HMC>
     remote_username: <Username of the remote HMC>
     remote_passwd: <Password of the remote HMC>
@@ -231,6 +231,7 @@ def init_logger():
 def validate_parameters(params):
     '''Check that the input parameters satisfy the mutual exclusiveness of HMC'''
     opr = params['action']
+    unsupportedList = []
 
     if opr == 'recover':
         mandatoryList = ['hmc_host', 'hmc_auth', 'src_system']

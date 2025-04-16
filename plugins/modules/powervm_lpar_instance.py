@@ -19,6 +19,7 @@ module: powervm_lpar_instance
 author:
     - Anil Vijayan (@AnilVijayan)
     - Navinakumar Kandakur (@nkandak1)
+    - Sreenidhi (@SreenidhiS1)
 short_description: Create, Delete, Shutdown, Activate, Restart, Facts and Install of PowerVM Partitions
 notes:
     - The network configuration currently will not support SRIOV configurations.
@@ -63,7 +64,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system.
+            - The name or mtms (machine type model serial) of the managed system..
             - Optional for I(state=absent), I(state=facts), I(action=poweron), I(action=shutdown) and I(action=restart).
         type: str
     vm_name:
@@ -368,6 +369,38 @@ options:
                     - VNIC Adapter ID to be configured while creating a partition.
                     - Optional, if not provided, next available value will be assigned.
                 type: int
+            allowed_vlanids:
+                description:
+                    - Setting controls whether the virtual NIC accepts packets with any VLAN ID.
+                    - Value can be All, None, comma-sepearted VLAN IDs.
+                    - For comma-seperated VLAN IDs values should be between 2 and 4094.
+                    - Maximum number of VLAN IDs that can be provided is 20.
+                    - Default value is All.
+                    - If the value is set to All, then allowed_macaddr should also be All.
+                    - If the value is set to None, then allowed_macaddr should also be None.
+                type: str
+            allowed_macaddr:
+                description:
+                    - Setting controls whether the virtual NIC accepts packets with any valid MAC Address.
+                    - Value can be All, None, comma-sepearted MAC Addresses.
+                    - Maximum number of MAC Addresses that can be provided is 4.
+                    - Default value is All.
+                    - If the value is set to All, then allowed_vlanids should also be All.
+                    - If the value is set to None, then allowed_vlanids should also be None.
+                type: str
+            port_vlan_id:
+                description:
+                    - Specify a Port VLAN ID that is within the valid range for the SR-IOV physical port that is selected for the backing device.
+                    - The Port VLAN ID field is displayed only if the SR-IOV physical port supports a port VLAN ID.
+                    - Value should be 0 or should range between 2 and 4094.
+                    - Default value is 0.
+                type: int
+            port_vlan_priority:
+                description:
+                    - Specified to prioritize the frames in a VLAN network.
+                    - Value can be between 0 and 7.
+                    - Default vale is 0.
+                type: int
             backing_devices:
                 description:
                     - SRIOV physical ports to be used as a backing device of VNIC.
@@ -428,22 +461,22 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       vm_id: <lpar_id>
       proc: 4
       proc_unit: 4
       mem: 20480
       volume_config:
-         - vios_name: <viosname1>
-           volume_name: <volumename1>
-         - vios_name: <viosname2>
-           volume_name: <volumename2>
+          - vios_name: <viosname1>
+            volume_name: <volumename1>
+          - vios_name: <viosname2>
+            volume_name: <volumename2>
       physical_io:
-         - <physicalIO location code>
-         - <physicalio location code>
+          - <physicalIO location code>
+          - <physicalio location code>
       max_virtual_slots: 50
       os_type: ibmi
       state: present
@@ -453,33 +486,33 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       volume_config:
-         - volume_size: <disk_size>
-         - volume_size: <disk_size>
+          - volume_size: <disk_size>
+          - volume_size: <disk_size>
       virt_network_config:
-         - network_name: <virtual_nw_name>
-           slot_number: <client_slot_no>
+          - network_name: <virtual_nw_name>
+            slot_number: <client_slot_no>
       npiv_config:
-         - vios_name: <viosname>
-           fc_port: <fc_port_name/loc_code>
-           wwpn_pair: <wwpn1;wwpn2>
+          - vios_name: <viosname>
+            fc_port: <fc_port_name/loc_code>
+            wwpn_pair: <wwpn1;wwpn2>
       vnic_config:
-         - vnic_adapter_id: <vnic_adapter_id>
-           backing_devices:
-              - location_code: XXXXX.XXX.XXXXXXX-P1-T1
-                capacity: <capacity>
-                hosting_partition: <vios_name>
-              - location_code: P1-T2
-         - backing_devices:
-              - location_code: P1-T3
-                hosting_partition: <vios_name>
-              - location_code: P1-T4
-                capacity: <capacity>
-         - vnic_adapter_id: <vnic_adapter_id>
+          - vnic_adapter_id: <vnic_adapter_id>
+            backing_devices:
+                - location_code: XXXXX.XXX.XXXXXXX-P1-T1
+                  capacity: <capacity>
+                  hosting_partition: <vios_name>
+                - location_code: P1-T2
+          - backing_devices:
+                - location_code: P1-T3
+                  hosting_partition: <vios_name>
+                - location_code: P1-T4
+                  capacity: <capacity>
+          - vnic_adapter_id: <vnic_adapter_id>
       os_type: aix_linux
       state: present
 
@@ -487,21 +520,21 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
-      retain_vios_cfg: True
-      delete_vdisks: True
+      retain_vios_cfg: true
+      delete_vdisks: true
       state: absent
 
 - name: Shutdown a logical partition.
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       action: shutdown
 
@@ -509,9 +542,9 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       prof_name: <profile_name>
       action: poweron
@@ -520,9 +553,9 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       keylock: 'normal'
       iIPLsource: 'd'
@@ -532,11 +565,11 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-      system_name: <system_name>
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
-      all_resources: True
+      all_resources: true
       os_type: aix_linux
       state: present
 
@@ -544,29 +577,28 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: "{{ curr_hmc_auth }}"
-      system_name: <system_name>
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       install_settings:
-         vm_ip: <IP_address of the lpar>
-         nim_ip: <IP_address of the NIM Server>
-         nim_gateway: <Gateway IP_Addres>
-         nim_subnetmask: <Subnetmask IP_Address>
+          vm_ip: <IP_address of the lpar>
+          nim_ip: <IP_address of the NIM Server>
+          nim_gateway: <Gateway IP_Addres>
+          nim_subnetmask: <Subnetmask IP_Address>
       action: install_os
 
 - name: Install Linux OS on LPAR from NIM Server.
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: "{{ curr_hmc_auth }}"
-      system_name: <system_name>
+      system_name: <system_name/mtms>
       vm_name: <vm_name>
       install_settings:
-         vm_ip: <IP_address of the lpar>
-         nim_ip: <IP_address of the NIM Server>
-         nim_gateway: <Gateway IP_Addres>
-         nim_subnetmask: <Subnetmask IP_Address>
-         vm_mac: <mac address of lpar>
+          vm_ip: <IP_address of the lpar>
+          nim_ip: <IP_address of the NIM Server>
+          nim_gateway: <Gateway IP_Addres>
+          nim_subnetmask: <Subnetmask IP_Address>
+          vm_mac: <mac address of lpar>
       action: install_os
-
 '''
 
 RETURN = '''
@@ -597,6 +629,7 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client impo
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import add_taggedIO_details
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import add_physical_io
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_constants import HmcConstants
 from random import randint
 from collections import OrderedDict
 from decimal import Decimal
@@ -1062,8 +1095,18 @@ def create_partition(module, params):
     temp_template_name = "ansible_powervm_create_{0}".format(str(randint(1000, 9999)))
     temp_copied = False
     fcports_config = None
+
     cli_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(cli_conn)
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1255,6 +1298,9 @@ def create_partition(module, params):
                     vios_name_list.append(vios['PartitionName'])
             if not vios_name_list:
                 module.fail_json(msg="There are no RMC Active VIOS available in the managed system")
+            error_msg = rest_conn.check_vnic_condition(params)
+            if error_msg != "":
+                module.fail_json(msg=error_msg)
             sriov_adapters_dom = server_dom.xpath("//SRIOVAdapters//SRIOVAdapter")
             sriov_dvc_col = rest_conn.create_sriov_collection(sriov_adapters_dom)
             if not sriov_dvc_col:
@@ -1270,6 +1316,12 @@ def create_partition(module, params):
     except Exception as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+        try:
+            partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            if partition_dom:
+                hmc.deletePartition(system_name, vm_name, False, False)
+        except Exception:
+            logger.debug("The lpar is not yet created")
         module.fail_json(msg=error_msg)
     finally:
         if temp_copied:
@@ -1299,8 +1351,18 @@ def remove_partition(module, params):
     deleteVdisks = params['delete_vdisks']
     flag = False
     force = False
+    changed = False
     if params['force'] is True:
         force = True
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1377,6 +1439,15 @@ def poweroff_partition(module, params):
     shutdown_option = params['shutdown_option'] or 'Delayed'
     restart_option = params['restart_option'] or 'Immediate'
     operation = params['action']
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1456,6 +1527,15 @@ def poweron_partition(module, params):
     prof_name = params['prof_name']
     keylock = params['keylock']
     iIPLsource = params['iIPLsource']
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1612,6 +1692,7 @@ def install_aix_os(module, params):
 
 
 def partition_details(module, params):
+    changed = False
     rest_conn = None
     system_uuid = None
     server_dom = None
@@ -1624,6 +1705,15 @@ def partition_details(module, params):
     system_name = params['system_name']
     vm_name = params['vm_name']
     advanced_info = params['advanced_info']
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1761,6 +1851,10 @@ def run_module():
                         hosting_partition=dict(type='str')
                         )
     vnic_args = dict(vnic_adapter_id=dict(type='int'),
+                     port_vlan_id=dict(type='int'),
+                     allowed_vlanids=dict(type='str'),
+                     allowed_macaddr=dict(type='str'),
+                     port_vlan_priority=dict(type='int'),
                      backing_devices=dict(type='list',
                                           elements='dict',
                                           options=bck_dvc_args)

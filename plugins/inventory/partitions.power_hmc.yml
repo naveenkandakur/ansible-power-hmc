@@ -10,5 +10,5 @@ hmc_hosts:
           3664333762656138640a306539363765343261383363346532643639383938656434333564323139
           6365
 filter:
-    PartitionState: 'not running'
+  PartitionState: 'not running'
 identify_unknown_by: PartitionName

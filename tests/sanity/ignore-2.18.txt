@@ -1,0 +1,2 @@
+plugins/inventory/source.power_hmc.yml validate-modules!skip
+plugins/inventory/partitions.power_hmc.yml validate-modules!skip

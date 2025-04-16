@@ -7,42 +7,42 @@ on:
     branches:
       - '*'
   pull_request:
-    branches: [ dev-collection ]
+    branches: [dev-collection]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   module-linting-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python-version: ['3.10', '3.11']
 
     name: run module linting
     steps:
-    - name: checkout repository
-      uses: actions/checkout@v4
+      - name: checkout repository
+        uses: actions/checkout@v4
 
-    - name: setup python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: install linting test requirements
-      run: |
-        python -m pip install --upgrade pip
-        make install-ansible
-        make install-sanity-test-requirements
-        make install-ansible-lint
+      - name: install linting test requirements
+        run: |
+          python -m pip install --upgrade pip
+          make install-ansible
+          make install-sanity-test-requirements
+          make install-ansible-lint
 
-    - name: build and install new content as collection
-      run: |
-        make prep-collection
+      - name: build and install new content as collection
+        run: |
+          make prep-collection
 
-    - name: run linter
-      run: make module-lint
-      working-directory: /home/runner/.ansible/collections/ansible_collections/ibm/power_hmc
+      - name: run linter
+        run: make module-lint
+        working-directory: /home/runner/.ansible/collections/ansible_collections/ibm/power_hmc
 
-    - name: run install-ansible
-      run: make ansible-lint
+      - name: run install-ansible
+        run: make ansible-lint

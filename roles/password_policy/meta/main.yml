@@ -1,0 +1,15 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: Manya Aeron
+  description: Password Policy management for power HMC
+  license: GPL-3.0-only
+  min_ansible_version: '>=2.14.0'
+  galaxy_tags:
+    - infrastructure
+    - ibm
+    - power
+    - hmc
+    - password
+    - policy

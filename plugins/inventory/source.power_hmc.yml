@@ -7,9 +7,9 @@ hmc_hosts:
     user: user
     password: <password>
 filters:
-    PartitionState: 'running'
+  PartitionState: 'running'
 groups:
-    AIX_72: "'7.2' in OperatingSystemVersion"
+  AIX_72: "'7.2' in OperatingSystemVersion"
 keyed_groups:
   - prefix: type
     key: PartitionType
@@ -18,8 +18,8 @@ compose:
   os: OperatingSystemVersion
   name: PartitionName
 exclude_ip:
-    - 10.0.0.44
+  - 10.0.0.44
 exclude_lpar:
-    - nonsense
+  - nonsense
 exclude_system:
-    - Frame1-XXX-MMB-WWWWWW
+  - Frame1-XXX-MMB-WWWWWW

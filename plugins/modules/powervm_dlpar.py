@@ -51,7 +51,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system.
+            - The name or mtms (machine type model serial) of the managed system.
         required: true
         type: str
     vm_name:
@@ -218,9 +218,9 @@ EXAMPLES = '''
   powervm_dlpar:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-    system_name: <server name>
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: <server name/mtms>
     vm_name: <vm name>
     proc_settings:
       proc: 3
@@ -236,15 +236,15 @@ EXAMPLES = '''
   powervm_dlpar:
     hmc_host: '{{ inventory_hostname }}'
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-    system_name: <server name>
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: <server name/mtms>
     vm_name: <vm name>
     pv_settings:
       - vios_name: <vios1>
         disk_name: <hdiskA>
-      - vios_name:  <vios2>
-        disk_name:  <hdiskB>
+      - vios_name: <vios2>
+        disk_name: <hdiskB>
         target_name: <TargetName>
       - vios_name: <vios1>
         disk_name: <hdiskC>
@@ -257,9 +257,9 @@ EXAMPLES = '''
   powervm_dlpar:
     hmc_host: '{{ inventory_hostname }}'
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-    system_name: <server name>
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: <server name/mtms>
     vm_name: <vm name>
     npiv_settings:
       - vios_name: '<VIOS_NAME1>'
@@ -277,9 +277,9 @@ EXAMPLES = '''
   powervm_dlpar:
     hmc_host: '{{ inventory_hostname }}'
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
-    system_name: <server name>
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: <server name/mtms>
     vm_name: <vm name>
     vod_settings:
       - vios_name: '<VIOS_Name1>'
@@ -304,10 +304,15 @@ LOG_FILENAME = "/tmp/ansible_power_hmc.log"
 logger = logging.getLogger(__name__)
 import sys
 import json
+import re
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import ParameterError
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_cli_client import HmcCliConnection
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import parse_error_response
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import HmcError
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_constants import HmcConstants
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_resource import Hmc
 from itertools import groupby
 from operator import itemgetter
 
@@ -425,6 +430,15 @@ def update_proc_mem(module, params):
     newUncappedWeight = None
     newPoolID = None
 
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
+
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
     except Exception as error:
@@ -463,11 +477,11 @@ Setting proc units is not supported")
     prevProcValue = rest_conn.getProcs(isDedicated, partition_dom)
     if not isDedicated:
         prevProcUnitValue = rest_conn.getProcUnits(partition_dom)
-    if (proc is not None and prevProcValue != proc):
+    if (proc is not None and prevProcValue != str(proc)):
         logger.debug("prevProcValue: %s", prevProcValue)
         partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc=str(proc))
         difference = True
-    if (proc_unit is not None and prevProcUnitValue != proc_unit):
+    if (proc_unit is not None and prevProcUnitValue != str(proc_unit)):
         logger.debug("prevProcUnitValue: %s", prevProcUnitValue)
         partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc_unit=str(proc_unit))
         difference = True
@@ -478,14 +492,14 @@ Setting proc units is not supported")
         else:
             prevPoolID = rest_conn.getProcPool(partition_dom)
             logger.debug("prevPoolID: %s", prevPoolID)
-            if prevPoolID != pool_id:
+            if prevPoolID != str(pool_id):
                 partition_dom = rest_conn.updateProcPool(partition_dom, str(pool_id))
                 difference = True
 
     if mem:
         prevMem = rest_conn.getMem(partition_dom)
         logger.debug("prevMem: %s", prevMem)
-        if prevMem != mem:
+        if prevMem != str(mem):
             partition_dom = rest_conn.updateMem(partition_dom, str(mem))
             difference = True
 
@@ -498,7 +512,7 @@ Setting proc units is not supported")
         else:
             if sharing_mode not in ['capped', 'uncapped']:
                 module.fail_json(msg="Given sharing mode is not supported with shared processor configuration")
-        if prevSharingMode != sharing_mode:
+        if prevSharingMode != str(sharing_mode):
             logger.debug("sharing_mode: %s", sharing_mode)
             partition_dom = rest_conn.updateProcSharingMode(partition_dom, sharing_mode)
             difference = True
@@ -511,7 +525,7 @@ Setting proc units is not supported")
             if rest_conn.getProcSharingMode(partition_dom) == 'capped' and \
                     (sharing_mode is None or sharing_mode == 'capped'):
                 module.fail_json(msg="Uncapped weight is not supported in case sharing mode is not uncapped")
-        if prevUncappedWeight != uncapped_weight:
+        if prevUncappedWeight != str(uncapped_weight):
             partition_dom = rest_conn.updateProcUncappedWeight(partition_dom, str(uncapped_weight))
             difference = True
 
@@ -597,6 +611,15 @@ def update_pv(module, params):
     lpar_id = ""
     counter = 0
     changed = False
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -693,6 +716,15 @@ def update_npiv(module, params):
     counter = 0
     changed = False
 
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
+
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
     except Exception as error:
@@ -787,6 +819,15 @@ def update_vod(module, params):
     lpar_id = ""
     counter = 0
     changed = False
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+
+    if re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)

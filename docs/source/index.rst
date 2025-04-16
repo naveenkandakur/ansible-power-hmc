@@ -58,13 +58,14 @@ This Ansible collection is maintained by the IBM Power HMC development team.
    quickstart
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
    :caption: References
    :hidden:
 
    modules
    plugins
    playbooks
+   roles
    demo
 
 .. toctree::

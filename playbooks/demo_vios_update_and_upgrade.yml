@@ -1,0 +1,55 @@
+- name: Demonstration of upgrading the VIOS version to 4.1.0.10 and then updating the minor patch version 4.1.0.21
+  hosts: hmcs
+  connection: local
+  vars:
+      curr_hmc_auth:
+          username: hscroot
+          password: !vault |
+              $ANSIBLE_VAULT;1.1;AES256
+              34656335616165343966323739633761653065346138623233633764353636373063313736373563
+              6130373162376464666634363734303164396364656535350a663661636663323434386466383634
+              63323432303833643864396130393133346666336661346432356433353035663038643833373332
+              3664333762656138640a306539363765343261383363346532643639383938656434333564323139
+              6365
+
+  tasks:
+      - name: Get the current version of VIOS
+        ibm.power_hmc.vios_update_upgrade:
+            hmc_host: '{{ inventory_hostname }}'
+            hmc_auth: '{{ curr_hmc_auth }}'
+            attributes:
+                vios_name: <vios-name>
+                system_name: <system-name>
+            state: facts
+
+      - name: Upgarde the VIOS version from 3.1.0.21 to 4.1.0.10 using a VIOS update image from NFS
+        ibm.power_hmc.vios_update_upgrade:
+            hmc_host: '{{ inventory_hostname }}'
+            hmc_auth: '{{ curr_hmc_auth }}'
+            attributes:
+                repository: nfs
+                system_name: <system-name>
+                vios_name: <vios-name>
+                host_name: <nfs server>
+                mount_loc: /extras/viosimages
+                options: 4
+                files:
+                    - dvdimage.v1.iso
+                disks:
+                    - hdisk5
+            state: upgraded
+
+      - name: Update the VIOS version to 4.1.0.21 using a VIOS update image from NFS
+        ibm.power_hmc.vios_update_upgrade:
+            hmc_host: '{{ inventory_hostname }}'
+            hmc_auth: '{{ curr_hmc_auth }}'
+            attributes:
+                repository: nfs
+                system_name: <system-name>
+                vios_name: <vios-name>
+                host_name: <nfs server>
+                mount_loc: /extras/viosimages
+                directory: vios/update/VIOS_FP_3.1.3.14
+                files:
+                    - H06412454.iso
+            state: updated

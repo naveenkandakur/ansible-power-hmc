@@ -13,7 +13,7 @@ jobs:
   # generate doc files
   ########################################################################
   gen-doc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -41,10 +41,9 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: hmc-doc-artifact
-        path: ./docs/build 
-
+        path: ./docs/build
   deploy-doc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: gen-doc
     environment:
       name: github-pages

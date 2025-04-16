@@ -38,7 +38,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system.
+            - The name or mtms (machine type model serial) of the managed system.
         required: true
         type: str
     repository:
@@ -116,24 +116,24 @@ EXAMPLES = r'''
   ibm.power_hmc.firmware_update:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
       system_name: <System name/mtms>
       state: updated
 
 - name: Upgrade system to specific level at an sftp repo.
   firmware_update:
-    hmc_host: '{{ inventory_hostname }}'
-    hmc_auth: '{{ curr_hmc_auth }}'
-    system_name: <System name/mtms>
-    repository: sftp
-    remote_repo:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth: '{{ curr_hmc_auth }}'
+      system_name: <System name/mtms>
+      repository: sftp
+      remote_repo:
       hostname: 9.3.147.210
       userid: <user>
       passwd: <password>
       directory: /repo/images/
-    level: 01VL941_047
-    state: upgraded
+      level: 01VL941_047
+      state: upgraded
 '''
 
 RETURN = r'''

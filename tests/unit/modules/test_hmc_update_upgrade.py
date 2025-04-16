@@ -13,186 +13,186 @@ test_data = [
 
     # All SFTP related testdata
     # host name is missed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
-      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
+      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'hostname' is missing"),
 
     # userid is missed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'userid' is missing"),
 
     # passwd and sshkey_file is missing
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'passwd' or 'sshkey_file' is missing"),
 
     # passwd and sskjey information passed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'passwd': "password_value", 'sshkey_file': "None", 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'passwd': "password_value", 'sshkey_file': "None", 'ptf': None, 'restart': None}},
      "ParameterError: conflicting parameters 'passwd' and 'sshkey_file'. Provide any one"),
 
     # mount_location are mentioned in sftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: mount_location"),
 
     # ptf are mentioned in sftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': None, 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': 'data', 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': None, 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': 'data', 'restart': None}},
      "ParameterError: unsupported parameter: ptf"),
 
     # build_file is not mentioned in sftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': None, 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'sftp', 'build_file': None, 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'build_file' is missing"),
 
     # All FTP related testdata
     # host name is missed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
-      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
+      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'hostname' is missing"),
 
     # userid is missed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'userid' is missing"),
 
     # passwd is missing
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'data', 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'data', 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'passwd' is missing"),
 
     # mount_location are mentioned in ftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: mount_location"),
 
     # ptf are mentioned in ftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': None, 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': 'data', 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': None, 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': 'data', 'restart': None}},
      "ParameterError: unsupported parameter: ptf"),
 
     # hostname is not mentioned in ftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
-      'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
+      'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'hostname' is missing"),
 
     # build_file is not mentioned in ftp
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': None, 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ftp', 'build_file': None, 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'build_file' is missing"),
 
     # All NFS related testdata
     # host name is missed
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
-      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
+      'userid': 'data', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'hostname' is missing"),
 
     # userid is mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0', \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0',
       'mount_location': 'data', 'userid': 'data', 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: userid"),
 
     # password is mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: passwd"),
 
     # sshkey_file is mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': 'data', 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': 'data', 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: sshkey_file"),
 
     # mount location is missing in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': None, 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': None, 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'mount_location' is missing"),
 
     # ptf is mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': 'data', 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': 'data', 'restart': None}},
      "ParameterError: unsupported parameter: ptf"),
 
     # hostname is not mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
-      'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
+      'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'hostname' is missing"),
 
     # build_file is not mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': None, 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfs', 'build_file': None, 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': 'test', 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'build_file' is missing"),
 
     # All disk related testdata
     # host name is mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': None, 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': None, 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: unsupported parameter: hostname"),
 
     # userid is mentioned in nfs
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None,
       'userid': 'data', 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, "ParameterError: unsupported parameter: userid"),
 
     # password is mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None,
       'userid': None, 'passwd': 'data', 'sshkey_file': None, 'ptf': None, 'restart': None}}, "ParameterError: unsupported parameter: passwd"),
 
     # sshkey_file is mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None,
       'userid': None, 'passwd': None, 'sshkey_file': 'data', 'ptf': None, 'restart': None}}, "ParameterError: unsupported parameter: sshkey_file"),
 
     # mount location is mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': 'data', \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': 'data',
       'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, "ParameterError: unsupported parameter: mount_location"),
 
     # ptf is mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': 'path', 'hostname': None, 'mount_location': None,
       'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': 'data', 'restart': None}}, "ParameterError: unsupported parameter: ptf"),
 
     # build_file is not mentioned in disk
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': None, 'hostname': None, 'mount_location': None, \
-      'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'disk', 'build_file': None, 'hostname': None, 'mount_location': None,
+      'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: mandatory parameter 'build_file' is missing"),
 
     # All ibmwebsite related testdata
     # host name is mentioned in ibmwebsite
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': '0.0.0.0', \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': '0.0.0.0',
       'mount_location': None, 'userid': None, 'passwd': None, 'sshkey_file': None, 'build_file': None, 'restart': None}},
      "ParameterError: unsupported parameter: hostname"),
 
     # userid is mentioned in ibmwebsite
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None,
       'userid': 'data', 'passwd': None, 'sshkey_file': None, 'build_file': None, 'restart': None}}, "ParameterError: unsupported parameter: userid"),
 
     # password is mentioned in ibmwebsite
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None,
       'userid': None, 'passwd': 'data', 'sshkey_file': None, 'build_file': None, 'restart': None}}, "ParameterError: unsupported parameter: passwd"),
 
     # sshkey_file is mentioned in ibmwebiste
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': None,
       'userid': None, 'passwd': None, 'sshkey_file': 'data', 'build_file': None, 'restart': None}}, "ParameterError: unsupported parameter: sshkey_file"),
 
     # mount location is mentioned in ibmwebsite
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': 'data', \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': 'data', 'hostname': None, 'mount_location': 'data',
       'userid': None, 'passwd': None, 'sshkey_file': None, 'build_file': None, 'restart': None}}, "ParameterError: unsupported parameter: mount_location"),
 
     # ptf is not mentioned in ibmwebsite
-    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': None, 'hostname': None, 'mount_location': None, \
-      'userid': None, 'passwd': None, 'sshkey_file': None, 'build_file': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'ibmwebsite', 'ptf': None, 'hostname': None, 'mount_location': None,
+      'userid': None, 'passwd': None, 'sshkey_file': None, 'build_file': None, 'restart': None}},
      "ParameterError: mandatory parameter 'ptf' is missing"),
 
     # unsupported location_type
-    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfssed', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'nfssed', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: not supporting the location_type option: 'nfssed'"),
 
-    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'usb', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'usb', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: not supporting the option 'usb'"),
 
-    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'dvd', 'build_file': 'path', 'hostname': '0.0.0.0', \
-      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}}, \
+    ({'hmc_host': "0.0.0.10", 'hmc_auth': hmc_auth, 'build_config': {'location_type': 'dvd', 'build_file': 'path', 'hostname': '0.0.0.0',
+      'mount_location': 'data', 'userid': None, 'passwd': None, 'sshkey_file': None, 'ptf': None, 'restart': None}},
      "ParameterError: not supporting the option 'dvd'")]
 
 facts_test_data = [({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'build_config': None}, ""),

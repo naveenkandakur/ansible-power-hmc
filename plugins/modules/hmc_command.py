@@ -57,8 +57,8 @@ EXAMPLES = '''
   hmc_command:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     cmd: <cmd>
 '''
 

@@ -79,7 +79,13 @@ test_data6 = [
      "ParameterError: mandatory parameter 'system_name' is missing"),
     # when mertrics is mssing
     ({'hmc_host': "0.0.0.0", 'hmc_auth': hmc_auth, 'action': 'enable_pcm', 'state': None, 'system_name': "system_name", 'metrics': None},
-     "ParameterError: mandatory parameter 'metrics' is missing")]
+     "ParameterError: mandatory parameter 'metrics' is missing"),
+    # when hostname is misssing for pcm facts
+    ({'hmc_host': None, 'hmc_auth': hmc_auth, 'action': None, 'state': 'pcm_facts', 'system_name': "system_name", 'metrics': None},
+     "ParameterError: mandatory parameter 'hmc_host' is missing"),
+    # when system_name is misssing for pcm facts
+    ({'hmc_host': '0.0.0.0', 'hmc_auth': hmc_auth, 'action': None, 'state': 'pcm_facts', 'system_name': None, 'metrics': None},
+     "ParameterError: mandatory parameter 'system_name' is missing")]
 
 
 def common_mock_setup(mocker):

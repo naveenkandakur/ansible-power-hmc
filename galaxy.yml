@@ -7,7 +7,7 @@ namespace: ibm
 name: power_hmc
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 1.9.0
+version: 1.11.0
 
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
@@ -16,9 +16,9 @@ readme: README.md
 # A list of the collection's content authors. Can be just the name or in the format 'Full Name <email> (url)
 # @nicks:irc/im.site#channel'
 authors:
-- Anil Vijayan (@AnilVijayan)
-- Navinakumar Kandakur (@nkandak1)
-
+  - Anil Vijayan (@AnilVijayan)
+  - Navinakumar Kandakur (@nkandak1)
+  - Sreenidhi S (@sreenidhi.s01)
 
 ### OPTIONAL but strongly recommended
 
@@ -27,7 +27,7 @@ description: Ansible Content for IBM Power HMCs - to manage configurations of Po
 
 # Collection License
 license:
-- GPL-3.0-only
+  - GPL-3.0-only
 
 # Collection Tags
 tags: [infrastructure, ibm, power, hmc]
@@ -48,8 +48,8 @@ issues: https://github.com/IBM/ansible-power-hmc/issues
 
 # Files to ignore when building power_hmc collection
 build_ignore:
-- builds
-- devops
-- docs/images
-- docs/source/demo.rst
-- '*.tar.gz'
+  - builds
+  - devops
+  - docs/images
+  - docs/source/demo.rst
+  - '*.tar.gz'

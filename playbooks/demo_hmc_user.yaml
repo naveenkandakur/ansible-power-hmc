@@ -10,7 +10,7 @@
   tasks:
       - name: Read the yaml file and assign its content to a variable
         ansible.builtin.include_vars:
-            file: hmc_users_input.yaml
+            file: vars/hmc_users_input.yaml
             name: userslist
 
       - name: Create Users by reading the user detail from yaml input file

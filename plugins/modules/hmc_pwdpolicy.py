@@ -131,8 +131,8 @@ EXAMPLES = '''
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     policy_type: status
     state: facts
 
@@ -140,8 +140,8 @@ EXAMPLES = '''
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     policy_name: dummy
     state: present
     policy_config:
@@ -150,20 +150,20 @@ EXAMPLES = '''
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     policy_name: dummy
     policy_config:
-       pwage: 80
-       hist_size: 12
+      pwage: 80
+      hist_size: 12
     state: modified
 
 - name: activate the password policy
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     policy_name: dummy
     state: activated
 
@@ -171,16 +171,16 @@ EXAMPLES = '''
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     state: deactivated
 
 - name: remove the password policy
   hmc_pwdpolicy:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
-         username: '{{ ansible_user }}'
-         password: '{{ hmc_password }}'
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
     policy_name: dummy
     state: absent
 '''

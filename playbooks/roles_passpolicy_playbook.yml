@@ -1,0 +1,24 @@
+---
+# Main playbook for HMC Password policy Management
+- name: Create/update/apply a password policy, and modify the credentials of the local power HMC users if desired
+  hosts: hmcs
+  connection: local
+  gather_facts: false
+  vars_files:
+    - secrets.yml
+  roles:
+    - role: password_policy
+      vars:
+        password_policy_name: password_policy1
+        password_policy_configs:
+          min_pwage: "3"
+          pwage: "150"
+          min_length: "8"
+          hist_size: "8"
+          warn_pwage: "10"
+          min_digits: "2"
+          min_uppercase_chars: "1"
+          min_lowercase_chars: "2"
+          min_special_chars: "1"
+        password_policy_hmc_username: hscroot
+        password_policy_password_change: true
