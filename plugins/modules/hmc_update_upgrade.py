@@ -31,7 +31,7 @@ description:
     - Upgrades the HMC by obtaining  the required  files  from a remote server or from the HMC hard disk. The files are transferred
       onto a special partition on the HMC hard disk. After the files have been transferred, HMC will boot from this partition
       and perform the upgrade.
-    - Update the HMC from IBM Fix Central website
+    - Update/Upgrade the HMC from IBM Fix Central website
 version_added: 1.0.0
 requirements:
 - Python >= 3
@@ -67,10 +67,11 @@ options:
                     - The type of location which contains the corrective service ISO image.
                       Valid values are C(disk) for the HMC hard disk, C(ftp) for an FTP site,
                       C(sftp) for a secure FTP (SFTP) site, C(nfs) for an NFS file system and
-                      C(ibmwebsite) for update through IBM fixcentral website.
+                      C(ibmwebsite) for an IBM fixcentral website.
                     - When the location type is set to C(disk), first it looks for the C(build_file) in HMC hard disk
                       if it doesn't exist then it looks for C(build_file) in the Ansible Controller node.
-                    - ibmwebsite location type supports only update operation and V10 R2 M1030 release onwards
+                    - C(ibmwebsite) location type supports update operation from V10 R2 M1030 release onwards and upgrade
+                      operation from V10 R3 M1060 release onwards.
                 type: str
                 required: true
                 choices: ['disk', 'ftp', 'sftp', 'nfs', 'ibmwebsite']
