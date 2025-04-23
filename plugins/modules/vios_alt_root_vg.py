@@ -22,8 +22,8 @@ notes:
       To achieve this, the user should create a task role based on hmcsuperadmin with additional permissions,
       including ViosAdminOp, VirtualIOServerCommand and other permissions for managing lpar and cec resources.
       The following example demonstrates the same
-    - Create a task role with following command
-      C(mkaccfg -t taskrole -i name=new_task_role,parent=hmcsuperadmin,
+    - Create a task role with above mentioned additional permissions using following command
+      V(mkaccfg -t taskrole -i name=new_task_role,parent=hmcsuperadmin,
       resources=lpar:ActivateLPAR+CapturePartitionTemplate+ChangeLPARProperty+
       ChangeNPortLogin+ChangeProfileProperty+CloseVTerm+Connect5250VTerm+
       CreateProfile+Delete5250VTerm+DeleteLPAR+DeleteProfile+DisableEnableVirtualEthernet+
