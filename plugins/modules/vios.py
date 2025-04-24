@@ -27,6 +27,9 @@ description:
     - "Installs VIOS"
     - "Displays VIOS information"
     - "Accepts VIOS License"
+    - "List all VIOS Images available in HMC"
+    - "Copy VIOS Images from SFTP/NFS server"
+    - "Delete VIOS Images from HMC"
 version_added: 1.0.0
 options:
     hmc_host:
