@@ -102,7 +102,7 @@ options:
     force:
         description:
             - Forces removal of any existing alternate disk copy on target disks.
-            - valid only for C(state) = I(copy)
+            - valid only for I(state) = C(copy)
         type: bool
         default: False
     state:

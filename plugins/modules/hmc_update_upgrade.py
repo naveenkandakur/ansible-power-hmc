@@ -64,10 +64,12 @@ options:
         suboptions:
             location_type:
                 description:
-                    - The type of location which contains the corrective service ISO image.
-                      Valid values are C(disk) for the HMC hard disk, C(ftp) for an FTP site,
-                      C(sftp) for a secure FTP (SFTP) site, C(nfs) for an NFS file system and
-                      C(ibmwebsite) for an IBM fixcentral website.
+                    - The type of location which contains the corrective service ISO image.Valid values are
+                    - C(disk) for the HMC hard disk
+                    - C(ftp) for an FTP site
+                    - C(sftp) for a secure FTP (SFTP) site
+                    - C(nfs) for an NFS file system and
+                    - C(ibmwebsite) for an IBM fixcentral website
                     - When the location type is set to C(disk), first it looks for the C(build_file) in HMC hard disk
                       if it doesn't exist then it looks for C(build_file) in the Ansible Controller node.
                     - C(ibmwebsite) location type supports update operation from V10 R2 M1030 release onwards and upgrade
@@ -89,13 +91,13 @@ options:
             passwd:
                 description:
                     - The password to use to log in to the remote FTP or SFTP server.
-                      The I(passwd) and I(sshkey) options are mutually exclusive in case if I(location_type=sftp).
-                      This option is only valid when the ISO image is located on a remote FTP or SFTP server.
+                    - The I(passwd) and I(sshkey) options are mutually exclusive in case if I(location_type=sftp).
+                    - This option is only valid when the ISO image is located on a remote FTP or SFTP server.
                 type: str
             sshkey_file:
                 description:
                     - The name of the file that contains the SSH private key.
-                      This option is only valid if I(location_type=sftp).
+                    - This option is only valid if I(location_type=sftp).
                 type: str
             mount_location:
                 description:
@@ -105,22 +107,22 @@ options:
             build_file:
                 description:
                     - The name of the corrective service ISO image file.
-                      This  option  is required when the ISO image is located on any of the following locations HMC hard disk,
-                      Ansible controller node filesystem, remote FTP, SFTP, or NFS server.
-                      During upgrade of the HMC, this option represents the host path where the network install
+                    - This  option  is required when the ISO image is located on any of the following locations HMC hard disk,
+                    - Ansible controller node filesystem, remote FTP, SFTP, or NFS server.
+                    - During upgrade of the HMC, this option represents the host path where the network install
                       image is kept.
-                      During update of the HMC if I(location_type=disk) and ISO image is kept in Ansible controller node or HMC hard disk,
+                    - During update of the HMC if I(location_type=disk) and ISO image is kept in Ansible controller node or HMC hard disk,
                       this option should be provided with the ansible control node path in which ISO file or network install image is kept.
-                      If the path specified contains the ISO file name then that specified ISO file will considered for updation.
-                      If the path specified doesnot contain the ISO file name then the specified folder will be searched for ISO files,
+                    - If the path specified contains the ISO file name then that specified ISO file will considered for updation.
+                    - If the path specified doesnot contain the ISO file name then the specified folder will be searched for ISO files,
                       sorted in alphabetical order and the 1st ISO will be considered for updation.
                 type: str
             ptf:
                 description:
                     - The name of the PTF to install.
-                      This option is required when the ISO image is located on the IBM Fix Central website. Otherwise, this option is not valid.
-                      This option is required only when the location_type is 'ibmwebsite'.
-                      This option is available for HMC versions from V10 R2 M1030 onwards for update and V10 R3 M1060 onwards for upgrade.
+                    - This option is required when the ISO image is located on the IBM Fix Central website. Otherwise, this option is not valid.
+                    - This option is required only when the location_type is 'ibmwebsite'.
+                    - This option is available for HMC versions from V10 R2 M1030 onwards for update and V10 R3 M1060 onwards for upgrade.
                 type: str
     state:
         description:
