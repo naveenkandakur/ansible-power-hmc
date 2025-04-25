@@ -604,7 +604,7 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: '{{ curr_hmc_auth }}'
-      system_name: hmc-zz1
+      system_name: <system_name/mtms>
       vm_name: lpar_no
       proc: 0
       os_type: aix_linux
