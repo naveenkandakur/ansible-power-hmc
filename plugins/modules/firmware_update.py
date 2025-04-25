@@ -128,7 +128,7 @@ EXAMPLES = r'''
       system_name: <System name/mtms>
       repository: sftp
       remote_repo:
-      hostname: 9.3.147.210
+      hostname: <hostname/ip>
       userid: <user>
       passwd: <password>
       directory: /repo/images/

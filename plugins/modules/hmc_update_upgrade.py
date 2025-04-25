@@ -31,7 +31,7 @@ description:
     - Upgrades the HMC by obtaining  the required  files  from a remote server or from the HMC hard disk. The files are transferred
       onto a special partition on the HMC hard disk. After the files have been transferred, HMC will boot from this partition
       and perform the upgrade.
-    - Update the HMC from IBM Fix Central website
+    - Update/Upgrade the HMC from IBM Fix Central website
 version_added: 1.0.0
 requirements:
 - Python >= 3
@@ -64,13 +64,16 @@ options:
         suboptions:
             location_type:
                 description:
-                    - The type of location which contains the corrective service ISO image.
-                      Valid values are C(disk) for the HMC hard disk, C(ftp) for an FTP site,
-                      C(sftp) for a secure FTP (SFTP) site, C(nfs) for an NFS file system and
-                      C(ibmwebsite) for update through IBM fixcentral website.
+                    - The type of location which contains the corrective service ISO image.Valid values are
+                    - C(disk) for the HMC hard disk
+                    - C(ftp) for an FTP site
+                    - C(sftp) for a secure FTP (SFTP) site
+                    - C(nfs) for an NFS file system and
+                    - C(ibmwebsite) for an IBM fixcentral website
                     - When the location type is set to C(disk), first it looks for the C(build_file) in HMC hard disk
                       if it doesn't exist then it looks for C(build_file) in the Ansible Controller node.
-                    - ibmwebsite location type supports only update operation and V10 R2 M1030 release onwards
+                    - C(ibmwebsite) location type supports update operation from V10 R2 M1030 release onwards and upgrade
+                      operation from V10 R3 M1060 release onwards.
                 type: str
                 required: true
                 choices: ['disk', 'ftp', 'sftp', 'nfs', 'ibmwebsite']
@@ -88,13 +91,13 @@ options:
             passwd:
                 description:
                     - The password to use to log in to the remote FTP or SFTP server.
-                      The I(passwd) and I(sshkey) options are mutually exclusive in case if I(location_type=sftp).
-                      This option is only valid when the ISO image is located on a remote FTP or SFTP server.
+                    - The I(passwd) and I(sshkey) options are mutually exclusive in case if I(location_type=sftp).
+                    - This option is only valid when the ISO image is located on a remote FTP or SFTP server.
                 type: str
             sshkey_file:
                 description:
                     - The name of the file that contains the SSH private key.
-                      This option is only valid if I(location_type=sftp).
+                    - This option is only valid if I(location_type=sftp).
                 type: str
             mount_location:
                 description:
@@ -104,22 +107,22 @@ options:
             build_file:
                 description:
                     - The name of the corrective service ISO image file.
-                      This  option  is required when the ISO image is located on any of the following locations HMC hard disk,
-                      Ansible controller node filesystem, remote FTP, SFTP, or NFS server.
-                      During upgrade of the HMC, this option represents the host path where the network install
+                    - This  option  is required when the ISO image is located on any of the following locations HMC hard disk,
+                    - Ansible controller node filesystem, remote FTP, SFTP, or NFS server.
+                    - During upgrade of the HMC, this option represents the host path where the network install
                       image is kept.
-                      During update of the HMC if I(location_type=disk) and ISO image is kept in Ansible controller node or HMC hard disk,
+                    - During update of the HMC if I(location_type=disk) and ISO image is kept in Ansible controller node or HMC hard disk,
                       this option should be provided with the ansible control node path in which ISO file or network install image is kept.
-                      If the path specified contains the ISO file name then that specified ISO file will considered for updation.
-                      If the path specified doesnot contain the ISO file name then the specified folder will be searched for ISO files,
+                    - If the path specified contains the ISO file name then that specified ISO file will considered for updation.
+                    - If the path specified doesnot contain the ISO file name then the specified folder will be searched for ISO files,
                       sorted in alphabetical order and the 1st ISO will be considered for updation.
                 type: str
             ptf:
                 description:
                     - The name of the PTF to install.
-                      This option is required when the ISO image is located on the IBM Fix Central website. Otherwise, this option is not valid.
-                      This option is required only when the location_type is 'ibmwebsite'.
-                      This option is available for HMC versions from V10 R2 M1030 onwards.
+                    - This option is required when the ISO image is located on the IBM Fix Central website. Otherwise, this option is not valid.
+                    - This option is required only when the location_type is 'ibmwebsite'.
+                    - This option is available for HMC versions from V10 R2 M1030 onwards for update and V10 R3 M1060 onwards for upgrade.
                 type: str
     state:
         description:
@@ -133,12 +136,14 @@ options:
         description:
             - C(listptf) lists available Hardware Management Console (HMC) updates from the IBM Fix Central website.
             - This option is available for HMC versions from V10 R2 M1030 onwards
+            - C(listupg) lists available Hardware Management Console (HMC) upgrades from the IBM Fix Central website.
+            - This option is available for HMC versions from V10 R3 M1060 onwards
         type: str
-        choices: ['listptf']
+        choices: ['listptf', 'listupg']
 '''
 
 EXAMPLES = '''
-- name: List the HMC current build level
+- name: List the Power HMC current build level
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -146,7 +151,7 @@ EXAMPLES = '''
           password: '{{ hmc_password }}'
       state: facts
 
-- name: Update the HMC to the V10R2M1040 build level from nfs location
+- name: Update the Power HMC to the V10R2M1040 build level from nfs location
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -159,7 +164,7 @@ EXAMPLES = '''
           mount_location: /HMCImages
       state: updated
 
-- name: Update the HMC to the V10R2M1041 build level from sftp location
+- name: Update the Power HMC to the V10R2M1041 build level from sftp location
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -173,7 +178,7 @@ EXAMPLES = '''
           build_file: /Images/MF71190-10.2.1041.0-2308160028-x86_64.iso
       state: updated
 
-- name: List all the available ptfs
+- name: List all the available ptfs for update
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -181,7 +186,7 @@ EXAMPLES = '''
           password: '{{ hmc_password }}'
       action: listptf
 
-- name: Update the HMC to the V10R2M1041(ifix) build level from ibmwebsite
+- name: Update the Power HMC to the V10R2M1041(ifix) build level from ibmwebsite
   hmc_update_upgrade:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -191,6 +196,47 @@ EXAMPLES = '''
           location_type: ibmwebsite
           ptf: vMF71409
       state: updated
+
+- name: Upgrade Power HMC to the mentioned PTF level using the image obtained from ibmwebsite
+  hmc_update_upgrade:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth: '{{ curr_hmc_auth }}'
+      build_config:
+          location_type: ibmwebsite
+          ptf: <ptf>
+      state: upgraded
+
+- name: Upgrade the Power HMC using NFS server
+  hmc_update_upgrade:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth: '{{ curr_hmc_auth }}'
+      build_config:
+          location_type: nfs
+          hostname: <hostname>
+          mount_location: /HMCImages
+          build_file: <build_file_path>
+      state: upgraded
+
+- name: Upgrade the Power HMC using SFTP server
+  hmc_update_upgrade:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth: '{{ curr_hmc_auth }}'
+      build_config:
+          location_type: sftp
+          hostname: <SFTP_Server_IP/Hostname>
+          userid: <SFTP_Server_Username>
+          passwd: <SFTP_Server_Password>
+          build_file: <build_file>
+      state: upgraded
+
+- name: Provide a list of all available image files in ibmwebsite for upgrading Power HMC
+  hmc_update_upgrade:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth:
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      action: listupg
+
 '''
 
 RETURN = '''
@@ -430,6 +476,30 @@ def list_ptf(module, params):
     return changed, ptf_details, None
 
 
+def list_upgrade_files(module, params):
+    hmc_host = params['hmc_host']
+    hmc_user = params['hmc_auth']['username']
+    password = params['hmc_auth']['password']
+    changed = False
+    hmc_conn = None
+    ptf_details = None
+
+    if params['build_config']:
+        raise ParameterError("not supporting build_config option")
+
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+    initial_version_details = hmc.listHMCVersion()
+
+    if int(initial_version_details["SERVICEPACK"]) < 1060:
+        raise VersionError("List upgrade ptf is supported from V10 R3 M1060 version onwards.")
+    else:
+        ptf_details = hmc.listUpgradeFiles('ibmwebsite')
+    if 'No upgrade files available' in ptf_details:
+        return False, {"info": ptf_details}, None
+    return changed, ptf_details, None
+
+
 def upgrade_hmc(module, params):
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
@@ -449,9 +519,6 @@ def upgrade_hmc(module, params):
     command_option_checker(params['build_config'])
 
     locationType = params['build_config']['location_type']
-
-    if locationType == 'ibmwebsite':
-        raise ParameterError("Upgrade through ibmwebsite is not supported ")
 
     if locationType == 'disk':
         is_img_in_hmc = check_image_in_hmc(module, params)
@@ -489,6 +556,12 @@ def upgrade_hmc(module, params):
             otherConfig['-D'] = params['build_config']['build_file']
 
     initial_version_details = hmc.listHMCVersion()
+
+    if locationType == 'ibmwebsite':
+        if int(initial_version_details["SERVICEPACK"]) >= 1060:
+            otherConfig['--PTF'] = params['build_config']['ptf']
+        else:
+            raise VersionError("Upgrade through ibmwebsite supported from V10 R3 M1060 version onwards.")
 
     hmc.getHMCUpgradeFiles(locationType, configDict=otherConfig)
 
@@ -635,6 +708,7 @@ def perform_task(module):
         "facts": facts,
         "upgraded": upgrade_hmc,
         "listptf": list_ptf,
+        "listupg": list_upgrade_files
     }
 
     oper = 'state'
@@ -684,7 +758,7 @@ def run_module():
                           )
                           ),
         state=dict(type='str', choices=['updated', 'upgraded', 'facts']),
-        action=dict(type='str', choices=['listptf'])
+        action=dict(type='str', choices=['listptf', 'listupg'])
     )
 
     module = AnsibleModule(
@@ -695,6 +769,7 @@ def run_module():
                      ['state', 'updated', ['hmc_host', 'hmc_auth', 'build_config']],
                      ['state', 'upgraded', ['hmc_host', 'hmc_auth', 'build_config']],
                      ['action', 'listptf', ['hmc_host', 'hmc_auth']],
+                     ['action', 'listupg', ['hmc_host', 'hmc_auth']],
                      ]
     )
 

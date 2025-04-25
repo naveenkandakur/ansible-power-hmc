@@ -2,6 +2,9 @@
 
 # Copyright: (c) 2018- IBM, Inc
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
     'status': ['preview'],
@@ -413,7 +416,7 @@ def ensure_update_upgrade(module, params):
             raise ParameterError("For remote server repository'image_name' parameter is only required if 'save' option is set to 'true'")
     attributes['files'] = ','.join(attributes['files']) if attributes.get('files') else None
     attributes['disks'] = ','.join(attributes['disks']) if attributes.get('disks') else None
-    attributes['option'] = f'"ver={attributes["option"]}"' if attributes.get('option') else None
+    attributes['option'] = '"ver={}"'.format(attributes["option"]) if attributes.get('option') else None
 
     try:
         hmc.updatevios(module.params['state'], configDict=attributes)
