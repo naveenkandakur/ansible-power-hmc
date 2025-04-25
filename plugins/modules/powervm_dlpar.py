@@ -22,7 +22,10 @@ notes:
     - If the updating of settings for at least one VIOS is successful during the execution of the "update_pv" action,
       the changed status will be displayed as 1, and any failed updates will be shown as warnings.
       This behavior remains consistent for both the "update_npiv" and "update_vod" actions.
-    - Passwordless authentication is not supported
+    - Passwordless authentication is not supported.
+    - If the updating of settings for at least one VIOS is successful during the execution of the "update_pv" action,
+      the changed status will be displayed as 1, and any failed updates will be shown as warnings. This behavior remains
+      consistent for both the "update_npiv" and "update_vod" actions.
 description:
     - "Managing processor resources dynamically"
     - "Managing memory resources dynamically"

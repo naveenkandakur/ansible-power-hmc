@@ -30,12 +30,12 @@ notes:
     - install_settings suboption "location_code" supports AIX installation, "vm_mac" supports Linux installation on LPAR
 description:
     - "Creates AIX/Linux or IBMi partition with specified configuration details on mentioned system"
-    - "Or Deletes specified AIX/Linux or IBMi partition on specified system"
-    - "Or Shutdown specified AIX/Linux or IBMi partition on specified system"
-    - "Or Poweron/Activate specified AIX/Linux or IBMi partition, with provided configuration details on the mentioned system"
-    - "Or Restart specified AIX/Linux or IBMi partition on specified system"
-    - "Or Facts of the specified AIX/Linux or IBMi partition of specified system"
-    - "Or Install of PowerVM Partition"
+    - "Deletes specified AIX/Linux or IBMi partition on specified system"
+    - "Shutdown specified AIX/Linux or IBMi partition on specified system"
+    - "Poweron/Activate specified AIX/Linux or IBMi partition, with provided configuration details on the mentioned system"
+    - "Restart specified AIX/Linux or IBMi partition on specified system"
+    - "Facts of the specified AIX/Linux or IBMi partition of specified system"
+    - "Install of PowerVM Partition"
 
 version_added: "1.2.0"
 requirements:
@@ -604,7 +604,7 @@ EXAMPLES = '''
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth: '{{ curr_hmc_auth }}'
-      system_name: hmc-zz1
+      system_name: <system_name/mtms>
       vm_name: lpar_no
       proc: 0
       os_type: aix_linux
@@ -614,9 +614,9 @@ EXAMPLES = '''
             port_vlan_priority: 6
             allowed_vlanids: ALL
             backing_devices:
-               - location_code: U78D2.001.WZS007V-P1-C11-T2
+               - location_code: <location_code>
                  capacity: 20
-                 hosting_partition: hmc-zz1-vios2
+                 hosting_partition: <vios_name>
       state: present
 '''
 
