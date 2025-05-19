@@ -99,13 +99,15 @@ class Hmc():
         waited = 0
         pingSuccess = False
         while waited < WAIT_UNTIL_IN_SEC:
-            if waited%150 == 0 and waited < WAIT_UNTIL_IN_SEC and None == self.hmcconn.pwd:
+            # Check the hmc status using 'SSH' every 5th interval only in password less authentication
+            if waited%150 == 0 and None == self.hmcconn.pwd:
                 ssh_state = self.sshTest(self.hmcconn.ip, self.hmcconn.user)
                 logger.debug(ssh_state)
-                if "Alive" in ssh_state and rebootStarted:
+                if "Alive" in ssh_state
                     logger.debug("SSH Alive")
                     pingSuccess = True
                     break
+
             ping_state = self.pingTest(self.hmcconn.ip)
             if "Alive" in ping_state and rebootStarted:
                 logger.debug("Alive")
