@@ -285,3 +285,22 @@ Notes
 
 .. _GitHub v1.11.0:
    https://github.com/IBM/ansible-power-hmc/releases/download/v1.11.0/ibm-power_hmc-1.11.0.tar.gz
+
+Version 1.12.0
+-------------
+Notes
+  * hmc_update_upgrade: Support for HMC upgrade through ibmwebsite(IBM Fixcentral website) and listing available upgrade images (Issue: #103)
+  * vios_alt_root_vg: Support for copying the root vg content to alternate disk and clean up existing alternate disk
+  * powervm_dlpar: Support for idempotency across all actions (Issues: #135 , #111)
+  * powervm_lpar_instance: Support for configuring advanced VNIC settings in lpar creation (Issue: #147)
+  * powervm_inventory: Fix for password reveal issue in warning message (Issue: #148)
+
+  Availability
+    * `Galaxy v1.12.0`_
+    * `GitHub v1.12.0`_
+
+.. _Galaxy v1.12.0:
+   https://galaxy.ansible.com/download/ibm-power_hmc-1.12.0.tar.gz
+
+.. _GitHub v1.12.0:
+   https://github.com/IBM/ansible-power-hmc/releases/download/v1.12.0/ibm-power_hmc-1.12.0.tar.gz

@@ -30,12 +30,12 @@ notes:
     - install_settings suboption "location_code" supports AIX installation, "vm_mac" supports Linux installation on LPAR
 description:
     - "Creates AIX/Linux or IBMi partition with specified configuration details on mentioned system"
-    - "Or Deletes specified AIX/Linux or IBMi partition on specified system"
-    - "Or Shutdown specified AIX/Linux or IBMi partition on specified system"
-    - "Or Poweron/Activate specified AIX/Linux or IBMi partition, with provided configuration details on the mentioned system"
-    - "Or Restart specified AIX/Linux or IBMi partition on specified system"
-    - "Or Facts of the specified AIX/Linux or IBMi partition of specified system"
-    - "Or Install of PowerVM Partition"
+    - "Deletes specified AIX/Linux or IBMi partition on specified system"
+    - "Shutdown specified AIX/Linux or IBMi partition on specified system"
+    - "Poweron/Activate specified AIX/Linux or IBMi partition, with provided configuration details on the mentioned system"
+    - "Restart specified AIX/Linux or IBMi partition on specified system"
+    - "Facts of the specified AIX/Linux or IBMi partition of specified system"
+    - "Install of PowerVM Partition"
 
 version_added: "1.2.0"
 requirements:
@@ -372,34 +372,34 @@ options:
             allowed_vlanids:
                 description:
                     - Setting controls whether the virtual NIC accepts packets with any VLAN ID.
-                    - Value can be All, None, comma-sepearted VLAN IDs.
-                    - For comma-seperated VLAN IDs values should be between 2 and 4094.
+                    - Value can be C(All), C(None), C(comma-sepearted VLAN IDs).
+                    - For comma-separated VLAN IDs values should be between 2 and 4094.
                     - Maximum number of VLAN IDs that can be provided is 20.
-                    - Default value is All.
-                    - If the value is set to All, then allowed_macaddr should also be All.
-                    - If the value is set to None, then allowed_macaddr should also be None.
+                    - Default value is C(All).
+                    - The value of allowed_vlanids should match the setting if set to C(All), allowed_macaddr should also be C(All)
+                      and if set to C(None), allowed_macaddr should be either C(None) or C(comma-sepearted Mac-addresses).
                 type: str
             allowed_macaddr:
                 description:
                     - Setting controls whether the virtual NIC accepts packets with any valid MAC Address.
-                    - Value can be All, None, comma-sepearted MAC Addresses.
+                    - Value can be C(All), C(None), C(comma-sepearted VLAN IDs).
                     - Maximum number of MAC Addresses that can be provided is 4.
-                    - Default value is All.
-                    - If the value is set to All, then allowed_vlanids should also be All.
-                    - If the value is set to None, then allowed_vlanids should also be None.
+                    - Default value is C(All).
+                    - The value of allowed_macaddr should match the setting if set to C(All), allowed_vlanids should also be C(All)
+                      and if set to C(None), allowed_vlanids should be either C(None) or C(comma-sepearted VLAN IDs).
                 type: str
             port_vlan_id:
                 description:
                     - Specify a Port VLAN ID that is within the valid range for the SR-IOV physical port that is selected for the backing device.
                     - The Port VLAN ID field is displayed only if the SR-IOV physical port supports a port VLAN ID.
-                    - Value should be 0 or should range between 2 and 4094.
-                    - Default value is 0.
+                    - Value should be C(0) or should range between C(2 and 4094).
+                    - Default value is C(0).
                 type: int
             port_vlan_priority:
                 description:
                     - Specified to prioritize the frames in a VLAN network.
-                    - Value can be between 0 and 7.
-                    - Default vale is 0.
+                    - Value can be between C(0 and 7).
+                    - Default value is C(0).
                 type: int
             backing_devices:
                 description:
@@ -599,6 +599,25 @@ EXAMPLES = '''
           nim_subnetmask: <Subnetmask IP_Address>
           vm_mac: <mac address of lpar>
       action: install_os
+
+- name: Create an AIX/Linux logical partition instance with allowed_vlanids,port_vlan_priority
+  powervm_lpar_instance:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth: '{{ curr_hmc_auth }}'
+      system_name: <system_name/mtms>
+      vm_name: lpar_no
+      proc: 0
+      os_type: aix_linux
+      vnic_config:
+          - vnic_adapter_id: 5
+            port_vlan_id: 5
+            port_vlan_priority: 6
+            allowed_vlanids: ALL
+            backing_devices:
+               - location_code: <location_code>
+                 capacity: 20
+                 hosting_partition: <vios_name>
+      state: present
 '''
 
 RETURN = '''
