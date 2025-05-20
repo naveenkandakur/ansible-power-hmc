@@ -71,7 +71,7 @@ class Hmc():
     def sshTest(self, i_host, u_host):
         pattern = re.compile(r"Alive")
         report = ("No response", "Alive")
-        if None == u_host:
+        if None is u_host:
             cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + i_host.strip() + " echo 'Alive'"
         else:
             cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + u_host.strip() + "@" + i_host.strip() + " echo 'Alive'"
@@ -100,7 +100,7 @@ class Hmc():
         pingSuccess = False
         while waited < WAIT_UNTIL_IN_SEC:
             # Check the hmc status using 'SSH' every 5th interval only in password less authentication
-            if waited%150 == 0 and None == self.hmcconn.pwd and rebootStarted:
+            if waited%150 == 0 and None is self.hmcconn.pwd and rebootStarted:
                 ssh_state = self.sshTest(self.hmcconn.ip, self.hmcconn.user)
                 logger.debug(ssh_state)
                 if "Alive" in ssh_state:
