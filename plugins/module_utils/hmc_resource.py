@@ -99,7 +99,8 @@ class Hmc():
         waited = 0
         pingSuccess = False
         while waited < WAIT_UNTIL_IN_SEC:
-            # Check the hmc status using 'SSH' every 5th interval only in password less authentication
+            # This section of code is used when the ICMP is disabled HMC and this confirms
+            # HMC active status by SSHing to it and this routine works only in case of password less authentication
             if waited % 150 == 0 and None is self.hmcconn.pwd and rebootStarted:
                 ssh_state = self.sshTest(self.hmcconn.ip, self.hmcconn.user)
                 logger.debug(ssh_state)
