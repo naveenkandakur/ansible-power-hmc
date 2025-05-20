@@ -60,6 +60,7 @@ class HmcCommandStack():
                'RMVIOSIMG': 'rmviosimg',
                'UPDVIOS': 'updvios',
                'UPGVIOS': 'upgvios',
+               'VIOSECURE': 'viosecure',
                }
 
     HMC_CMD_OPT = {'LSHMC': {'-N': ' -n ',
@@ -490,7 +491,18 @@ class HmcCommandStack():
                                '--OPTIONS': ' --options ',
                                '--RESTART': ' --restart ',
                                '--SAVE': ' --save ',
-                               '--DISK': ' --disk '}
+                               '--DISK': ' --disk '},
+                   'VIOSECURE': {'-LEVEL': ' -level ',
+                                 '-APPLY': ' -apply ',
+                                 '-RULE': ' -rule ',
+                                 '-FILE': ' -file ',
+                                 '-FIREWALL': ' -firewall ',
+                                 '-PORT': ' -port ',
+                                 '-IPV6': ' -ip6 ',
+                                 '-INTERFACE': ' -interface ',
+                                 '-REMOTE': ' -remote ',
+                                 '-ADDRESS': ' -address ',
+                                 '-TIMEOUT': ' -timeout '}
                    }
 
     def filterBuilder(self, cmdKey, configOptionsDict):
