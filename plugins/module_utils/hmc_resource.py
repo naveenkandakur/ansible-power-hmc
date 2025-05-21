@@ -68,13 +68,10 @@ class Hmc():
 
         return result
 
-    def sshTest(self, i_host, u_host):
+    def sshTest(self, i_host):
         pattern = re.compile(r"Alive")
         report = ("No response", "Alive")
-        if None is u_host:
-            cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + i_host.strip() + " echo 'Alive'"
-        else:
-            cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + u_host.strip() + "@" + i_host.strip() + " echo 'Alive'"
+        cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + u_host.strip() + "@" + i_host.strip() + " echo 'Alive'"
 
         result = report[0]
         with subprocess.Popen(cmd, shell=True, executable="/bin/bash",
@@ -102,7 +99,7 @@ class Hmc():
             # This section of code is used when the ICMP is disabled HMC and this confirms
             # HMC active status by SSHing to it and this routine works only in case of password less authentication
             if waited % 150 == 0 and None is self.hmcconn.pwd and rebootStarted:
-                ssh_state = self.sshTest(self.hmcconn.ip, self.hmcconn.user)
+                ssh_state = self.sshTest(self.hmcconn.ip)
                 logger.debug(ssh_state)
                 if "Alive" in ssh_state:
                     logger.debug("SSH Alive")
