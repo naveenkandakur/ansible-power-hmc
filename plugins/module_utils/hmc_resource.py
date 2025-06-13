@@ -68,6 +68,26 @@ class Hmc():
 
         return result
 
+    def sshTest(self, i_host, u_host):
+        pattern = re.compile(r"Alive")
+        report = ("No response", "Alive")
+        cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + u_host.strip() + "@" + i_host.strip() + " echo 'Alive'"
+
+        result = report[0]
+        with subprocess.Popen(cmd, shell=True, executable="/bin/bash",
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE) as proc:
+
+            stdout_value, stderr_value = proc.communicate()
+            if isinstance(stdout_value, bytes):
+                stdout_value = stdout_value.decode('ascii')
+
+            igot = re.findall(pattern, stdout_value)
+            if igot:
+                result = report[1]
+
+        return result
+
     def checkHmcUpandRunning(self, rebootStarted=False, timeoutInMin=12):
         POLL_INTERVAL_IN_SEC = 30
         WAIT_UNTIL_IN_SEC = timeoutInMin * 60
@@ -76,8 +96,17 @@ class Hmc():
         waited = 0
         pingSuccess = False
         while waited < WAIT_UNTIL_IN_SEC:
-            ping_state = self.pingTest(self.hmcconn.ip)
+            # This section of code is used when the ICMP is disabled HMC and this confirms
+            # HMC active status by SSHing to it and this routine works only in case of password less authentication
+            if waited % 150 == 0 and None is self.hmcconn.pwd and rebootStarted:
+                ssh_state = self.sshTest(self.hmcconn.ip, self.hmcconn.user)
+                logger.debug(ssh_state)
+                if "Alive" in ssh_state:
+                    logger.debug("SSH Alive")
+                    pingSuccess = True
+                    break
 
+            ping_state = self.pingTest(self.hmcconn.ip)
             if "Alive" in ping_state and rebootStarted:
                 logger.debug("Alive")
                 pingSuccess = True
