@@ -846,6 +846,8 @@ class Hmc():
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
         raw_result = raw_result.replace("Power Off", "Off")
+        raw_result = raw_result.replace("No Connection", "No_Connection")
+        raw_result = raw_result.replace("Version Mismatch", "Version_Mismatch")
         lines = raw_result.split()
 
         return lines

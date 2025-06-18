@@ -1121,11 +1121,11 @@ def create_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
-            system_name = hmc.getSystemNameFromMTMS(system_name)
+           system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
+           return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1377,11 +1377,11 @@ def remove_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
-            system_name = hmc.getSystemNameFromMTMS(system_name)
+           system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
+           return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1462,11 +1462,11 @@ def poweroff_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
-            system_name = hmc.getSystemNameFromMTMS(system_name)
+           system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
+           return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1550,11 +1550,12 @@ def poweron_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
-            system_name = hmc.getSystemNameFromMTMS(system_name)
+           system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
+           return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
@@ -1728,11 +1729,11 @@ def partition_details(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
-            system_name = hmc.getSystemNameFromMTMS(system_name)
+           system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
+           return changed, repr(on_system_error), None
 
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
