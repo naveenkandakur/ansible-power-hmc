@@ -356,6 +356,28 @@ class HmcRestClient:
         uuid = managedsystem_root.xpath("//AtomID")[0].text
         return uuid, managedsystem_root.xpath("//ManagedSystem")[0]
 
+    def getManagementConsole(self):
+        url = f"https://{self.hmc_ip}/rest/api/uom/ManagementConsole"
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/json'}
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            if resp.code == 204:
+                logger.error("Request failed. Response code: %d", resp.code)
+                return None
+            response = json.loads(resp.read())
+            managementConsoleLink = response['feed']['ManagementConsoleLink']
+            managementConsole_uuid = managementConsoleLink.split('/')[-1]
+            return managementConsole_uuid
+        except Exception as e:
+            logger.error("ManagementConsole request failed: %s", str(e))
+            return None
+
     def getManagedSystems(self):
         url = "https://{0}/rest/api/uom/ManagedSystem".format(self.hmc_ip)
         header = {'X-API-Session': self.session,
@@ -2153,3 +2175,463 @@ class HmcRestClient:
         logger.debug("POST RESPONSE: \n %s", response)
         post_response = xml_strip_namespace(response)
         return post_response
+
+    def LicReadinessCheck(self, system_uuid, system_name):
+        url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/LICReadiness"
+        logger.info("In LICReadiness check")
+
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
+
+        payload = {
+            "JobRequest": {
+                "Metadata": {
+                    "Atom": ""
+                },
+                "RequestedOperation": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "OperationName": "LICReadiness",
+                    "GroupName": "ManagedSystem"
+                },
+                "JobParameters": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "JobParameter": [
+                        {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "managedSystem",
+                            "ParameterValue": f"{system_name}"
+                        },
+                        {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "operation",
+                            "ParameterValue": "k"
+                        }
+                    ]
+                }
+            }
+        }
+
+        timeout_in_sec = 3600
+
+        try:
+            resp = open_url(
+                url,
+                headers=header,
+                method='PUT',
+                data=json.dumps(payload),
+                validate_certs=False,
+                timeout=timeout_in_sec
+            )
+
+            if resp.code != 200:
+                logger.debug("LICReadiness failed. Response code: %d", resp.code)
+                return None
+
+            response = json.loads(resp.read())
+            logger.info(f"first {response}")
+            job_url = response['entry']['selfLink']
+            logger.info(f"job url {job_url}")
+            response = self._check_job_status_and_wait(job_url)
+            status = response['entry']['content']['JobResponse']['Status']
+            result = response['entry']['content']['JobResponse']['Result']
+            logger.info(f'response {status}')
+            return status, result
+
+        except Exception as e:
+            logger.error("LICReadiness request failed: %s", str(e))
+            return None
+
+    def LicQueryLevel(self, system_uuid, system_name, type):
+        url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/LICQueryLevel"
+
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
+
+        timeout_in_sec = 3600
+        job_result_dict = {}
+
+        try:
+            job_params = [
+                {
+                    "Metadata": {"Atom": ""},
+                    "ParameterName": "managedSystem",
+                    "ParameterValue": system_name
+                },
+                {
+                    "Metadata": {"Atom": ""},
+                    "ParameterName": "type",
+                    "ParameterValue": type
+                }
+            ]
+
+            if type == "io":
+                job_params += [
+                    {
+                        "Metadata": {"Atom": ""},
+                        "ParameterName": "attributes",
+                        "ParameterValue": "partition,logical_device,mtms,location_code,current_level,device"
+                    },
+                    {
+                        "Metadata": {"Atom": ""},
+                        "ParameterName": "filter",
+                        "ParameterValue": "os=vios"
+                    }
+                ]
+
+            payload = {
+                "JobRequest": {
+                    "Metadata": {"Atom": ""},
+                    "RequestedOperation": {
+                        "Metadata": {"Atom": ""},
+                        "OperationName": "LICQueryLevel",
+                        "GroupName": "ManagedSystem"
+                    },
+                    "JobParameters": {
+                        "Metadata": {"Atom": ""},
+                        "JobParameter": job_params
+                    }
+                }
+            }
+
+            resp = open_url(
+                url,
+                headers=header,
+                method='PUT',
+                data=json.dumps(payload),
+                validate_certs=False,
+                timeout=timeout_in_sec
+            )
+
+            if resp.code != 200:
+                logger.debug(f"LICQueryLevel failed for type {type}. Response code: {resp.code}")
+                return {}
+
+            response = json.loads(resp.read())
+            job_url = response['entry']['selfLink']
+            logger.info(f"job url for type {type}: {job_url}")
+            response = self._check_job_status_and_wait(job_url)
+            result = response['entry']['content']['JobResponse']['Result']
+            status = response['entry']['content']['JobResponse']['Status']
+
+            value = ''
+            for output in result:
+                if status == 'COMPLETED_WITH_ERROR':
+                    if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                        value = output
+                        return value
+                if output.get('ParameterName') == 'JOBRESULT_KEY_OUTPUT':
+                    value = output.get('ParameterValue')
+                    break
+
+            if type == 'sriov':
+                if 'No results' in value:
+                    adapter_id = value
+                else:
+                    adapter_id = [int(dict(item.split("=", 1) for item in line.split(","))["adapter_id"])
+               for line in value.strip().split("\n")]
+                job_result_dict["SRIOVAdapterUpdate"] = {"AdapterID": adapter_id}
+            elif type == 'io':
+                if 'No results' in value:
+                    IOAdapterUpdate = value
+                else:
+                    logger.info(f"the IO adapter raw value: {value}")
+                    IOAdapterUpdate = {}
+                    for line in value.splitlines():
+                        parts = line.split(",")
+                        if len(parts) >= 2:
+                            partition_id = parts[0].strip()
+                            device = parts[1].strip()
+                            IOAdapterUpdate.setdefault(partition_id, []).append(device)
+                job_result_dict["IOAdapterUpdate"] = IOAdapterUpdate
+
+            logger.info(f'Final output for type {type}: {job_result_dict}')
+            return job_result_dict
+
+        except Exception as e:
+            logger.error(f"LICQueryLevel request failed for type {type}: {str(e)}")
+            return {}
+
+    def listViosUpdates(self, console_uuid, system_name, vios_name, source_file):
+        url = f'https://{self.hmc_ip}/rest/api/uom/ManagementConsole/{console_uuid}/do/ListVIOSUpdates'
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
+        payload = {
+                    "JobRequest": {
+                        "Metadata": {
+                        "Atom": ""
+                        },
+                        "RequestedOperation": {
+                        "Metadata": {
+                            "Atom": ""
+                        },
+                        "OperationName": "ListVIOSUpdates",
+                        "GroupName": "ManagementConsole"
+                        },
+                        "JobParameters": {
+                        "Metadata": {
+                            "Atom": ""
+                        },
+                        "JobParameter": [
+                            {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "Source",
+                            "ParameterValue": source_file
+                            },
+                            {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "SystemName",
+                            "ParameterValue": system_name
+                            },
+                            {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "VIOSName",
+                            "ParameterValue": vios_name
+                            }
+                        ]
+                        }
+                    }
+                    }
+        timeout_in_sec = 3600
+
+        try:
+            resp = open_url(
+                url,
+                headers=header,
+                method='PUT',
+                data=json.dumps(payload),
+                validate_certs=False,
+                timeout=timeout_in_sec
+            )
+
+            if resp.code != 200:
+                logger.debug("listViosUpdates failed. Response code: %d", resp.code)
+                return None
+
+            response = json.loads(resp.read())
+            logger.info(f"first {response}")
+            job_url = response['entry']['selfLink']
+            logger.info(f"job url {job_url}")
+            response = self._check_job_status_and_wait(job_url)
+            logger.info(f"response for vios Update {response}")
+            result = response['entry']['content']['JobResponse']['Result']
+            value = ''
+            for output in result:
+                if output.get('ParameterName') == 'Updates':
+                    value = output.get('ParameterValue')
+                    break
+            logger.info(f'response value {value}')
+            return value
+        except Exception as e:
+            logger.error("listViosUpdates request failed: %s", str(e))
+            return None
+
+    def LICQueryRepository(self, system_uuid, system_name, source_file, type="io", level=None):
+        url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/LICQueryRepository"
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
+
+        job_parameters = [
+            {
+                "Metadata": {"Atom": ""},
+                "ParameterName": "managedSystem",
+                "ParameterValue": system_name
+            },
+            {
+                "Metadata": {"Atom": ""},
+                "ParameterName": "type",
+                "ParameterValue": type
+            },
+            {
+                "Metadata": {"Atom": ""},
+                "ParameterName": "repository",
+                "ParameterValue": source_file
+            }
+        ]
+
+        if type == "sys":
+            if level:
+                job_parameters.append({
+                    "Metadata": {"Atom": ""},
+                    "ParameterName": "level",
+                    "ParameterValue": level
+                })
+            job_parameters.append({
+                "Metadata": {"Atom": ""},
+                "ParameterName": "attributes",
+                "ParameterValue": "lic_type,ecnumber,level,spname,concurrency,is_concurrent"
+            })
+        elif type == "io":
+            job_parameters.append({
+                "Metadata": {"Atom": ""},
+                "ParameterName": "filter",
+                "ParameterValue": "os=vios"
+            })
+
+        payload = {
+            "JobRequest": {
+                "Metadata": {"Atom": ""},
+                "RequestedOperation": {
+                    "Metadata": {"Atom": ""},
+                    "OperationName": "LICQueryRepository",
+                    "GroupName": "ManagedSystem"
+                },
+                "JobParameters": {
+                    "Metadata": {"Atom": ""},
+                    "JobParameter": job_parameters
+                }
+            }
+        }
+        logger.info(f'payload info {payload}')
+        timeout_in_sec = 3600
+        try:
+            resp = open_url(
+                url,
+                headers=header,
+                method='PUT',
+                data=json.dumps(payload),
+                validate_certs=False,
+                timeout=timeout_in_sec
+            )
+
+            if resp.code != 200:
+                logger.debug("LICQueryRepository failed. Response code: %d", resp.code)
+                return None
+
+            response = json.loads(resp.read())
+            logger.info(f"first {response}")
+            job_url = response['entry']['selfLink']
+            logger.info(f"job url {job_url}")
+            response = self._check_job_status_and_wait(job_url)
+            logger.info(f"response from LICQueryRepository {response}")
+            result = response['entry']['content']['JobResponse']['Result']
+            status = response['entry']['content']['JobResponse']['Status']
+            value = {}
+            for output in result:
+                if status == 'COMPLETED_WITH_ERROR':
+                    if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                        value = output
+                        break
+                if output.get('ParameterName') == 'JOBRESULT_KEY_OUTPUT':
+                    value = output
+
+            logger.info(f'response value {value}')
+            return value
+        except Exception as e:
+            logger.error("LICQueryRepository request failed: %s", str(e))
+            return None
+
+    def PlatformUpdate(self, system_uuid, param):
+        # url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/PlatformUpdate"
+        # header = {
+        #     "X-API-Session": self.session,
+        #     "Accept": "application/json",
+        #     "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        # }
+        payload = {
+            "JobRequest": {
+                "Metadata": {
+                    "Atom": ""
+                },
+                "RequestedOperation": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "OperationName": "PlatformUpdate",
+                    "GroupName": "ManagedSystem"
+                },
+                "JobParameters": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "JobParameter": [
+                        {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "PlatformUpdateParameter",
+                            "ParameterValue": param
+                        }
+                    ]
+                }
+            }
+        }
+        # try:
+            # resp = open_url(
+            #         url,
+            #         headers=header,
+            #         method='PUT',
+            #         data=json.dumps(payload),
+            #         validate_certs=False,
+            #         timeout=3600
+            #     )
+
+            # if resp.code != 200:
+            #     logger.debug("LICQueryRepository failed. Response code: %d", resp.code)
+            #     return None
+            # response = json.loads(resp.read())
+            # logger.info(f"first {response}")
+            # job_url = response['entry']['selfLink']
+            # logger.info(f"job url {job_url}")
+            # response = self._check_job_status_and_wait(job_url)
+        return payload
+        # except Exception as e:
+        #         logger.error("LICQueryRepository request failed: %s", str(e))
+        #         return None
+
+    def _check_job_status_and_wait(self, job_url):
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
+
+        try:
+            resp = open_url(
+                job_url,
+                headers=header,
+                method='GET',
+                validate_certs=False,
+                timeout=60
+            )
+            if resp.code != 200:
+                logger.debug("Request failed. Response code: %d", resp.code)
+                return None
+            result = json.loads(resp.read())
+            status = result['entry']['content']['JobResponse']['Status']
+            logger.info(f"Job status: {status}")
+
+            if status == "RUNNING":
+                time.sleep(10)
+                return self._check_job_status_and_wait(job_url)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to check job status: {e}")
+            return "Error"
