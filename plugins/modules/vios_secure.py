@@ -269,7 +269,6 @@ def validate_parameters(params):
         if (str(params['reload']).lower() == 'true' and str(params['active']).lower() != 'true'):
             raise ParameterError("Reload option can be applied only with active option.")
     if opr == 'firewall_facts':
-        logger.debug("evida ethunund")
         unsupportedList = ['level', 'rule', 'file', 'firewall_config', 'active', 'reload']
         if str(params['ip_version']).lower() != 'ipv6':
             params['ip_version'] = 'ipv4'
@@ -306,7 +305,7 @@ def apply_security_setting(module, params):
     vios_name = params['vios_name']
     validate_parameters(params)
     sys_list = (
-        hmc_conn.execute("lssyscfg -r sys -F name").splitlines()
+        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
     )
     if system_name not in sys_list:
         module.fail_json(msg="The managed system is not available in HMC")
@@ -326,7 +325,6 @@ def apply_security_setting(module, params):
 
 
 def firewall_setting(module, params):
-    logger.debug("Inside setting")
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
@@ -335,13 +333,13 @@ def firewall_setting(module, params):
     system_name = params['system_name']
     vios_name = params['vios_name']
     validate_parameters(params)
-    logger.debug("after valdate params")
     changed = False
     failed_ports = []
-    sys_list = hmc_conn.execute("lssyscfg -r sys -F name").splitlines()
+    sys_list = (
+        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
+    )
     if system_name not in sys_list:
         module.fail_json(msg="The managed system is not available in HMC")
-
     if vios_name is not None:
         vios_list = hmc_conn.execute(
             f"lssyscfg -r lpar -m {system_name} -F name"
@@ -392,6 +390,11 @@ def display_firewall_setting(module, params):
     system_name = params['system_name']
     vios_name = params['vios_name']
     validate_parameters(params)
+    sys_list = (
+        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
+    )
+    if system_name not in sys_list:
+        module.fail_json(msg="The managed system is not available in HMC")
     cmd = "viosecure -firewall view  -fmt , "
     if str(params['ip_version']).lower() == 'ipv6':
         cmd += "-ip6"
