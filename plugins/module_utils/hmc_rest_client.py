@@ -2239,13 +2239,10 @@ class HmcRestClient:
                 return None
 
             response = json.loads(resp.read())
-            logger.info(f"first {response}")
             job_url = response['entry']['selfLink']
-            logger.info(f"job url {job_url}")
             response = self._check_job_status_and_wait(job_url)
             status = response['entry']['content']['JobResponse']['Status']
             result = response['entry']['content']['JobResponse']['Result']
-            logger.info(f'response {status}')
             return status, result
 
         except Exception as e:
@@ -2317,12 +2314,11 @@ class HmcRestClient:
             )
 
             if resp.code != 200:
-                logger.debug(f"LICQueryLevel failed for type {type}. Response code: {resp.code}")
+                logger.debug("LICQueryLevel failed for type %s. Response code: %s", type, resp.code)
                 return {}
 
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            logger.info(f"job url for type {type}: {job_url}")
             response = self._check_job_status_and_wait(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
@@ -2342,13 +2338,12 @@ class HmcRestClient:
                     adapter_id = value
                 else:
                     adapter_id = [int(dict(item.split("=", 1) for item in line.split(","))["adapter_id"])
-               for line in value.strip().split("\n")]
+                                  for line in value.strip().split("\n")]
                 job_result_dict["SRIOVAdapterUpdate"] = {"AdapterID": adapter_id}
             elif type == 'io':
                 if 'No results' in value:
                     IOAdapterUpdate = value
                 else:
-                    logger.info(f"the IO adapter raw value: {value}")
                     IOAdapterUpdate = {}
                     for line in value.splitlines():
                         parts = line.split(",")
@@ -2358,11 +2353,10 @@ class HmcRestClient:
                             IOAdapterUpdate.setdefault(partition_id, []).append(device)
                 job_result_dict["IOAdapterUpdate"] = IOAdapterUpdate
 
-            logger.info(f'Final output for type {type}: {job_result_dict}')
             return job_result_dict
 
         except Exception as e:
-            logger.error(f"LICQueryLevel request failed for type {type}: {str(e)}")
+            logger.error("LICQueryLevel request failed for type %s: %s", type, e)
             return {}
 
     def listViosUpdates(self, console_uuid, system_name, vios_name, source_file):
@@ -2373,47 +2367,47 @@ class HmcRestClient:
             "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
         }
         payload = {
-                    "JobRequest": {
-                        "Metadata": {
+            "JobRequest": {
+                "Metadata": {
+                    "Atom": ""
+                },
+                "RequestedOperation": {
+                    "Metadata": {
                         "Atom": ""
-                        },
-                        "RequestedOperation": {
-                        "Metadata": {
-                            "Atom": ""
-                        },
-                        "OperationName": "ListVIOSUpdates",
-                        "GroupName": "ManagementConsole"
-                        },
-                        "JobParameters": {
-                        "Metadata": {
-                            "Atom": ""
-                        },
-                        "JobParameter": [
-                            {
+                    },
+                    "OperationName": "ListVIOSUpdates",
+                    "GroupName": "ManagementConsole"
+                },
+                "JobParameters": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "JobParameter": [
+                        {
                             "Metadata": {
                                 "Atom": ""
                             },
                             "ParameterName": "Source",
                             "ParameterValue": source_file
-                            },
-                            {
+                        },
+                        {
                             "Metadata": {
                                 "Atom": ""
                             },
                             "ParameterName": "SystemName",
                             "ParameterValue": system_name
-                            },
-                            {
+                        },
+                        {
                             "Metadata": {
                                 "Atom": ""
                             },
                             "ParameterName": "VIOSName",
                             "ParameterValue": vios_name
-                            }
-                        ]
                         }
-                    }
-                    }
+                    ]
+                }
+            }
+        }
         timeout_in_sec = 3600
 
         try:
@@ -2431,18 +2425,14 @@ class HmcRestClient:
                 return None
 
             response = json.loads(resp.read())
-            logger.info(f"first {response}")
             job_url = response['entry']['selfLink']
-            logger.info(f"job url {job_url}")
             response = self._check_job_status_and_wait(job_url)
-            logger.info(f"response for vios Update {response}")
             result = response['entry']['content']['JobResponse']['Result']
             value = ''
             for output in result:
                 if output.get('ParameterName') == 'Updates':
                     value = output.get('ParameterValue')
                     break
-            logger.info(f'response value {value}')
             return value
         except Exception as e:
             logger.error("listViosUpdates request failed: %s", str(e))
@@ -2507,7 +2497,6 @@ class HmcRestClient:
                 }
             }
         }
-        logger.info(f'payload info {payload}')
         timeout_in_sec = 3600
         try:
             resp = open_url(
@@ -2524,11 +2513,8 @@ class HmcRestClient:
                 return None
 
             response = json.loads(resp.read())
-            logger.info(f"first {response}")
             job_url = response['entry']['selfLink']
-            logger.info(f"job url {job_url}")
             response = self._check_job_status_and_wait(job_url)
-            logger.info(f"response from LICQueryRepository {response}")
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
             value = {}
@@ -2539,8 +2525,6 @@ class HmcRestClient:
                         break
                 if output.get('ParameterName') == 'JOBRESULT_KEY_OUTPUT':
                     value = output
-
-            logger.info(f'response value {value}')
             return value
         except Exception as e:
             logger.error("LICQueryRepository request failed: %s", str(e))
@@ -2582,23 +2566,23 @@ class HmcRestClient:
             }
         }
         # try:
-            # resp = open_url(
-            #         url,
-            #         headers=header,
-            #         method='PUT',
-            #         data=json.dumps(payload),
-            #         validate_certs=False,
-            #         timeout=3600
-            #     )
+        #     resp = open_url(
+        #             url,
+        #             headers=header,
+        #             method='PUT',
+        #             data=json.dumps(payload),
+        #             validate_certs=False,
+        #             timeout=3600
+        #         )
 
-            # if resp.code != 200:
-            #     logger.debug("LICQueryRepository failed. Response code: %d", resp.code)
-            #     return None
-            # response = json.loads(resp.read())
-            # logger.info(f"first {response}")
-            # job_url = response['entry']['selfLink']
-            # logger.info(f"job url {job_url}")
-            # response = self._check_job_status_and_wait(job_url)
+        #     if resp.code != 200:
+        #         logger.debug("LICQueryRepository failed. Response code: %d", resp.code)
+        #         return None
+        #     response = json.loads(resp.read())
+        #     logger.info(f"first {response}")
+        #     job_url = response['entry']['selfLink']
+        #     logger.info(f"job url {job_url}")
+        #     response = self._check_job_status_and_wait(job_url)
         return payload
         # except Exception as e:
         #         logger.error("LICQueryRepository request failed: %s", str(e))
@@ -2624,14 +2608,10 @@ class HmcRestClient:
                 return None
             result = json.loads(resp.read())
             status = result['entry']['content']['JobResponse']['Status']
-            logger.info(f"Job status: {status}")
-
             if status == "RUNNING":
                 time.sleep(10)
                 return self._check_job_status_and_wait(job_url)
-
             return result
-
         except Exception as e:
-            logger.error(f"Failed to check job status: {e}")
+            logger.error("Failed to check job status: %s", e)
             return "Error"
