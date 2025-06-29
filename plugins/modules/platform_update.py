@@ -143,7 +143,7 @@ options:
                                 description: Whether to update all I/O adapters.
                                 type: bool
                             Id:
-                                description: Adapter ID to update.
+                                description: Partition ID to update.
                                 type: str
                             Device:
                                 description: Device name of the adapter.
@@ -219,7 +219,7 @@ result:
 
 
 import logging
-LOG_FILENAME = "tmp/ansible_power_hmc.log"
+LOG_FILENAME = "/tmp/ansible_power_hmc.log"
 logger = logging.getLogger(__name__)
 import re
 from ansible.module_utils.basic import AnsibleModule
@@ -537,6 +537,9 @@ def platform_update(module):
                 if vios_details:
                     if vios_details[3] == 'inactive':
                         module.fail_json(msg=f"The VIOS {vios} does not have an active RMC connection and cannot be updated at this time")
+                    for io_update in all_io_updates:
+                        if io_update.get("VIOSName") == vios:
+                            io_update["vios_id"] = vios_details[2].zfill(3)
                 else:
                     module.fail_json(msg=f"The VIOS {vios} is not available in HMC")
 
@@ -613,9 +616,20 @@ def platform_update(module):
                     error_msg = f"No IO Adapters are available for VIOS '{io_update.get('VIOSName')}'"
                     fail_with_logoff(module, rest_conn, error_msg)
                 if io_update.get('ALL'):
-                    available_io_updates = output
+                    vios_id = io_update.get('vios_id')
+                    if output.get('IOAdapterUpdate', {}).get(vios_id, []):
+                        available_io_updates = output.get('IOAdapterUpdate', {}).get(vios_id, [])
+                    else:
+                        error_msg = f"No available I/O adapters found for VIOS {output.get('VIOSName')}"
+                        fail_with_logoff(module, rest_conn, error_msg)
                 else:
                     io_id = str(io_update.get('Id')).zfill(3)
+                    if io_id != io_update.get('vios_id'):
+                        error_msg = (
+                            f"Adapter ID mismatch: VIOS {io_update.get('VIOSName')} has ID {io_update.get('vios_id')}, "
+                            f"but Adapter ID is {io_id}."
+                        )
+                        fail_with_logoff(module, rest_conn, error_msg)
                     device = io_update.get('Device')
                     valid_devices = output.get('IOAdapterUpdate', {}).get(io_id, [])
                     if valid_devices:
