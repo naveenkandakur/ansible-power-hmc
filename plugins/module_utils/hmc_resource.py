@@ -955,7 +955,7 @@ class Hmc():
         elif params['file'] is not None:
             viosecure_cmd += self.OPT['VIOSECURE']['-FILE'] + str(params['file'])
         elif params['firewall'] is True:
-            viosecure_cmd += self.OPT['VIOSECURE']['-FIREWALL'] + str(fields['present'])
+            viosecure_cmd += self.OPT['VIOSECURE']['-FIREWALL'] + str(fields['present'].lower())
             for key in option_map:
                 if fields[key] is not None and key != 'remote':
                     viosecure_cmd += self.OPT['VIOSECURE'][option_map[key]] + str(fields[key])
