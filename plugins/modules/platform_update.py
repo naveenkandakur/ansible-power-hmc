@@ -733,9 +733,9 @@ def platform_update(module):
                     adp_ids = vios_id
                 else:
                     adp_ids = {io_update.get('Id')}
-                # if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                #     error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('VIOSName')}': {output.get('ParameterValue')}"
-                #     fail_with_logoff(module, rest_conn, error_msg)
+                if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                    error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('VIOSName')}': {output.get('ParameterValue')}"
+                    fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
