@@ -141,11 +141,11 @@ options:
                         type: str
                         choices: ['IBMWebsite']
                     Level:
-                    description:
-                        - Specifies the VIOS version level to apply.
-                        - If not provided, the latest available version will be used by default.
-                    type: str
-                    default: 'latest'
+                        description:
+                            - Specifies the VIOS version level to apply.
+                            - If not provided, the latest available version will be used by default.
+                        type: str
+                        default: 'latest'
                     IOAdapterUpdate:
                         description: List of I/O adapters to update during VIOS update.
                         type: list
@@ -231,7 +231,7 @@ result:
 
 
 import logging
-LOG_FILENAME = "/tmp/ansible_power_hmc.log"
+LOG_FILENAME = "/Users/chiranthanmv/platform_up/ansible.log"
 logger = logging.getLogger(__name__)
 import re
 from ansible.module_utils.basic import AnsibleModule
@@ -244,6 +244,7 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client impo
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
 import sys
 import copy
+
 
 def init_logger():
     logging.basicConfig(
@@ -685,9 +686,9 @@ def platform_update(module):
                         fail_with_logoff(module, rest_conn, error_msg)
                     elif vios_level != 'latest' and vios_level not in output:
                         error_msg = (
-                                f"Update file {vios_level} for vios {vios_name} "
-                                f"is not found at the specified source location: {source_file}."
-                            )
+                            f"Update file {vios_level} for vios {vios_name} "
+                            f"is not found at the specified source location: {source_file}."
+                        )
                         fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -713,9 +714,9 @@ def platform_update(module):
                     )
                 elif firm_level != 'latest' and firm_level not in output:
                     error_msg = (
-                            f"Update file {firm_level} for the resource {system_name} "
-                            f"is not found at the specified source location: {source_file}."
-                        )
+                        f"Update file {firm_level} for the resource {system_name} "
+                        f"is not found at the specified source location: {source_file}."
+                    )
                     fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -732,9 +733,9 @@ def platform_update(module):
                     adp_ids = vios_id
                 else:
                     adp_ids = {io_update.get('Id')}
-                if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                    error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('VIOSName')}': {output.get('ParameterValue')}"
-                    fail_with_logoff(module, rest_conn, error_msg)
+                # if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                #     error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('VIOSName')}': {output.get('ParameterValue')}"
+                #     fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
