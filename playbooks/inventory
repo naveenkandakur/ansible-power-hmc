@@ -1,7 +1,2 @@
 [hmcs]
-hmc1
-hmc2
-hmc3
-
-[hmcs:vars]
-ansible_user=hscroot
+10.48.20.216

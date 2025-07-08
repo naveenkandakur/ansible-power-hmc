@@ -83,6 +83,12 @@ options:
                             - Source type for firmware image (e.g., from IBM Fix Central).
                         type: str
                         choices: ['IBMWebsite']
+                    Level:
+                        description:
+                            - Specifies the firmware version level to apply.
+                            - If not provided, the latest available version will be used by default.
+                        type: str
+                        default: 'latest'
                     SRIOVAdapterUpdate:
                         description:
                             - List of SR-IOV adapter update configurations.
@@ -134,6 +140,12 @@ options:
                         description: Source type for the update.
                         type: str
                         choices: ['IBMWebsite']
+                    Level:
+                    description:
+                        - Specifies the VIOS version level to apply.
+                        - If not provided, the latest available version will be used by default.
+                    type: str
+                    default: 'latest'
                     IOAdapterUpdate:
                         description: List of I/O adapters to update during VIOS update.
                         type: list
@@ -231,7 +243,7 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_constants import
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import parse_error_response
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
 import sys
-
+import copy
 
 def init_logger():
     logging.basicConfig(
@@ -339,9 +351,13 @@ def validate_parameters(params):
 
             if UpdateType.lower() in ['update', 'upgrade'] and not resourceType:
                 raise ParameterError(f"Required Parameter ResourceType for updateType = {UpdateType}")
-            elif UpdateType.lower() == 'noupdate' and resourceType:
-                raise ParameterError(f"Unsupported Parameter ResourceType for updateType = {UpdateType}")
-
+            elif UpdateType.lower() == 'noupdate':
+                if resourceType:
+                    raise ParameterError(f"Unsupported Parameter ResourceType for for SystemFirmwareUpdate when updateType = {UpdateType}")
+                if sfw_update.get('Level') != 'latest':
+                    raise ParameterError(f"Parameter 'Level' is not supported for SystemFirmwareUpdate when UpdateType = {UpdateType}")
+                if sfw_update.get('Level') == 'latest':
+                    sfw_update['Level'] = None
         if sriov_updates:
             for adapter in sriov_updates:
                 validate_sub_params(adapter, 'SRIOVAdapterUpdate')
@@ -381,6 +397,10 @@ def validate_parameters(params):
             if vios.get('UpdateType').lower() == 'noupdate':
                 if vios.get('ResourceType'):
                     raise ParameterError("Parameter 'ResourceType' is not supported for ViosUpdate when UpdateType is 'NoUpdate'")
+                if vios.get('Level') != 'latest':
+                    raise ParameterError("Parameter 'Level' is not supported for ViosUpdate when UpdateType is 'NoUpdate'")
+                if vios.get('Level') == 'latest':
+                    vios['Level'] = None
             else:
                 mandatoryList += ['ResourceType']
 
@@ -411,7 +431,7 @@ def validate_parameters(params):
             raise ParameterError("Invalid usage: 'PartitionMigration' must be specified along with either 'VIOSUpdate' or 'SystemFirmwareUpdate'")
         mandatoryList = ['IsQuickEvac', 'DestinationManagedSystem']
         unsupportedList = ['UpdateType', 'UpdateOrder', 'VIOSName', 'ResourceType', 'IOAdapterUpdate', 'Id', 'Device', 'Repository',
-                           'SRIOVAdapterUpdate', 'hmc_host', 'hmc_auth', 'AdapterID', 'SubType', 'system_name', 'IsDestruptive']
+                           'SRIOVAdapterUpdate', 'hmc_host', 'hmc_auth', 'AdapterID', 'SubType', 'system_name', 'IsDestruptive', 'Level']
         for migs in partition_migs:
             collate = []
             for eachUnsupported in unsupportedList:
@@ -506,7 +526,7 @@ def platform_update(module):
     system_name = params['system_name']
     attributes = params.get('ParameterValue')
     changed = False
-    vios_updates = attributes.get('VIOSUpdate')
+    vios_updates = copy.deepcopy(attributes.get('VIOSUpdate'))
     all_io_updates = []
     available_adapter_id = []
     available_io_updates = {}
@@ -618,7 +638,7 @@ def platform_update(module):
                 if io_update.get('ALL'):
                     vios_id = io_update.get('vios_id')
                     if output.get('IOAdapterUpdate', {}).get(vios_id, []):
-                        available_io_updates = output.get('IOAdapterUpdate', {}).get(vios_id, [])
+                        available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
                     else:
                         error_msg = f"No available I/O adapters found for VIOS {output.get('VIOSName')}"
                         fail_with_logoff(module, rest_conn, error_msg)
@@ -658,9 +678,16 @@ def platform_update(module):
                 if updateType in 'update':
                     vios_name = vios_info['VIOSName']
                     source_file = vios_info['ResourceType']
+                    vios_level = vios_info['Level']
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
                     if output.strip() in ("[]", "", "None"):
                         error_msg = f"Update file for {vios_name} not found at the specified source location: {source_file}."
+                        fail_with_logoff(module, rest_conn, error_msg)
+                    elif vios_level != 'latest' and vios_level not in output:
+                        error_msg = (
+                                f"Update file {vios_level} for vios {vios_name} "
+                                f"is not found at the specified source location: {source_file}."
+                            )
                         fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -672,6 +699,7 @@ def platform_update(module):
         if sysfirm_update:
             updateType = sysfirm_update.get('UpdateType').lower()
             if updateType in ['update', 'upgrade']:
+                firm_level = sysfirm_update.get('Level')
                 source_file = sysfirm_update.get('ResourceType').lower()
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                       type="sys", level=updateType)
@@ -683,6 +711,12 @@ def platform_update(module):
                         f"No {updateType.upper()} file found at the specified source: {source_file} "
                         f"for the resource: {system_name} reason: {output.get('ParameterValue')}"
                     )
+                elif firm_level != 'latest' and firm_level not in output:
+                    error_msg = (
+                            f"Update file {firm_level} for the resource {system_name} "
+                            f"is not found at the specified source location: {source_file}."
+                        )
+                    fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
@@ -692,9 +726,10 @@ def platform_update(module):
         if all_io_updates:
             for io_update in all_io_updates:
                 source_file = io_update.get('Repository').lower()
+                vios_id = io_update.get('vios_id')
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
                 if available_io_updates:
-                    adp_ids = ",".join(key for key in available_io_updates['IOAdapterUpdate'].keys())
+                    adp_ids = vios_id
                 else:
                     adp_ids = {io_update.get('Id')}
                 if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
@@ -745,6 +780,7 @@ def run_module():
                         UpdateOrder=dict(type='int'),
                         IsDestruptive=dict(type='bool'),
                         ResourceType=dict(type='str', choices=['IBMWebsite']),
+                        Level=dict(type='str', default="latest"),
                         SRIOVAdapterUpdate=dict(
                             type='list',
                             elements='dict',
@@ -773,6 +809,7 @@ def run_module():
                         VIOSName=dict(type='str'),
                         UpdateOrder=dict(type='int'),
                         ResourceType=dict(type='str', choices=['IBMWebsite']),
+                        Level=dict(type='str', default="latest"),
                         IOAdapterUpdate=dict(
                             type='list',
                             elements='dict',
