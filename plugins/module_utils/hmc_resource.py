@@ -845,10 +845,7 @@ class Hmc():
             lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + filter
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
-        raw_result = raw_result.replace("Power Off", "Off")
-        raw_result = raw_result.replace("No Connection", "No_Connection")
-        raw_result = raw_result.replace("Version Mismatch", "Version_Mismatch")
-        lines = raw_result.split()
+        lines = raw_result.strip().split("\n")
 
         return lines
 
@@ -862,7 +859,7 @@ class Hmc():
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
         raw_result = raw_result.replace("Power Off", "Off")
-        lines = raw_result.split()
+        lines = raw_result.strip().split()
 
         return lines
 
