@@ -23,7 +23,8 @@ description:
     - It supports both minimal and full update strategies for SR-IOV adapters and allows updates from IBM Fix Central website when specified.
     - Supports defining the order in which updates are applied across components.
     - Includes validation for Live Partition Mobility (LPM) readiness and VIOS redundancy.
-    - Compatible with update source like IBM Fix Central website (recommended for end-to-end automation)
+    - Compatible with update source like IBM Fix Central website (recommended for end-to-end automation).
+    - Support for additional sources will be added in future implementations.
 version_added: 1.0.0
 requirements:
 - Python >= 3
@@ -54,116 +55,150 @@ options:
             - The name or mtms (machine type model serial) of the managed system on which the operations are to be performed.
         required: true
         type: str
-    ParameterValue:
+    platform_config:
         description:
-            - Specifies the operation details, including firmware update, partition migration, or VIOS update.
+            - Defines the configuration for the operation to be performed, such as system firmware updates, partition migrations, or VIOS updates.
+            - This option applies changes to the HMC.
         required: false
         type: dict
         suboptions:
-            SystemFirmwareUpdate:
+            system_firmware_update:
                 description:
                     - System firmware update configuration.
                 type: dict
                 suboptions:
-                    UpdateType:
+                    update_type:
                         description:
                             - Type of firmware update operation.
+                            - 'C(NoUpdate): No update will be performed.'
+                            - 'C(Update): Performs a standard update.'
+                            - 'C(Upgrade): Performs an upgrade.'
+                            - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) option must not be provided.
+                            - When set to C(NoUpdate), the fields C(is_distruptive), C(resource_type), and C(level) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update', 'Upgrade']
-                    UpdateOrder:
+                    update_order:
                         description:
                             - Optional order in which the update should be applied.
                         type: int
-                    IsDestruptive:
+                    is_distruptive:
                         description:
                             - Whether the update is disruptive (causes reboots/downtime).
                         type: bool
-                    ResourceType:
+                    resource_type:
                         description:
-                            - Source type for firmware image (e.g., from IBM Fix Central).
+                            - Specifies the source repository for the update image.
+                            - If not provided, the default repository C(IBMWebsite) will be used.
                         type: str
                         choices: ['IBMWebsite']
-                    Level:
+                        default: 'IBMWebsite'
+                    level:
                         description:
                             - Specifies the firmware version level to apply.
                             - If not provided, the latest available version will be used by default.
                         type: str
                         default: 'latest'
-                    SRIOVAdapterUpdate:
+                    sriov_adapter_update:
                         description:
                             - List of SR-IOV adapter update configurations.
+                            - This option must not be provided if C(update_type) is set to C(Update) or C(Upgrade)
                         type: list
                         elements: dict
                         suboptions:
-                            ALL:
-                                description: Whether to apply the update to all adapters.
+                            all:
+                                description:
+                                    - Indicates whether the update should be applied to all adapters.
+                                    - If set to C(true), the C(adapter_id) field is not required and will be ignored if provided.
                                 type: bool
-                            AdapterID:
-                                description: ID of the adapter to be updated.
+                            adapter_id:
+                                description:
+                                    - ID of the specific adapter to be updated.
+                                    - Required only when C(all) is not specified.
                                 type: str
-                            SubType:
-                                description: Level of update to apply.
+                            subtype:
+                                description:
+                                    - Specifies the level of update to apply.
+                                    - C(DriverOnly) applies only the driver update.
+                                    - C(Adapter) applies both the adapter firmware and driver updates.
                                 type: str
-                                choices: ['Minimal', 'Full']
-            PartitionMigration:
+                                choices: ['DriverOnly', 'Adapter']
+            partition_migration:
                 description:
                     - Configuration for migrating logical partitions.
                 type: list
                 elements: dict
                 suboptions:
-                    IsQuickEvac:
+                    is_quick_evac:
                         description: Whether to enable quick evacuation.
                         type: bool
-                    DestinationManagedSystem:
+                    destination_managed_system:
                         description: Target managed system name.
                         type: str
-                    LeavePartitionInTarget:
+                    leave_partition_in_target:
                         description: Whether to keep the partition in the target system post-migration.
                         type: bool
-            VIOSUpdate:
+            vios_update:
                 description:
                     - Configuration for updating Virtual I/O Servers.
                 type: list
                 elements: dict
                 suboptions:
-                    UpdateType:
-                        description: Type of VIOS update.
+                    update_type:
+                        description:
+                            - Specifies the type of VIOS update to be performed.
+                            - 'C(NoUpdate): No update will be applied to VIOS.'
+                            - 'C(Update): Triggers a VIOS update using the provided configuration.'
+                            - When set to C(NoUpdate), the fields C(resource_type) and C(level) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update']
-                    VIOSName:
+                    vios_name:
                         description: Name of the VIOS partition.
                         type: str
-                    UpdateOrder:
+                    update_order:
                         description: Priority/order of update among multiple VIOS.
                         type: int
-                    ResourceType:
-                        description: Source type for the update.
+                    resource_type:
+                        description:
+                            - Specifies the source repository for the update image.
+                            - If not provided, the default repository C(IBMWebsite) will be used.
                         type: str
                         choices: ['IBMWebsite']
-                    Level:
+                        default: 'IBMWebsite'
+                    level:
                         description:
                             - Specifies the VIOS version level to apply.
                             - If not provided, the latest available version will be used by default.
                         type: str
                         default: 'latest'
-                    IOAdapterUpdate:
+                    io_adapter_update:
                         description: List of I/O adapters to update during VIOS update.
                         type: list
                         elements: dict
                         suboptions:
-                            ALL:
-                                description: Whether to update all I/O adapters.
+                            all:
+                                description:
+                                    - Indicates whether all I/O adapters should be updated.
+                                    - If set to C(true), the C(device) field is not required
                                 type: bool
-                            Id:
-                                description: Partition ID to update.
+                            device:
+                                description:
+                                    - Name of the I/O adapter device(s) to be updated.
+                                    - Can be a single device name or a comma-separated list of multiple devices (e.g., C(ent0,fcs0)).
+                                    - Required only when C(all) is not specified.
                                 type: str
-                            Device:
-                                description: Device name of the adapter.
-                                type: str
-                            Repository:
-                                description: Source repository for update image.
+                            repository:
+                                description:
+                                    - Specifies the source repository for the update image.
+                                    - If not provided, the default repository C(IBMWebsite) will be used.
                                 type: str
                                 choices: ['IBMWebsite']
+                                default: 'IBMWebsite'
+    state:
+        description:
+            - When set to C(facts), the module performs a read-only operation on the HMC
+            - It gathers and returns information about available SR-IOV adapters, Virtual I/O Servers (VIOS), and I/O adapters without making any changes.
+        type: str
+        choices: ['facts']
 '''
 
 EXAMPLES = '''
@@ -174,13 +209,13 @@ EXAMPLES = '''
       username: "hscroot"
       password: "hmcpass"
     system_name: "p910_system"
-    ParameterValue:
-      SystemFirmwareUpdate:
-        UpdateType: NoUpdate
-        UpdateOrder: 1
-        SRIOVAdapterUpdate:
-          - AdapterID: "ent0"
-            SubType: Minimal
+    platform_config:
+      system_firmware_update:
+        update_type: NoUpdate
+        update_order: 1
+        sriov_adapter_update:
+          - adapter_id: "ent0"
+            subtype: DriverOnly
 
 - name: Migrate a partition to a different managed system
   platform_update:
@@ -189,15 +224,15 @@ EXAMPLES = '''
       username: "hscroot"
       password: "hmcpass"
     system_name: "p910_system"
-    ParameterValue:
-      SystemFirmwareUpdate:
-        UpdateType: Update
-        UpdateOrder: 1
-        ResourceType: IBMWebsite
-      PartitionMigration:
-        - IsQuickEvac: true
-          DestinationManagedSystem: "p920_system"
-          LeavePartitionInTarget: false
+    platform_config:
+      system_firmware_update:
+        update_type: Update
+        update_order: 1
+        resource_type: IBMWebsite
+      partition_migration:
+        - is_quick_evac: true
+          destination_managed_system: "p920_system"
+          leave_partition_in_target: false
 
 - name: Update VIOS using IBM Fix Central
   platform_update:
@@ -206,16 +241,24 @@ EXAMPLES = '''
       username: "hscroot"
       password: "hmcpass"
     system_name: "p910_system"
-    ParameterValue:
-      VIOSUpdate:
-        - UpdateType: Update
-          VIOSName: "vios1"
-          UpdateOrder: 1
-          ResourceType: IBMWebsite
-          IOAdapterUpdate:
-            - Id: "ent1"
-              Device: "fcs0"
-              Repository: IBMWebsite
+    platform_update:
+      vios_update:
+        - update_type: Update
+          vios_name: "vios1"
+          update_order: 1
+          resource_type: IBMWebsite
+          io_adapter_update:
+            device: "fcs0"
+            repository: IBMWebsite
+
+- name: Facts
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    state: facts
 '''
 
 RETURN = '''
@@ -256,28 +299,27 @@ def init_logger():
 def validate_sub_params(params, value):
     mandatoryList = []
     unsupportedList = []
-    if value == 'SRIOVAdapterUpdate':
-        mandatoryList += ['SubType']
-        unsupportedList += ['IsQuickEvac', 'DestinationManagedSystem', 'LeavePartitionInTarget', 'VIOSName', 'ResourceType',
-                            'IOAdapterUpdate', 'Id', 'Device', 'Repository', 'hmc_host', 'hmc_auth', 'UpdateType',
-                            'system_name', 'IsDestruptive']
+    if value == 'sriov_adapter_update':
+        mandatoryList += ['subtype']
+        unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
+                            'io_adapter_update', 'device', 'repository', 'hmc_host', 'hmc_auth', 'update_type',
+                            'system_name', 'is_distruptive', 'vios_update']
 
-        if params.get('ALL') and params.get('AdapterID'):
-            raise ParameterError("Parameter ALL and AdapterID are mutually exculsive")
+        if params.get('all') and params.get('adapter_id'):
+            raise ParameterError("Parameter all and adapter_id are mutually exculsive")
 
-        if not (params.get('ALL') or params.get('AdapterID')):
-            raise ParameterError("either ALL or AdapterID parameter is required")
+        if not (params.get('all') or params.get('adapter_id')):
+            raise ParameterError("either all or adapter_id parameter is required")
 
-    if value == 'IOAdapterUpdate':
-        mandatoryList += ['Repository']
-        unsupportedList += ['IsQuickEvac', 'DestinationManagedSystem', 'LeavePartitionInTarget', 'VIOSName', 'ResourceType',
-                            'IOAdapterUpdate', 'hmc_host', 'hmc_auth', 'UpdateType', 'system_name', 'IsDestruptive']
+    if value == 'io_adapter_update':
+        unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
+                            'io_adapter_update', 'hmc_host', 'hmc_auth', 'update_type', 'system_name', 'is_distruptive', 'vios_update']
 
-        if params.get('ALL'):
-            if params.get('Id') or params.get('Device'):
-                raise ParameterError("'ALL' is mutually exclusive with 'Id' and 'Device'.")
+        if params.get('all'):
+            if params.get('device'):
+                raise ParameterError("'all' is mutually exclusive with 'device'.")
         else:
-            mandatoryList += ['Id', 'Device']
+            mandatoryList += ['device']
     collate = []
     for eachUnsupported in unsupportedList:
         if params.get(eachUnsupported):
@@ -302,157 +344,121 @@ def validate_sub_params(params, value):
 
 
 def validate_parameters(params):
+    def check_params(param_dict, mandatory, unsupported, context=''):
+        missing = [key for key in mandatory if not param_dict.get(key)]
+        if missing:
+            raise ParameterError(
+                f"mandatory parameter{'s' if len(missing) > 1 else ''} "
+                f"{'[' + ', '.join(missing) + ']'} {'are' if len(missing) > 1 else 'is'} missing"
+                + (f" for {context}" if context else '')
+            )
 
-    mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'ParameterValue']
-    unsupportedList = ['IsQuickEvac', 'DestinationManagedSystem', 'LeavePartitionInTarget', 'VIOSName', 'ResourceType',
-                       'IOAdapterUpdate', 'Id', 'Device', 'Repository', 'AdapterID', 'SubType', 'UpdateType', 'ALL',
-                       'IsDestruptive']
+        invalid = [key for key in unsupported if param_dict.get(key)]
+        if invalid:
+            raise ParameterError(
+                f"unsupported parameter{'s' if len(invalid) > 1 else ''} "
+                f"{'[' + ', '.join(invalid) + ']'}"
+                + (f" for {context}" if context else '')
+            )
 
-    collate = []
-    for eachUnsupported in unsupportedList:
-        if params.get(eachUnsupported):
-            collate.append(eachUnsupported)
+    def validate_sfw_update(sfw_update):
+        mandatory = ['update_type', 'update_order']
+        unsupported = [
+            'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
+            'io_adapter_update', 'id', 'device', 'repository', 'hmc_host', 'hmc_auth', 'adapter_id',
+            'subtype', 'system_name', 'vios_update'
+        ]
+        update_type = sfw_update.get('update_type', '').lower()
+        sriov_updates = sfw_update.get('sriov_adapter_update', [])
+        resource_type = sfw_update.get('resource_type')
 
-    if collate:
-        if len(collate) == 1:
-            raise ParameterError("unsupported parameter: %s" % (collate[0]))
-        else:
-            raise ParameterError("unsupported parameters: %s" % (','.join(collate)))
+        if update_type == 'noupdate':
+            if not sriov_updates:
+                raise ParameterError("Missing parameter sriov_adapter_update for system_firmware_update")
+            if resource_type:
+                sfw_update['resource_type'] = None
+            if sfw_update.get('level') != 'latest':
+                raise ParameterError("Parameter 'level' is not supported for system_firmware_update when update_type = 'noupdate'")
+            sfw_update['level'] = None
+        elif update_type in ['update', 'upgrade']:
+            if sriov_updates:
+                raise ParameterError(f"Invalid combination: sriov_adapter_update is not allowed with update_type = '{update_type}'")
 
-    collate = []
-    for eachMandatory in mandatoryList:
-        if not params.get(eachMandatory):
-            collate.append(eachMandatory)
-    if collate:
-        if len(collate) == 1:
-            raise ParameterError("mandatory parameter '%s' is missing" % (collate[0]))
-        else:
-            raise ParameterError("mandatory parameters '%s' are missing" % (','.join(collate)))
-
-    param_val = params.get('ParameterValue', {})
-
-    if not param_val:
-        raise ParameterError('Missing parameter ParameterValue')
-
-    sfw_update = param_val.get('SystemFirmwareUpdate', {})
-    if sfw_update:
-        mandatoryList = ['UpdateType', 'UpdateOrder']
-        unsupportedList = ['IsQuickEvac', 'DestinationManagedSystem', 'LeavePartitionInTarget', 'VIOSName',
-                           'IOAdapterUpdate', 'Id', 'Device', 'Repository', 'hmc_host', 'hmc_auth', 'AdapterID',
-                           'SubType', 'system_name']
-        UpdateType = sfw_update.get('UpdateType', {})
-        sriov_updates = sfw_update.get('SRIOVAdapterUpdate', {})
-        resourceType = sfw_update.get('ResourceType', {})
-
-        if UpdateType:
-            if UpdateType.lower() == 'noupdate' and not sriov_updates:
-                raise ParameterError("Missing Parameter SRIOVAdapterUpdate for SystemFirmwareUpdate")
-            elif UpdateType.lower() in ['update', 'upgrade'] and sriov_updates:
-                raise ParameterError(f"Invalid combination: SRIOVAdapterUpdate is not allowed with UpdateType = '{UpdateType}")
-
-            if UpdateType.lower() in ['update', 'upgrade'] and not resourceType:
-                raise ParameterError(f"Required Parameter ResourceType for updateType = {UpdateType}")
-            elif UpdateType.lower() == 'noupdate':
-                if resourceType:
-                    raise ParameterError(f"Unsupported Parameter ResourceType for for SystemFirmwareUpdate when updateType = {UpdateType}")
-                if sfw_update.get('Level') != 'latest':
-                    raise ParameterError(f"Parameter 'Level' is not supported for SystemFirmwareUpdate when UpdateType = {UpdateType}")
-                if sfw_update.get('Level') == 'latest':
-                    sfw_update['Level'] = None
         if sriov_updates:
             for adapter in sriov_updates:
-                validate_sub_params(adapter, 'SRIOVAdapterUpdate')
+                validate_sub_params(adapter, 'sriov_adapter_update')
 
-        collate = []
-        for eachMandatory in mandatoryList:
-            if not sfw_update.get(eachMandatory):
-                collate.append(eachMandatory)
-        if collate:
-            if len(collate) == 1:
-                raise ParameterError(f"mandatory parameter {(collate[0])} is missing for SystemFirmwareUpdate")
-            else:
-                raise ParameterError(f"mandatory parameters {(','.join(collate))} are missing for SystemFirmwareUpdate")
+        check_params(sfw_update, mandatory, unsupported, 'system_firmware_update')
 
-        collate = []
-        for eachUnsupported in unsupportedList:
-            if sfw_update.get(eachUnsupported):
-                collate.append(eachUnsupported)
-
-            if collate:
-                if len(collate) == 1:
-                    raise ParameterError("unsupported parameter for SystemFirmwareUpdate: %s" % (collate[0]))
-                else:
-                    raise ParameterError("unsupported parameters for SystemFirmwareUpdate: %s" % (','.join(collate)))
-
-    vios_updates = param_val.get('VIOSUpdate', [])
-    if vios_updates:
-        mandatoryList = ['UpdateType', 'VIOSName', 'UpdateOrder']
-        unsupportedList = ['IsQuickEvac', 'DestinationManagedSystem', 'LeavePartitionInTarget', 'Id', 'Device', 'Repository',
-                           'SRIOVAdapterUpdate', 'hmc_host', 'hmc_auth', 'AdapterID', 'SubType', 'system_name', 'IsDestruptive']
+    def validate_vios_update(vios_updates):
         for vios in vios_updates:
-            collate = []
-            for eachUnsupported in unsupportedList:
-                if vios.get(eachUnsupported):
-                    collate.append(eachUnsupported)
-
-            if vios.get('UpdateType').lower() == 'noupdate':
-                if vios.get('ResourceType'):
-                    raise ParameterError("Parameter 'ResourceType' is not supported for ViosUpdate when UpdateType is 'NoUpdate'")
-                if vios.get('Level') != 'latest':
-                    raise ParameterError("Parameter 'Level' is not supported for ViosUpdate when UpdateType is 'NoUpdate'")
-                if vios.get('Level') == 'latest':
-                    vios['Level'] = None
+            mandatory = ['update_type', 'vios_name', 'update_order']
+            unsupported = [
+                'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'device',
+                'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id', 'subtype',
+                'system_name', 'is_distruptive'
+            ]
+            if vios.get('update_type', '').lower() != 'noupdate':
+                mandatory.append('resource_type')
             else:
-                mandatoryList += ['ResourceType']
+                if vios.get('resource_type'):
+                    vios['resource_type'] = None
+                if vios.get('level') != 'latest':
+                    raise ParameterError("Parameter 'level' is not supported for vios_update when update_type = 'noupdate'")
+                vios['level'] = None
 
-            io_adapters = vios.get('IOAdapterUpdate', [])
-            if io_adapters:
-                for io in io_adapters:
-                    validate_sub_params(io, 'IOAdapterUpdate')
+            io_adapters = vios.get('io_adapter_update', [])
+            for adapter in io_adapters:
+                validate_sub_params(adapter, 'io_adapter_update')
 
-            if collate:
-                if len(collate) == 1:
-                    raise ParameterError("unsupported parameter for VIOSUpdate: %s" % (collate[0]))
-                else:
-                    raise ParameterError("unsupported parameters for VIOSUpdate: %s" % (','.join(collate)))
+            check_params(vios, mandatory, unsupported, 'vios_update')
 
-            collate = []
-            for eachMandatory in mandatoryList:
-                if not vios.get(eachMandatory):
-                    collate.append(eachMandatory)
-            if collate:
-                if len(collate) == 1:
-                    raise ParameterError("mandatory parameter '%s' is missing for VIOSUpdate" % (collate[0]))
-                else:
-                    raise ParameterError("mandatory parameters '%s' are missing for VIOSUpdate" % (','.join(collate)))
+    def validate_partition_migration(partition_migs):
+        mandatory = ['is_quick_evac', 'destination_managed_system']
+        unsupported = [
+            'update_type', 'update_order', 'vios_name', 'resource_type', 'io_adapter_update',
+            'device', 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id',
+            'subtype', 'system_name', 'is_distruptive', 'level', 'vios_update'
+        ]
+        for mig in partition_migs:
+            check_params(mig, mandatory, unsupported, 'partition_migration')
 
-    partition_migs = param_val.get('PartitionMigration', [])
-    if partition_migs:
-        if not (sfw_update or vios_updates):
-            raise ParameterError("Invalid usage: 'PartitionMigration' must be specified along with either 'VIOSUpdate' or 'SystemFirmwareUpdate'")
-        mandatoryList = ['IsQuickEvac', 'DestinationManagedSystem']
-        unsupportedList = ['UpdateType', 'UpdateOrder', 'VIOSName', 'ResourceType', 'IOAdapterUpdate', 'Id', 'Device', 'Repository',
-                           'SRIOVAdapterUpdate', 'hmc_host', 'hmc_auth', 'AdapterID', 'SubType', 'system_name', 'IsDestruptive', 'Level']
-        for migs in partition_migs:
-            collate = []
-            for eachUnsupported in unsupportedList:
-                if migs.get(eachUnsupported):
-                    collate.append(eachUnsupported)
-            if collate:
-                if len(collate) == 1:
-                    raise ParameterError("unsupported parameter for PartitionMigration : %s" % (collate[0]))
-                else:
-                    raise ParameterError("unsupported parameters for PartitionMigration: %s" % (','.join(collate)))
+    if params.get('state') and params.get('platform_config'):
+        raise ParameterError("Invalid parameter combination: 'state' and 'platform_config' cannot be used together. Please provide only one of them.")
+    if params.get('state'):
+        mandatory = ['hmc_host', 'hmc_auth', 'system_name']
+        unsupported = [
+            'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
+            'resource_type', 'io_adapter_update', 'id', 'device', 'repository', 'adapter_id',
+            'subtype', 'update_type', 'all', 'is_distruptive', 'platform_config', 'vios_update',
+        ]
+        check_params(params, mandatory, unsupported)
+    else:
+        mandatory = ['hmc_host', 'hmc_auth', 'system_name', 'platform_config']
+        unsupported = [
+            'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
+            'resource_type', 'io_adapter_update', 'id', 'device', 'repository', 'adapter_id',
+            'subtype', 'update_type', 'all', 'is_distruptive', 'vios_update'
+        ]
+        check_params(params, mandatory, unsupported)
 
-            collate = []
-            for eachMandatory in mandatoryList:
-                if not migs.get(eachMandatory):
-                    collate.append(eachMandatory)
-            if collate:
-                if len(collate) == 1:
-                    raise ParameterError("mandatory parameter '%s' is missing for PartitionMigration" % (collate[0]))
-                else:
-                    raise ParameterError("mandatory parameters '%s' are missing for PartitionMigration" % (','.join(collate)))
+        platform_config = params.get('platform_config', {})
+        if not platform_config:
+            raise ParameterError("Missing parameter 'platform_config'")
+
+        sfw_update = platform_config.get('system_firmware_update')
+        if sfw_update:
+            validate_sfw_update(sfw_update)
+
+        vios_updates = platform_config.get('vios_update', [])
+        if vios_updates:
+            validate_vios_update(vios_updates)
+
+        partition_migs = platform_config.get('partition_migration', [])
+        if partition_migs:
+            if not (sfw_update or vios_updates):
+                raise ParameterError("Invalid usage: 'partition_migration' must be specified along with either 'vios_update' or 'system_firmware_update'")
+            validate_partition_migration(partition_migs)
 
 
 def fail_with_logoff(module, rest_conn, msg):
@@ -466,26 +472,26 @@ def fail_with_logoff(module, rest_conn, msg):
 
 def cleanup_entries(data, sriov=None, io=None):
     Adapter_subtype_map = {
-        'Minimal': 'adapterdriver',
-        'Full': 'adapterdriver,adapter'
+        'DriverOnly': 'adapterdriver',
+        'Adapter': 'adapterdriver,adapter'
     }
     if sriov:
-        sriov_adapters = data["SystemFirmwareUpdate"].get("SRIOVAdapterUpdate", [])
+        sriov_adapters = data["system_firmware_update"].get("sriov_adapter_update", [])
         if sriov_adapters:
-            subtype = sriov_adapters[0].get("SubType", "adapterdriver")
-            data['SystemFirmwareUpdate']['SRIOVAdapterUpdate'] = [
+            subtype = sriov_adapters[0].get("subtype", "adapterdriver")
+            data['system_firmware_updatde']['sriov_adapter_update'] = [
                 {
                     "AdapterID": str(adapter_id),
                     "SubType": subtype
                 } for adapter_id in sriov
             ]
     if io:
-        viosUpdates = data['VIOSUpdate']
+        viosUpdates = data['vios_update']
         for vios in viosUpdates:
-            ioAdapters = vios.get("IOAdapterUpdate")
-            if ioAdapters and ioAdapters[0].get('ALL'):
-                repo = ioAdapters[0].get("Repository", "")
-                vios["IOAdapterUpdate"] = [
+            ioAdapters = vios.get("io_adapter_update")
+            if ioAdapters and ioAdapters[0].get('all'):
+                repo = ioAdapters[0].get("repository", "")
+                vios["io_adapter_update"] = [
                     {
                         "Id": adapter_id,
                         "Device": ",".join(devices),
@@ -502,7 +508,7 @@ def cleanup_entries(data, sriov=None, io=None):
                 cleaned_value = cleanup_entries(value)
 
                 # If this is the SubType key, normalize it
-                if key == "SubType" and isinstance(cleaned_value, str):
+                if key == "subtype" and isinstance(cleaned_value, str):
                     cleaned_value = Adapter_subtype_map.get(cleaned_value, cleaned_value)
 
                 cleaned[key] = cleaned_value
@@ -511,6 +517,42 @@ def cleanup_entries(data, sriov=None, io=None):
     elif isinstance(data, list):
         return [cleanup_entries(item) for item in data]
 
+    else:
+        return data
+
+
+def map_entries(data):
+    config_map = {
+        "vios_update": "VIOSUpdate",
+        "io_adapter_update": "IOAdapterUpdate",
+        "device": "Device",
+        "repository": "Repository",
+        "update_order": "UpdateOrder",
+        "vios_name": "VIOSName",
+        "update_type": "UpdateType",
+        "system_firware_update": "SystemFirmwareUpdate",
+        "sriov_adapter_update": "SRIOVAdapterUpdate",
+        "adapter_id": "AdapterID",
+        "subtype": "SubType",
+        "partition_migration": "PartitionMigration",
+        "is_quick_evac": "IsQuickEvac",
+        "destination_managed_system": "DestinationManagedSystem",
+        "leave_partition_in_target": "LeavePartitionInTarget",
+        "resource_type": "ResourceType",
+        "name": "Name",
+        "is_distruptive": "IsDestruptive",
+        "level": "Level",
+        "all": "ALL"
+    }
+
+    if isinstance(data, dict):
+        new_dict = {}
+        for k, v in data.items():
+            new_key = config_map.get(k, k)
+            new_dict[new_key] = map_entries(v)
+        return new_dict
+    elif isinstance(data, list):
+        return [map_entries(item) for item in data]
     else:
         return data
 
@@ -525,20 +567,20 @@ def platform_update(module):
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
     system_name = params['system_name']
-    attributes = params.get('ParameterValue')
+    attributes = params.get('platform_config')
     changed = False
-    vios_updates = copy.deepcopy(attributes.get('VIOSUpdate'))
+    vios_updates = copy.deepcopy(attributes.get('vios_update'))
     all_io_updates = []
     available_adapter_id = []
     available_io_updates = {}
     if vios_updates:
         for entry in vios_updates:
-            vios_name = entry.get("VIOSName")
-            io_adapters = entry.get("IOAdapterUpdate")
+            vios_name = entry.get("vios_name")
+            io_adapters = entry.get("io_adapter_update")
 
             if isinstance(io_adapters, list):
-                for adapter in entry["IOAdapterUpdate"]:
-                    adapter["VIOSName"] = vios_name
+                for adapter in entry["io_adapter_update"]:
+                    adapter["vios_name"] = vios_name
                     all_io_updates.append(adapter)
 
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
@@ -552,15 +594,21 @@ def platform_update(module):
     else:
         vios_list = list(hmc_conn.execute("lssyscfg -r lpar -m {0} -F name,state,lpar_id,rmc_state".format(system_name)).splitlines())
         if vios_updates:
-            vios_names = [entry["VIOSName"] for entry in attributes.get("VIOSUpdate", [])]
+            vios_names = [entry["vios_name"] for entry in attributes.get("vios_update", [])]
             for vios in vios_names:
                 vios_details = next((entry.split(',') for entry in vios_list if entry.split(',')[0] == vios), None)
                 if vios_details:
                     if vios_details[3] == 'inactive':
                         module.fail_json(msg=f"The VIOS {vios} does not have an active RMC connection and cannot be updated at this time")
                     for io_update in all_io_updates:
-                        if io_update.get("VIOSName") == vios:
+                        if io_update.get("vios_name") == vios:
                             io_update["vios_id"] = vios_details[2].zfill(3)
+                    if attributes.get('vios_update'):
+                        for entry in attributes.get('vios_update'):
+                            io_adapters = entry.get("io_adapter_update")
+                            if io_adapters:
+                                for adapter in io_adapters:
+                                    adapter["Id"] = vios_details[2].zfill(3)
                 else:
                     module.fail_json(msg=f"The VIOS {vios} is not available in HMC")
 
@@ -586,7 +634,7 @@ def platform_update(module):
         fail_with_logoff(module, rest_conn, error_msg)
 
     try:
-        sysfirm_update = attributes.get("SystemFirmwareUpdate", {})
+        sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
             if status == 'COMPLETED_OK':
@@ -605,13 +653,13 @@ def platform_update(module):
         fail_with_logoff(module, rest_conn, error_msg)
 
     try:
-        sysfirm_update = attributes.get("SystemFirmwareUpdate", {})
+        sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
                 fail_with_logoff(module, rest_conn, error_msg)
-            sriov_update = sysfirm_update.get('SRIOVAdapterUpdate')
+            sriov_update = sysfirm_update.get('sriov_adapter_update')
             if sriov_update:
                 if 'No results' in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                     error_msg = f'No SRIOV Adapters are available for {system_name}'
@@ -621,7 +669,7 @@ def platform_update(module):
                     if adapter.get('ALL'):
                         available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
                     else:
-                        adapter_id = adapter.get("AdapterID")
+                        adapter_id = adapter.get("adapter_id")
                         if int(adapter_id) not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                             error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
                             fail_with_logoff(module, rest_conn, error_msg)
@@ -634,34 +682,28 @@ def platform_update(module):
 
             for io_update in all_io_updates:
                 if 'No results' in output.get("IOAdapterUpdate"):
-                    error_msg = f"No IO Adapters are available for VIOS '{io_update.get('VIOSName')}'"
+                    error_msg = f"No IO Adapters are available for VIOS '{io_update.get('vios_name')}'"
                     fail_with_logoff(module, rest_conn, error_msg)
-                if io_update.get('ALL'):
+                if io_update.get('all'):
                     vios_id = io_update.get('vios_id')
                     if output.get('IOAdapterUpdate', {}).get(vios_id, []):
                         available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
                     else:
-                        error_msg = f"No available I/O adapters found for VIOS {output.get('VIOSName')}"
+                        error_msg = f"No available I/O adapters found for VIOS {output.get('vios_name')}"
                         fail_with_logoff(module, rest_conn, error_msg)
                 else:
-                    io_id = str(io_update.get('Id')).zfill(3)
-                    if io_id != io_update.get('vios_id'):
-                        error_msg = (
-                            f"Adapter ID mismatch: VIOS {io_update.get('VIOSName')} has ID {io_update.get('vios_id')}, "
-                            f"but Adapter ID is {io_id}."
-                        )
-                        fail_with_logoff(module, rest_conn, error_msg)
-                    device = io_update.get('Device')
+                    io_id = str(io_update.get('vios_id')).zfill(3)
+                    device = io_update.get('device')
                     valid_devices = output.get('IOAdapterUpdate', {}).get(io_id, [])
                     if valid_devices:
                         if device not in valid_devices:
                             error_msg = (
-                                f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('Id')}' "
-                                f"for VIOS '{io_update.get('VIOSName')}'."
+                                f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('vios_id')}' "
+                                f"for VIOS '{io_update.get('vios_name')}'."
                             )
                             fail_with_logoff(module, rest_conn, error_msg)
                     else:
-                        error_msg = f"VIOS '{io_update.get('VIOSName')}' does not contain IO Adapter with ID '{io_update.get('Id')}'."
+                        error_msg = f"VIOS '{io_update.get('vios_name')}' does not contain IO Adapter with ID '{io_update.get('vios_id')}'."
                         fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -671,15 +713,15 @@ def platform_update(module):
     try:
         needs_update = None
         if vios_updates:
-            needs_update = any('update' == vios.get('UpdateType', '').lower() for vios in attributes.get("VIOSUpdate", []))
+            needs_update = any('update' == vios.get('update_type', '').lower() for vios in attributes.get("vios_update", []))
         if needs_update:
             console_uuid = rest_conn.getManagementConsole()
-            for vios_info in attributes.get("VIOSUpdate", []):
-                updateType = vios_info['UpdateType'].lower()
+            for vios_info in attributes.get("vios_update", []):
+                updateType = vios_info['update_type'].lower()
                 if updateType in 'update':
-                    vios_name = vios_info['VIOSName']
-                    source_file = vios_info['ResourceType']
-                    vios_level = vios_info['Level']
+                    vios_name = vios_info['vios_name']
+                    source_file = vios_info['resource_type']
+                    vios_level = vios_info['level']
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
                     if output.strip() in ("[]", "", "None"):
                         error_msg = f"Update file for {vios_name} not found at the specified source location: {source_file}."
@@ -696,12 +738,12 @@ def platform_update(module):
         fail_with_logoff(module, rest_conn, error_msg)
 
     try:
-        sysfirm_update = attributes.get('SystemFirmwareUpdate')
+        sysfirm_update = attributes.get('system_firmware_update')
         if sysfirm_update:
-            updateType = sysfirm_update.get('UpdateType').lower()
+            updateType = sysfirm_update.get('update_type').lower()
             if updateType in ['update', 'upgrade']:
-                firm_level = sysfirm_update.get('Level')
-                source_file = sysfirm_update.get('ResourceType').lower()
+                firm_level = sysfirm_update.get('level')
+                source_file = sysfirm_update.get('resource_type').lower()
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                       type="sys", level=updateType)
                 if "No results" in output.get('ParameterValue'):
@@ -726,15 +768,15 @@ def platform_update(module):
     try:
         if all_io_updates:
             for io_update in all_io_updates:
-                source_file = io_update.get('Repository').lower()
+                source_file = io_update.get('repository').lower()
                 vios_id = io_update.get('vios_id')
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
                 if available_io_updates:
                     adp_ids = vios_id
                 else:
-                    adp_ids = {io_update.get('Id')}
+                    adp_ids = {io_update.get('id')}
                 if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                    error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('VIOSName')}': {output.get('ParameterValue')}"
+                    error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
                     fail_with_logoff(module, rest_conn, error_msg)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -743,7 +785,8 @@ def platform_update(module):
 
     try:
         cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
-        final_output = rest_conn.PlatformUpdate(system_uuid, cleaned_data)
+        mapped_data = map_entries(cleaned_data)
+        final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
@@ -759,6 +802,85 @@ def platform_update(module):
     return True, final_output, None
 
 
+def facts(module):
+    params = module.params
+    hmc_host = params['hmc_host']
+    hmc_user = params['hmc_auth']['username']
+    password = params['hmc_auth']['password']
+    system_name = params['system_name']
+    changed = False
+    hmc_conn = None
+    try:
+        validate_parameters(params)
+    except Exception as e:
+        module.fail_json(msg=str(e))
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+    sys_list = (
+        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
+    )
+    if system_name not in sys_list:
+        module.fail_json(msg="The managed system is not available in HMC")
+    else:
+        cmd = f"lssyscfg -r lpar -m {system_name} -F name,rmc_state,lpar_id,lpar_env | grep vioserver | grep -w active"
+        output = hmc_conn.execute(cmd).splitlines()
+        vios_list = [(line.split(',')[0], line.split(',')[2]) for line in output if line.strip()]
+        if re.match(HmcConstants.MTMS_pattern, system_name):
+            try:
+                system_name = hmc.getSystemNameFromMTMS(system_name)
+            except HmcError as on_system_error:
+                return changed, repr(on_system_error), None
+
+        try:
+            rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        except Exception as error:
+            error_msg = parse_error_response(error)
+            module.fail_json(msg=error_msg)
+
+        try:
+            system_uuid, _unused = rest_conn.getManagedSystem(system_name)
+            if not system_uuid:
+                fail_with_logoff(module, rest_conn, "Given system is not present")
+        except (Exception, HmcError) as error:
+            error_msg = parse_error_response(error)
+            logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+            fail_with_logoff(module, rest_conn, error_msg)
+
+        def extract_adapters(response, key):
+            if response.get('ParameterName'):
+                return None
+            value = response.get(key)
+            if not value or 'No results' in value:
+                return None
+            return value
+
+        sriov_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
+        sriov_adapters = extract_adapters(sriov_output, 'SRIOVAdapterUpdate')
+
+        io_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
+        io_adapters = extract_adapters(io_output, 'IOAdapterUpdate')
+
+        vios_info = []
+
+        for vios_name, vios_id in vios_list:
+            padded_id = vios_id.zfill(3)
+            adapter_info = io_adapters.get(padded_id)
+            vios_info.append({
+                'vios_name': vios_name,
+                'vios_id': vios_id,
+                'io_devices': adapter_info if adapter_info else 'No adapters available'
+            })
+
+        adapter_info = {
+            system_name: {
+                'sriov_adapters': sriov_adapters if sriov_adapters else 'No sriov_adapters available',
+                'vios_info': vios_info
+            }
+        }
+
+    return changed, adapter_info, None
+
+
 def run_module():
     module_args = dict(
         hmc_host=dict(type='str', required=True),
@@ -771,60 +893,60 @@ def run_module():
                       )
                       ),
         system_name=dict(type='str', required=True),
-        ParameterValue=dict(
+        platform_config=dict(
             type='dict',
             options=dict(
-                SystemFirmwareUpdate=dict(
+                system_firmware_update=dict(
                     type='dict',
                     options=dict(
-                        UpdateType=dict(type='str', choices=['NoUpdate', 'Update', 'Upgrade']),
-                        UpdateOrder=dict(type='int'),
-                        IsDestruptive=dict(type='bool'),
-                        ResourceType=dict(type='str', choices=['IBMWebsite']),
-                        Level=dict(type='str', default="latest"),
-                        SRIOVAdapterUpdate=dict(
+                        update_type=dict(type='str', choices=['NoUpdate', 'Update', 'Upgrade']),
+                        update_order=dict(type='int'),
+                        is_distruptive=dict(type='bool'),
+                        resource_type=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite'),
+                        level=dict(type='str', default="latest"),
+                        sriov_adapter_update=dict(
                             type='list',
                             elements='dict',
                             options=dict(
-                                ALL=dict(type="bool"),
-                                AdapterID=dict(type='str'),
-                                SubType=dict(type='str', choices=['Minimal', 'Full'])
+                                all=dict(type="bool"),
+                                adapter_id=dict(type='str'),
+                                subtype=dict(type='str', choices=['DriverOnly', 'Adapter'])
                             )
                         )
                     )
                 ),
-                PartitionMigration=dict(
+                partition_migration=dict(
                     type='list',
                     elements='dict',
                     options=dict(
-                        IsQuickEvac=dict(type='bool'),
-                        DestinationManagedSystem=dict(type='str'),
-                        LeavePartitionInTarget=dict(type='bool')
+                        is_quick_evac=dict(type='bool'),
+                        destination_managed_system=dict(type='str'),
+                        leave_partition_in_target=dict(type='bool')
                     )
                 ),
-                VIOSUpdate=dict(
+                vios_update=dict(
                     type='list',
                     elements='dict',
                     options=dict(
-                        UpdateType=dict(type='str', choices=['NoUpdate', 'Update']),
-                        VIOSName=dict(type='str'),
-                        UpdateOrder=dict(type='int'),
-                        ResourceType=dict(type='str', choices=['IBMWebsite']),
-                        Level=dict(type='str', default="latest"),
-                        IOAdapterUpdate=dict(
+                        update_type=dict(type='str', choices=['NoUpdate', 'Update']),
+                        vios_name=dict(type='str'),
+                        update_order=dict(type='int'),
+                        resource_type=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite'),
+                        level=dict(type='str', default="latest"),
+                        io_adapter_update=dict(
                             type='list',
                             elements='dict',
                             options=dict(
-                                ALL=dict(type='bool'),
-                                Id=dict(type='str'),
-                                Device=dict(type='str'),
-                                Repository=dict(type='str', choices=['IBMWebsite'])
+                                all=dict(type='bool'),
+                                device=dict(type='str'),
+                                repository=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite')
                             )
                         )
                     )
                 )
             )
-        )
+        ),
+        state=dict(type='str', choices=['facts'])
     )
 
     module = AnsibleModule(
@@ -838,7 +960,10 @@ def run_module():
         py_ver = sys.version_info[0]
         raise ParameterError("Unsupported Python version {0}, supported python version is 3 and above".format(py_ver))
 
-    changed, info, warning = platform_update(module)
+    if module.params.get('state'):
+        changed, info, warning = facts(module)
+    else:
+        changed, info, warning = platform_update(module)
 
     result = {}
     result['changed'] = changed
