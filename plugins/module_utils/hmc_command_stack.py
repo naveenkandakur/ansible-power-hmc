@@ -60,6 +60,7 @@ class HmcCommandStack():
                'RMVIOSIMG': 'rmviosimg',
                'UPDVIOS': 'updvios',
                'UPGVIOS': 'upgvios',
+               'MKSVCEVENT': 'mksvcevent'
                }
 
     HMC_CMD_OPT = {'LSHMC': {'-N': ' -n ',
@@ -490,7 +491,22 @@ class HmcCommandStack():
                                '--OPTIONS': ' --options ',
                                '--RESTART': ' --restart ',
                                '--SAVE': ' --save ',
-                               '--DISK': ' --disk '}
+                               '--DISK': ' --disk '},
+                   'MKSVCEVENT': {'-R': ' -r ',
+                                  '-D': ' -d ',
+                                  '-T': ' -t ',
+                                  '-M': ' -m ',
+                                  '-A': ' -a ',
+                                  '-TITLE': 'title=',
+                                  '-SEVERITY': ',severity=',
+                                  '-NAME': ',name=',
+                                  '-PHONE': ',phone=',
+                                  '-EMAIL': ',email=',
+                                  '-TARGET_MTMS': ',target_mtms=',
+                                  '-TARGET_LPAR_NAME': ',target_lpar_name=',
+                                  '-LPAR_NAME': ',lpar_name=',
+                                  '-IS_CALLHOME': ',is_callhome=',
+                                  '-SERVICE_FILE': ',\\"service_file='}
                    }
 
     def filterBuilder(self, cmdKey, configOptionsDict):
