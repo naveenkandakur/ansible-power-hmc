@@ -153,12 +153,11 @@ options:
                 choices: ['allow', 'deny', 'ALLOW', 'DENY']
     state:
         description:
-            - C(security_facts) does not change anything on the HMC and returns the security hardening information.
             - C(setting_security) ensures the new security hardening rules are configured.
             - C(firewall_facts) does not change anything on the HMC and returns the firewall settings information.
             - C(setting_firewall) ensures the firewall settings are configured.
         type: str
-        choices: ['security_facts', 'setting_security', 'firewall_facts', 'setting_firewall']
+        choices: ['setting_security', 'firewall_facts', 'setting_firewall']
 '''
 EXAMPLES = '''
 - name: Apply the single rule lls_maxage
@@ -478,7 +477,7 @@ def run_module():
                              ),
         active=dict(type='bool'),
         reload=dict(type='bool'),
-        state=dict(type='str', choices=['security_facts', 'setting_security', 'firewall_facts', 'setting_firewall']),
+        state=dict(type='str', choices=['setting_security', 'firewall_facts', 'setting_firewall']),
     )
 
     module = AnsibleModule(
