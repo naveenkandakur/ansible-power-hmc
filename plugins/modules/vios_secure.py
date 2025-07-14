@@ -80,10 +80,12 @@ options:
         description:
             - The name or mtms (machine type model serial) of the managed system.
         type: str
+        required: true
     vios_name:
         description:
             - The name of the VirtualIOServer.
         type: str
+        required: true
     file:
         description:
             - Specifies the security rules file to be applied.
@@ -177,34 +179,24 @@ EXAMPLES = '''
 
 - name: Get firewall information for ipv6
   vios_secure:
-    hmc_host: "{{ inventory_hostname }}"
-    hmc_auth:
-        username: '{{ ansible_user }}'
-        password: '{{ hmc_password }}'
-    attributes:
-        hmc_host: '{{ hmc_ip }}'
-        hmc_auth: '{{ curr_hmc_auth }}'
-        system_name: <sys>
-        vios_name: <vios>
-        ip_version: IPV6
-    state: firewall_facts
+    hmc_host: '{{ hmc_ip }}'
+    hmc_auth: '{{ curr_hmc_auth }}'
+    system_name: <sys>
+    vios_name: <vios>
+    ip_version: IPV6
+  state: firewall_facts
 
 - name: Apply firewall rule for port 2000 with interface en0
   vios_secure:
-    hmc_host: "{{ inventory_hostname }}"
-    hmc_auth:
-        username: '{{ ansible_user }}'
-        password: '{{ hmc_password }}'
-    attributes:
-        hmc_host: '{{ hmc_ip }}'
-        hmc_auth: '{{ curr_hmc_auth }}'
-        system_name: <sys>
-        vios_name: <vios>
-        ip_version: IPV6
-        firewall_config:
-            - port: 2000
-              present: allow
-              interface: en0
+    hmc_host: '{{ hmc_ip }}'
+    hmc_auth: '{{ curr_hmc_auth }}'
+    system_name: <sys>
+    vios_name: <vios>
+    ip_version: IPV6
+    firewall_config:
+        - port: 2000
+          present: allow
+          interface: en0
     state: setting_firewall
 '''
 
