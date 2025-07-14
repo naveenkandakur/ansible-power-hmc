@@ -164,17 +164,12 @@ options:
 EXAMPLES = '''
 - name: Apply the single rule lls_maxage
   vios_secure:
-    hmc_host: "{{ inventory_hostname }}"
-    hmc_auth:
-      username: '{{ ansible_user }}'
-      password: '{{ hmc_password }}'
-    attributes:
-        hmc_host: '{{ hmc_ip }}'
-        hmc_auth: '{{ hmc_auth }}'
-        system_name: <sys>
-        vios_name: <vios>
-        rule: lls_maxage
-        level: low
+    hmc_host: '{{ hmc_ip }}'
+    hmc_auth: '{{ hmc_auth }}'
+    system_name: <sys>
+    vios_name: <vios>
+    rule: lls_maxage
+    level: low
     state: setting_security
 
 - name: Get firewall information for ipv6
@@ -457,8 +452,8 @@ def run_module():
                           password=dict(type='str', no_log=True),
                       )
                       ),
-        system_name=dict(type='str'),
-        vios_name=dict(type='str'),
+        system_name=dict(type='str', required=True),
+        vios_name=dict(type='str', required=True),
         level=dict(type='str', choices=['low', 'medium', 'high', 'default']),
         rule=dict(type='str'),
         file=dict(type='str'),
