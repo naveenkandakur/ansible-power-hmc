@@ -328,7 +328,7 @@ class Hmc():
             self.OPT['CHSYSSTATE']['-O']['ON']
         self.hmcconn.execute(chsysstateCmd)
 
-    def getManagedSystemDetails(self, cecName):
+    def getManagedSystemDetails(self, cecName, filter=None):
         lssyscfgCmd = self.CMD['LSSYSCFG'] + \
             self.OPT['LSSYSCFG']['-R']['SYS'] + \
             self.OPT['LSSYSCFG']['-M'] + cecName
