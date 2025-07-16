@@ -247,10 +247,10 @@ def create_svc_events(module, params):
             module.fail_json(msg="The partition is not available in HMC")
     if params['attributes']['target_mtms'] is not None:
         target_system = params['attributes']['target_mtms']
-        target_lpar_name = params['attributes']['target_lpar_name']
-        target_lpar_list = hmc.list_all_lpars_details(target_lpar_name, "name")
         if target_system not in sys_list:
             module.fail_json(msg="The target managed system is not available in HMC")
+        target_lpar_name = params['attributes']['target_lpar_name']
+        target_lpar_list = hmc.list_all_lpars_details(target_lpar_name, "name")
         if target_lpar_name not in target_lpar_list:
             module.fail_json(msg="The target partition is not available in HMC")
     try:
