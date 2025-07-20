@@ -845,7 +845,7 @@ class Hmc():
             lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
-        user_config = {"-F":config_F}
+        user_config = {"-F": config_F}
         res = self.cmdClass.parseMultiLineCSV(raw_result, user_config)
         return res
 
