@@ -838,7 +838,6 @@ class Hmc():
         self.hmcconn.execute(chhmcldap)
 
     def list_all_managed_system_details(self, config_F=None):
-        lines = []
         lssyscfgCmd = self.CMD['LSSYSCFG'] +\
             self.OPT['LSSYSCFG']['-R']['SYS']
         if config_F:
