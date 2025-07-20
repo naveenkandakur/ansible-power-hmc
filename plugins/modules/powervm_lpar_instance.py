@@ -1055,11 +1055,10 @@ def get_MS_names_by_lpar_name(hmc_obj, lpar_name):
     mss = hmc_obj.list_all_managed_system_details("name,state")
     ms_list = []
     for ms in mss:
-        ms_name, state = ms.split(',')
-        if state == 'Operating':
-            lpar_names = hmc_obj.list_all_lpars_details(ms_name, "name")
+        if ms["state"] == 'Operating':
+            lpar_names = hmc_obj.list_all_lpars_details(ms["name"], "name")
             if lpar_name in lpar_names:
-                ms_list.append(ms_name)
+                ms_list.append(ms["name"])
     return ms_list
 
 

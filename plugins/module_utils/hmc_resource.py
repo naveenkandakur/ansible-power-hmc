@@ -837,17 +837,17 @@ class Hmc():
                 self.OPT['CHHMCLDAP']['-R'][resource]
         self.hmcconn.execute(chhmcldap)
 
-    def list_all_managed_system_details(self, filter=None):
+    def list_all_managed_system_details(self, config_F=None):
         lines = []
         lssyscfgCmd = self.CMD['LSSYSCFG'] +\
             self.OPT['LSSYSCFG']['-R']['SYS']
         if filter:
-            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + filter
+            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
-        lines = raw_result.strip().split("\n")
-
-        return lines
+        user_config = {"-F":config_F}
+        res = self.cmdClass.parseMultiLineCSV(raw_result, user_config)
+        return res
 
     def list_all_lpars_details(self, sys_name, filter=None):
         lines = []
