@@ -841,7 +841,7 @@ class Hmc():
         lines = []
         lssyscfgCmd = self.CMD['LSSYSCFG'] +\
             self.OPT['LSSYSCFG']['-R']['SYS']
-        if filter:
+        if config_F:
             lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
