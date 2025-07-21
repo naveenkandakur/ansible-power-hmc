@@ -1055,11 +1055,10 @@ def get_MS_names_by_lpar_name(hmc_obj, lpar_name):
     mss = hmc_obj.list_all_managed_system_details("name,state")
     ms_list = []
     for ms in mss:
-        ms_name, state = ms.split(',')
-        if state == 'Operating':
-            lpar_names = hmc_obj.list_all_lpars_details(ms_name, "name")
+        if ms["state"] == 'Operating':
+            lpar_names = hmc_obj.list_all_lpars_details(ms["name"], "name")
             if lpar_name in lpar_names:
-                ms_list.append(ms_name)
+                ms_list.append(ms["name"])
     return ms_list
 
 
@@ -1121,7 +1120,7 @@ def create_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
@@ -1377,7 +1376,7 @@ def remove_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
@@ -1462,7 +1461,7 @@ def poweroff_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
@@ -1550,7 +1549,7 @@ def poweron_partition(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
@@ -1728,7 +1727,7 @@ def partition_details(module, params):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
 
-    if re.match(HmcConstants.MTMS_pattern, system_name):
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
         try:
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:

@@ -60,6 +60,8 @@ class HmcCommandStack():
                'RMVIOSIMG': 'rmviosimg',
                'UPDVIOS': 'updvios',
                'UPGVIOS': 'upgvios',
+               'MKSVCEVENT': 'mksvcevent',
+               'VIOSECURE': 'viosecure',
                }
 
     HMC_CMD_OPT = {'LSHMC': {'-N': ' -n ',
@@ -490,7 +492,33 @@ class HmcCommandStack():
                                '--OPTIONS': ' --options ',
                                '--RESTART': ' --restart ',
                                '--SAVE': ' --save ',
-                               '--DISK': ' --disk '}
+                               '--DISK': ' --disk '},
+                   'MKSVCEVENT': {'-R': ' -r ',
+                                  '-D': ' -d ',
+                                  '-T': ' -t ',
+                                  '-M': ' -m ',
+                                  '-A': ' -a ',
+                                  '-TITLE': 'title=',
+                                  '-SEVERITY': ',severity=',
+                                  '-NAME': ',name=',
+                                  '-PHONE': ',phone=',
+                                  '-EMAIL': ',email=',
+                                  '-TARGET_MTMS': ',target_mtms=',
+                                  '-TARGET_LPAR_NAME': ',target_lpar_name=',
+                                  '-LPAR_NAME': ',lpar_name=',
+                                  '-IS_CALLHOME': ',is_callhome=',
+                                  '-SERVICE_FILE': ',\\"service_file='},
+                   'VIOSECURE': {'-LEVEL': ' -level ',
+                                 '-APPLY': ' -apply ',
+                                 '-RULE': ' -rule ',
+                                 '-FILE': ' -file ',
+                                 '-FIREWALL': ' -firewall ',
+                                 '-PORT': ' -port ',
+                                 '-IPV6': ' -ip6 ',
+                                 '-INTERFACE': ' -interface ',
+                                 '-REMOTE': ' -remote ',
+                                 '-ADDRESS': ' -address ',
+                                 '-TIMEOUT': ' -timeout '}
                    }
 
     def filterBuilder(self, cmdKey, configOptionsDict):
