@@ -1020,4 +1020,3 @@ class Hmc():
             if str(params['ip_version']).lower() == 'ipv6':
                 viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
         return viosecure_cmd
-
