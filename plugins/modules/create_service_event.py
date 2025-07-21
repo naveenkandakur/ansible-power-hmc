@@ -67,7 +67,7 @@ options:
             - C(cloudconnector) to report a problem with the cloud connector on this HMC.
         required: true
         type: str
-        choices: ['cloudconnector', 'system', 'lpm', 'vios', 'hmc']
+        choices: ['cloudconnector', 'sys', 'lpm', 'vios', 'hmc']
     attributes:
         description:
             - The serviceable event attributes to set.
@@ -290,7 +290,7 @@ def run_module():
         state=dict(type='str', choices=['created']),
         system_name=dict(type='str', required=True),
         description=dict(type='str', required=True),
-        types=dict(required=True, type='str', choices=['cloudconnector', 'system', 'lpm', 'vios', 'hmc']),
+        types=dict(required=True, type='str', choices=['cloudconnector', 'sys', 'lpm', 'vios', 'hmc']),
         attributes=dict(type='dict', required=True,
                         options=dict(
                             title=dict(type='str', required=True,),
