@@ -837,18 +837,16 @@ class Hmc():
                 self.OPT['CHHMCLDAP']['-R'][resource]
         self.hmcconn.execute(chhmcldap)
 
-    def list_all_managed_system_details(self, filter=None):
-        lines = []
+    def list_all_managed_system_details(self, config_F=None):
         lssyscfgCmd = self.CMD['LSSYSCFG'] +\
             self.OPT['LSSYSCFG']['-R']['SYS']
-        if filter:
-            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + filter
+        if config_F:
+            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
-        raw_result = raw_result.replace("Power Off", "Off")
-        lines = raw_result.split()
-
-        return lines
+        user_config = {"-F": config_F}
+        res = self.cmdClass.parseMultiLineCSV(raw_result, user_config)
+        return res
 
     def list_all_lpars_details(self, sys_name, filter=None):
         lines = []
@@ -860,7 +858,7 @@ class Hmc():
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
         raw_result = raw_result.replace("Power Off", "Off")
-        lines = raw_result.split()
+        lines = raw_result.strip().split()
 
         return lines
 
