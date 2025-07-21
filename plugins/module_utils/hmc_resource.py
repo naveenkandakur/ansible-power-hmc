@@ -971,3 +971,24 @@ class Hmc():
         if state == 'upgraded':
             updviosbk_cmd += self.OPT['UPDVIOS']['--DISK'] + str(configDict['disks'])
         return self.hmcconn.execute(updviosbk_cmd)
+
+    def create_viosecure_command(self, params, fields):
+        option_map = {'port': '-PORT', 'interface': '-INTERFACE', 'remote': '-REMOTE', 'address': '-ADDRESS', 'timeout': '-TIMEOUT'}
+        viosecure_cmd = 'viosecure'
+        if params['level'] is not None:
+            viosecure_cmd += self.OPT['VIOSECURE']['-LEVEL'] + str(params['level']) + self.OPT['VIOSECURE']['-APPLY']
+            if params['rule'] is not None:
+                viosecure_cmd += self.OPT['VIOSECURE']['-RULE'] + str(params['rule'])
+        elif params['file'] is not None:
+            viosecure_cmd += self.OPT['VIOSECURE']['-FILE'] + str(params['file'])
+        elif params['firewall'] is True:
+            viosecure_cmd += self.OPT['VIOSECURE']['-FIREWALL'] + str(fields['present'].lower())
+            for key in option_map:
+                if fields[key] is not None and key != 'remote':
+                    viosecure_cmd += self.OPT['VIOSECURE'][option_map[key]] + str(fields[key])
+                elif key == 'remote' and fields[key] is not None:
+                    if str(fields[key]).lower() == 'true':
+                        viosecure_cmd += self.OPT['VIOSECURE'][option_map[key]]
+            if str(params['ip_version']).lower() == 'ipv6':
+                viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
+        return viosecure_cmd
