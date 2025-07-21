@@ -1,4 +1,4 @@
-- name: Demo HMC upgrade
+- name: Demo apply firewall rule
   hosts: hmcs
   connection: local
   gather_facts: false
@@ -18,8 +18,8 @@
         ibm.power_hmc.vios_secure:
             hmc_host: "{{ inventory_hostname }}"
             hmc_auth: '{{ curr_hmc_auth }}'
-            system_name: hmc-zz1
-            vios_name: hmc-zz1-vios1
+            system_name: < cec-name >
+            vios_name: < vios-name >
             ip_version: IPV4
             firewall_config:
                 - port: 2000
