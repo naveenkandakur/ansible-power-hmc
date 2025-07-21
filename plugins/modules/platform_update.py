@@ -368,7 +368,7 @@ result:
 
 
 import logging
-LOG_FILENAME = "/Users/chiranthanmv/platform_up/ansible.log"
+LOG_FILENAME = "/tmp/ansible_power_hmc.log"
 logger = logging.getLogger(__name__)
 import re
 from ansible.module_utils.basic import AnsibleModule
@@ -682,9 +682,11 @@ def platform_update(module):
     hmc = Hmc(hmc_conn)
 
     sys_list = (
-        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
+        hmc.list_all_managed_system_details(config_F="name") + hmc.list_all_managed_system_details(config_F="type_model*serial_num")
     )
-    if system_name not in sys_list:
+    if not sys_list:
+        module.fail_json(msg="No managed systems found in HMC")
+    elif system_name not in [v for d in sys_list for v in d.values()]:
         module.fail_json(msg="The managed system is not available in HMC")
     else:
         vios_list = list(hmc_conn.execute("lssyscfg -r lpar -m {0} -F name,state,lpar_id,rmc_state".format(system_name)).splitlines())
@@ -893,9 +895,11 @@ def facts(module):
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
     sys_list = (
-        hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
+        hmc.list_all_managed_system_details(config_F="name") + hmc.list_all_managed_system_details(config_F="type_model*serial_num")
     )
-    if system_name not in sys_list:
+    if not sys_list:
+        module.fail_json(msg="No managed systems found in HMC")
+    elif system_name not in [v for d in sys_list for v in d.values()]:
         module.fail_json(msg="The managed system is not available in HMC")
     else:
         cmd = f"lssyscfg -r lpar -m {system_name} -F name,rmc_state,lpar_id,lpar_env | grep vioserver | grep -w active"
