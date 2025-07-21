@@ -26,9 +26,6 @@ This repository contains some example best practices for open source repositorie
 * [MAINTAINERS.md](MAINTAINERS.md)
 * [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for more details you should [read this][coc].
 
-<!-- The following are OPTIONAL, but strongly suggested to have in your repository. -->
-* [travis.yml](.travis.yml) - Look https://docs.travis-ci.com/user/tutorial/ for more details.
-
 
 <!-- A notes section is useful for anything that isn't covered in the Usage or Scope. Like what we have below. -->
 <!-- ## Notes -->
@@ -36,12 +33,11 @@ This repository contains some example best practices for open source repositorie
 
 ### Platforms
 
-- HMC V9R1 or later
-- HMC V8R8.7.0
+- HMC V9R2 or later
 
 ### Ansible
 
-- Requires Ansible 2.14.0 or newer
+- Requires Ansible 2.16.0 or newer
 - For help installing Ansible, refer to the [Installing Ansible] section of the Ansible Documentation
 - For help installing the ibm.power\_hmc collection, refer to the [install](docs/source/installation.rst) page of this project
 
@@ -74,7 +70,7 @@ example:
 If you would like to see the detailed LICENSE click [here](LICENSE).
 
 ```text
-Copyright:: 2020- IBM, Inc
+Copyright:: 2025- IBM, Inc
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
