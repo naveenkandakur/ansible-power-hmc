@@ -60,7 +60,7 @@ class HmcCommandStack():
                'RMVIOSIMG': 'rmviosimg',
                'UPDVIOS': 'updvios',
                'UPGVIOS': 'upgvios',
-               'MKSVCEVENT': 'mksvcevent'
+               'MKSVCEVENT': 'mksvcevent',
                'VIOSECURE': 'viosecure',
                }
 
@@ -507,7 +507,7 @@ class HmcCommandStack():
                                   '-TARGET_LPAR_NAME': ',target_lpar_name=',
                                   '-LPAR_NAME': ',lpar_name=',
                                   '-IS_CALLHOME': ',is_callhome=',
-                                  '-SERVICE_FILE': ',\\"service_file='}
+                                  '-SERVICE_FILE': ',\\"service_file='},
                    'VIOSECURE': {'-LEVEL': ' -level ',
                                  '-APPLY': ' -apply ',
                                  '-RULE': ' -rule ',
