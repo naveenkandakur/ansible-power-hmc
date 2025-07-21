@@ -840,18 +840,16 @@ class Hmc():
                 self.OPT['CHHMCLDAP']['-R'][resource]
         self.hmcconn.execute(chhmcldap)
 
-    def list_all_managed_system_details(self, filter=None):
-        lines = []
+    def list_all_managed_system_details(self, config_F=None):
         lssyscfgCmd = self.CMD['LSSYSCFG'] +\
             self.OPT['LSSYSCFG']['-R']['SYS']
-        if filter:
-            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + filter
+        if config_F:
+            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
-        raw_result = raw_result.replace("Power Off", "Off")
-        lines = raw_result.split()
-
-        return lines
+        user_config = {"-F": config_F}
+        res = self.cmdClass.parseMultiLineCSV(raw_result, user_config)
+        return res
 
     def list_all_lpars_details(self, sys_name, filter=None):
         lines = []
@@ -863,7 +861,7 @@ class Hmc():
 
         raw_result = self.hmcconn.execute(lssyscfgCmd)
         raw_result = raw_result.replace("Power Off", "Off")
-        lines = raw_result.split()
+        lines = raw_result.strip().split()
 
         return lines
 
@@ -1001,3 +999,25 @@ class Hmc():
                 svc_ticket_cmd += self.OPT['MKSVCEVENT'][option_map[key]] + str(params['attributes'][key])
         svc_ticket_cmd += ",is_callhome=1"
         return self.hmcconn.execute(svc_ticket_cmd)
+
+    def create_viosecure_command(self, params, fields):
+        option_map = {'port': '-PORT', 'interface': '-INTERFACE', 'remote': '-REMOTE', 'address': '-ADDRESS', 'timeout': '-TIMEOUT'}
+        viosecure_cmd = 'viosecure'
+        if params['level'] is not None:
+            viosecure_cmd += self.OPT['VIOSECURE']['-LEVEL'] + str(params['level']) + self.OPT['VIOSECURE']['-APPLY']
+            if params['rule'] is not None:
+                viosecure_cmd += self.OPT['VIOSECURE']['-RULE'] + str(params['rule'])
+        elif params['file'] is not None:
+            viosecure_cmd += self.OPT['VIOSECURE']['-FILE'] + str(params['file'])
+        elif params['firewall'] is True:
+            viosecure_cmd += self.OPT['VIOSECURE']['-FIREWALL'] + str(fields['present'].lower())
+            for key in option_map:
+                if fields[key] is not None and key != 'remote':
+                    viosecure_cmd += self.OPT['VIOSECURE'][option_map[key]] + str(fields[key])
+                elif key == 'remote' and fields[key] is not None:
+                    if str(fields[key]).lower() == 'true':
+                        viosecure_cmd += self.OPT['VIOSECURE'][option_map[key]]
+            if str(params['ip_version']).lower() == 'ipv6':
+                viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
+        return viosecure_cmd
+
