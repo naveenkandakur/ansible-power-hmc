@@ -328,12 +328,12 @@ class Hmc():
             self.OPT['CHSYSSTATE']['-O']['ON']
         self.hmcconn.execute(chsysstateCmd)
 
-    def getManagedSystemDetails(self, cecName, filter=None):
+    def getManagedSystemDetails(self, cecName, config_F=None):
         lssyscfgCmd = self.CMD['LSSYSCFG'] + \
             self.OPT['LSSYSCFG']['-R']['SYS'] + \
             self.OPT['LSSYSCFG']['-M'] + cecName
         if filter is not None:
-            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + filter
+            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
             return self.hmcconn.execute(lssyscfgCmd)
         result = self.hmcconn.execute(lssyscfgCmd)
         res_dict = self.cmdClass.parseCSV(result)
