@@ -64,6 +64,7 @@ options:
             - C(vios) to report a problem with a Virtual I/O Server on managed-system.
             - C(lpm) to report a partition migration problem where managed-system is the source system for the partition migration operation.
             - C(hmc) to report a problem with this HMC.
+            - C(cloudconnector) to report a problem with the cloud connector on this HMC.
         required: true
         type: str
         choices: ['cloudconnector', 'system', 'lpm', 'vios', 'hmc']
@@ -106,7 +107,7 @@ options:
                 type: str
             target_mtms:
                 description:
-                    - The target managed system name for the serviceable event.
+                    - The target managed system MTMS for the serviceable event.
                     - Required for C(lpm)
                 type: str
             lpar_name:
@@ -141,7 +142,7 @@ EXAMPLES = '''
         title: test
         severity: 4
         contact_name: Test
-        contact_phone: 980980098
+        contact_phone: < phone-num >
         contact_email: test@abc.com
         lpar_name: < partition >
         service_file:
@@ -160,7 +161,7 @@ EXAMPLES = '''
         title: test
         severity: 4
         contact_name: Test
-        contact_phone: 980980098
+        contact_phone: < phone-num >
         contact_email: test@abc.com
         lpar_name: < partition1 >
         target_lpar_name: <partition2 >
