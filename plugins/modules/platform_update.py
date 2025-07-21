@@ -16,15 +16,15 @@ DOCUMENTATION = '''
 module: platform_update
 author:
     - Chiranthan M V (@chiranthanmv)
-short_description: Performs consolidated system firmware, VIOS, SR-IOV, and I/O adapter updates with migration and LPM readiness validation.
+short_description: Performs consolidated system firmware, VIOS, SR-IOV, and I/O adapter updates, including partition migration.
+notes:
+  - The current version supports IBM Fix Central website as the update source .
+  - Support for additional update sources will be added in future releases.
 description:
     - This module allows updating System Firmware, VIOS, SR-IOV adapters, and I/O adapters either individually or through a single consolidated update flow.
-    - The operations can be defined using the I(ParameterValue) structure.
-    - It supports both minimal and full update strategies for SR-IOV adapters and allows updates from IBM Fix Central website when specified.
+    - This operations can be configured using I(platform_config) parameter.
+    - It supports both 'DriverOnly' and 'Adapter' update strategies for SR-IOV adapters and allows updates from IBM Fix Central website when specified.
     - Supports defining the order in which updates are applied across components.
-    - Includes validation for Live Partition Mobility (LPM) readiness and VIOS redundancy.
-    - Compatible with update source like IBM Fix Central website (recommended for end-to-end automation).
-    - Support for additional sources will be added in future implementations.
 version_added: 1.0.0
 requirements:
 - Python >= 3
@@ -57,7 +57,9 @@ options:
         type: str
     platform_config:
         description:
-            - Defines the configuration for the operation to be performed, such as system firmware updates, partition migrations, or VIOS updates.
+            - Defines the configuration for the operation to be performed, such as system firmware updates
+              (including SR-IOV adapter updates) or VIOS updates (including I/O adapter updates).
+            - Also supports performing partition migrations.
             - This option applies changes to the HMC.
         required: false
         type: dict
@@ -70,10 +72,10 @@ options:
                     update_type:
                         description:
                             - Type of firmware update operation.
-                            - 'C(NoUpdate): No update will be performed.'
-                            - 'C(Update): Performs a standard update.'
+                            - 'C(NoUpdate): System firmware update is skipped, but SR-IOV adapter updates are still allowed'
+                            - 'C(Update): Performs an update.'
                             - 'C(Upgrade): Performs an upgrade.'
-                            - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) option must not be provided.
+                            - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
                             - When set to C(NoUpdate), the fields C(is_distruptive), C(resource_type), and C(level) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update', 'Upgrade']
@@ -88,7 +90,7 @@ options:
                     resource_type:
                         description:
                             - Specifies the source repository for the update image.
-                            - If not provided, the default repository C(IBMWebsite) will be used.
+                            - currently only supports C(IBMWebsite).
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
@@ -108,7 +110,7 @@ options:
                             all:
                                 description:
                                     - Indicates whether the update should be applied to all adapters.
-                                    - If set to C(true), the C(adapter_id) field is not required and will be ignored if provided.
+                                    - If set to C(true), the C(adapter_id) field is not required.
                                 type: bool
                             adapter_id:
                                 description:
@@ -135,7 +137,7 @@ options:
                         description: Target managed system name.
                         type: str
                     leave_partition_in_target:
-                        description: Whether to keep the partition in the target system post-migration.
+                        description: Whether to keep the partition in the target after platform update.
                         type: bool
             vios_update:
                 description:
@@ -146,7 +148,7 @@ options:
                     update_type:
                         description:
                             - Specifies the type of VIOS update to be performed.
-                            - 'C(NoUpdate): No update will be applied to VIOS.'
+                            - 'C(NoUpdate): No update will be applied to VIOS, but I/O adapter updates are still allowed'
                             - 'C(Update): Triggers a VIOS update using the provided configuration.'
                             - When set to C(NoUpdate), the fields C(resource_type) and C(level) are not required.
                         type: str
@@ -160,7 +162,7 @@ options:
                     resource_type:
                         description:
                             - Specifies the source repository for the update image.
-                            - If not provided, the default repository C(IBMWebsite) will be used.
+                            - Currentlt only supports C(IBMWebsite).
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
@@ -182,27 +184,27 @@ options:
                                 type: bool
                             device:
                                 description:
-                                    - Name of the I/O adapter device(s) to be updated.
-                                    - Can be a single device name or a comma-separated list of multiple devices (e.g., C(ent0,fcs0)).
+                                    - List of I/O adapter device names to be updated.
+                                    - Specify one or more device names as a list (e.g., C(['ent0', 'fcs0'])).
                                     - Required only when C(all) is not specified.
-                                type: str
+                                type: list
+                                elements: str
                             repository:
                                 description:
                                     - Specifies the source repository for the update image.
-                                    - If not provided, the default repository C(IBMWebsite) will be used.
+                                    - Currentlt only supports C(IBMWebsite).
                                 type: str
                                 choices: ['IBMWebsite']
                                 default: 'IBMWebsite'
     state:
         description:
-            - When set to C(facts), the module performs a read-only operation on the HMC
             - It gathers and returns information about available SR-IOV adapters, Virtual I/O Servers (VIOS), and I/O adapters without making any changes.
         type: str
         choices: ['facts']
 '''
 
 EXAMPLES = '''
-- name: Perform a minimal system firmware update using IBM Fix Central
+- name: Update a SR-IOV adapters (DriverOnly) using IBM Fix Central
   platform_update:
     hmc_host: "10.0.0.10"
     hmc_auth:
@@ -216,6 +218,46 @@ EXAMPLES = '''
         sriov_adapter_update:
           - adapter_id: "ent0"
             subtype: DriverOnly
+
+- name: Update all SR-IOV adapters (Adapter) using IBM Fix Central (No Firware Update)
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      system_firmware_update:
+        update_type: NoUpdate
+        update_order: 1
+        sriov_adapter_update:
+          - all: true
+            subtype: Adapter
+
+- name: Perform a System Firmware update using default level
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      system_firmware_update:
+        update_type: NoUpdate
+        update_order: 1
+
+- name: Perform a System Firmware update using specified level (level 12)
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      system_firmware_update:
+        update_type: NoUpdate
+        update_order: 1
+        level: 12
 
 - name: Migrate a partition to a different managed system
   platform_update:
@@ -234,22 +276,74 @@ EXAMPLES = '''
           destination_managed_system: "p920_system"
           leave_partition_in_target: false
 
-- name: Update VIOS using IBM Fix Central
+- name: Update VIOS to latest available level from IBM Fix Central
   platform_update:
     hmc_host: "10.0.0.10"
     hmc_auth:
       username: "hscroot"
       password: "hmcpass"
     system_name: "p910_system"
-    platform_update:
+    platform_config:
       vios_update:
         - update_type: Update
           vios_name: "vios1"
           update_order: 1
           resource_type: IBMWebsite
+
+- name: Update selected I/O adapters only (no VIOS update)
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      vios_update:
+        - update_type: NoUpdate
+          vios_name: "vios1"
+          update_order: 1
+          resource_type: IBMWebsite
           io_adapter_update:
-            device: "fcs0"
-            repository: IBMWebsite
+            - device:
+                - "device 1"
+                - "device 2"
+              repository: IBMWebsite
+
+- name: Update VIOS to specific level and all I/O adapters from IBM Fix Central
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      vios_update:
+        - update_type: NoUpdate
+          vios_name: "vios1"
+          update_order: 1
+          resource_type: IBMWebsite
+          level: 13
+          io_adapter_update:
+            - all: true
+              repository: IBMWebsite
+
+- name: Update multiple VIOS instances to the latest available level from IBM Fix Central
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    platform_config:
+      vios_update:
+        - update_type: Update
+          vios_name: "vios1"
+          update_order: 1
+          resource_type: IBMWebsite
+        - update_type: Update
+          vios_name: "vios2"
+          update_order: 2
+          resource_type: IBMWebsite
 
 - name: Facts
   platform_update:
@@ -425,6 +519,8 @@ def validate_parameters(params):
 
     if params.get('state') and params.get('platform_config'):
         raise ParameterError("Invalid parameter combination: 'state' and 'platform_config' cannot be used together. Please provide only one of them.")
+    elif not (params.get('state') or params.get('platform_config')):
+        raise ParameterError("Missing required parameter: Please provide either 'state' or 'platform_config'.")
     if params.get('state'):
         mandatory = ['hmc_host', 'hmc_auth', 'system_name']
         unsupported = [
@@ -461,15 +557,6 @@ def validate_parameters(params):
             validate_partition_migration(partition_migs)
 
 
-def fail_with_logoff(module, rest_conn, msg):
-    try:
-        rest_conn.logoff()
-    except Exception as logoff_error:
-        error_msg = parse_error_response(logoff_error)
-        module.warn(msg=error_msg)
-    module.fail_json(msg=msg)
-
-
 def cleanup_entries(data, sriov=None, io=None):
     Adapter_subtype_map = {
         'DriverOnly': 'adapterdriver',
@@ -479,7 +566,7 @@ def cleanup_entries(data, sriov=None, io=None):
         sriov_adapters = data["system_firmware_update"].get("sriov_adapter_update", [])
         if sriov_adapters:
             subtype = sriov_adapters[0].get("subtype", "adapterdriver")
-            data['system_firmware_updatde']['sriov_adapter_update'] = [
+            data['system_firmware_update']['sriov_adapter_update'] = [
                 {
                     "AdapterID": str(adapter_id),
                     "SubType": subtype
@@ -487,28 +574,36 @@ def cleanup_entries(data, sriov=None, io=None):
             ]
     if io:
         viosUpdates = data['vios_update']
-        for vios in viosUpdates:
-            ioAdapters = vios.get("io_adapter_update")
-            if ioAdapters and ioAdapters[0].get('all'):
-                repo = ioAdapters[0].get("repository", "")
-                vios["io_adapter_update"] = [
-                    {
-                        "Id": adapter_id,
-                        "Device": ",".join(devices),
-                        "Repository": repo
-                    }
-                    for adapter_id, devices in io['IOAdapterUpdate'].items()
-                ]
+        if viosUpdates:
+            for vios in viosUpdates:
+                ioAdapters = vios.get("io_adapter_update")
+                if ioAdapters and ioAdapters[0].get('all'):
+                    repo = ioAdapters[0].get("repository", "")
+                    vios["io_adapter_update"] = [
+                        {
+                            "Id": adapter_id,
+                            "Device": ",".join(devices),
+                            "Repository": repo
+                        }
+                        for adapter_id, devices in io['IOAdapterUpdate'].items()
+                    ]
+                elif ioAdapters:
+                    vios["io_adapter_update"] = [
+                        {
+                            "Id": adapter.get("Id", ""),
+                            "Device": ",".join(adapter.get("device", [])),
+                            "Repository": adapter.get("repository")
+                        }
+                        for adapter in ioAdapters
+                    ]
 
     if isinstance(data, dict):
         cleaned = {}
         for key, value in data.items():
             if value is not None:
-                # Recursively clean value
                 cleaned_value = cleanup_entries(value)
 
-                # If this is the SubType key, normalize it
-                if key == "subtype" and isinstance(cleaned_value, str):
+                if key in ["subtype", "SubType"] and isinstance(cleaned_value, str):
                     cleaned_value = Adapter_subtype_map.get(cleaned_value, cleaned_value)
 
                 cleaned[key] = cleaned_value
@@ -572,7 +667,7 @@ def platform_update(module):
     vios_updates = copy.deepcopy(attributes.get('vios_update'))
     all_io_updates = []
     available_adapter_id = []
-    available_io_updates = {}
+    available_io_updates = {"IOAdapterUpdate": {}}
     if vios_updates:
         for entry in vios_updates:
             vios_name = entry.get("vios_name")
@@ -627,13 +722,9 @@ def platform_update(module):
     try:
         system_uuid, _unused = rest_conn.getManagedSystem(system_name)
         if not system_uuid:
-            fail_with_logoff(module, rest_conn, "Given system is not present")
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+            module.fail_json(msg="Given system is not present")
 
-    try:
+        # System Readiness Check
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
@@ -646,71 +737,65 @@ def platform_update(module):
                         msg = param.get('ParameterValue')
                         break
                 error_msg = f'system {system_name} is not in ready state, therefore the system firmware cannot be updated, Msg: {msg}'
-                fail_with_logoff(module, rest_conn, error_msg)
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+                module.fail_json(msg=error_msg)
 
-    try:
+        # SRIOV Adapters Avaiability check
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
-                fail_with_logoff(module, rest_conn, error_msg)
+                module.fail_json(msg=error_msg)
             sriov_update = sysfirm_update.get('sriov_adapter_update')
             if sriov_update:
                 if 'No results' in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                     error_msg = f'No SRIOV Adapters are available for {system_name}'
-                    fail_with_logoff(module, rest_conn, error_msg)
+                    module.fail_json(msg=error_msg)
 
                 for adapter in sriov_update:
-                    if adapter.get('ALL'):
+                    if adapter.get('all'):
                         available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
                     else:
                         adapter_id = adapter.get("adapter_id")
                         if int(adapter_id) not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                             error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
-                            fail_with_logoff(module, rest_conn, error_msg)
+                            module.fail_json(msg=error_msg)
 
+        # IO Adapter Avaiabillty check
         if all_io_updates:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
-                fail_with_logoff(module, rest_conn, error_msg)
+                module.fail_json(msg=error_msg)
 
             for io_update in all_io_updates:
                 if 'No results' in output.get("IOAdapterUpdate"):
                     error_msg = f"No IO Adapters are available for VIOS '{io_update.get('vios_name')}'"
-                    fail_with_logoff(module, rest_conn, error_msg)
+                    module.fail_json(msg=error_msg)
                 if io_update.get('all'):
                     vios_id = io_update.get('vios_id')
                     if output.get('IOAdapterUpdate', {}).get(vios_id, []):
                         available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
                     else:
                         error_msg = f"No available I/O adapters found for VIOS {output.get('vios_name')}"
-                        fail_with_logoff(module, rest_conn, error_msg)
+                        module.fail_json(msg=error_msg)
                 else:
                     io_id = str(io_update.get('vios_id')).zfill(3)
-                    device = io_update.get('device')
+                    devices = io_update.get('device')
                     valid_devices = output.get('IOAdapterUpdate', {}).get(io_id, [])
                     if valid_devices:
-                        if device not in valid_devices:
-                            error_msg = (
-                                f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('vios_id')}' "
-                                f"for VIOS '{io_update.get('vios_name')}'."
-                            )
-                            fail_with_logoff(module, rest_conn, error_msg)
+                        for device in devices:
+                            if device not in valid_devices:
+                                error_msg = (
+                                    f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('vios_id')}' "
+                                    f"for VIOS '{io_update.get('vios_name')}'."
+                                )
+                                module.fail_json(msg=error_msg)
                     else:
                         error_msg = f"VIOS '{io_update.get('vios_name')}' does not contain IO Adapter with ID '{io_update.get('vios_id')}'."
-                        fail_with_logoff(module, rest_conn, error_msg)
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+                        module.fail_json(msg=error_msg)
 
-    try:
+        # Vios Update Check
         needs_update = None
         if vios_updates:
             needs_update = any('update' == vios.get('update_type', '').lower() for vios in attributes.get("vios_update", []))
@@ -725,19 +810,15 @@ def platform_update(module):
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
                     if output.strip() in ("[]", "", "None"):
                         error_msg = f"Update file for {vios_name} not found at the specified source location: {source_file}."
-                        fail_with_logoff(module, rest_conn, error_msg)
+                        module.fail_json(msg=error_msg)
                     elif vios_level != 'latest' and vios_level not in output:
                         error_msg = (
                             f"Update file {vios_level} for vios {vios_name} "
                             f"is not found at the specified source location: {source_file}."
                         )
-                        fail_with_logoff(module, rest_conn, error_msg)
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+                        module.fail_json(msg=error_msg)
 
-    try:
+        # System Firmware Update Check
         sysfirm_update = attributes.get('system_firmware_update')
         if sysfirm_update:
             updateType = sysfirm_update.get('update_type').lower()
@@ -748,24 +829,21 @@ def platform_update(module):
                                                       type="sys", level=updateType)
                 if "No results" in output.get('ParameterValue'):
                     error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
-                    fail_with_logoff(module, rest_conn, error_msg)
+                    module.fail_json(msg=error_msg)
                 if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
                     error_msg = (
                         f"No {updateType.upper()} file found at the specified source: {source_file} "
                         f"for the resource: {system_name} reason: {output.get('ParameterValue')}"
                     )
+                    module.fail_json(msg=error_msg)
                 elif firm_level != 'latest' and firm_level not in output:
                     error_msg = (
                         f"Update file {firm_level} for the resource {system_name} "
                         f"is not found at the specified source location: {source_file}."
                     )
-                    fail_with_logoff(module, rest_conn, error_msg)
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+                    module.fail_json(msg=error_msg)
 
-    try:
+        # IO Adapter Update check
         if all_io_updates:
             for io_update in all_io_updates:
                 source_file = io_update.get('repository').lower()
@@ -777,20 +855,15 @@ def platform_update(module):
                     adp_ids = {io_update.get('id')}
                 if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
                     error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
-                    fail_with_logoff(module, rest_conn, error_msg)
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+                    module.fail_json(msg=error_msg)
 
-    try:
         cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
         mapped_data = map_entries(cleaned_data)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        fail_with_logoff(module, rest_conn, error_msg)
+        module.fail_json(msg=error_msg)
 
     finally:
         try:
@@ -804,16 +877,19 @@ def platform_update(module):
 
 def facts(module):
     params = module.params
+
+    try:
+        validate_parameters(params)
+    except Exception as e:
+        module.fail_json(msg=str(e))
+
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
     system_name = params['system_name']
     changed = False
     hmc_conn = None
-    try:
-        validate_parameters(params)
-    except Exception as e:
-        module.fail_json(msg=str(e))
+
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
     sys_list = (
@@ -840,11 +916,11 @@ def facts(module):
         try:
             system_uuid, _unused = rest_conn.getManagedSystem(system_name)
             if not system_uuid:
-                fail_with_logoff(module, rest_conn, "Given system is not present")
+                module.fail_json(msg="Given system is not present")
         except (Exception, HmcError) as error:
             error_msg = parse_error_response(error)
             logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-            fail_with_logoff(module, rest_conn, error_msg)
+            module.fail_json(msg=error_msg)
 
         def extract_adapters(response, key):
             if response.get('ParameterName'):
@@ -938,7 +1014,7 @@ def run_module():
                             elements='dict',
                             options=dict(
                                 all=dict(type='bool'),
-                                device=dict(type='str'),
+                                device=dict(type='list', elements='str'),
                                 repository=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite')
                             )
                         )

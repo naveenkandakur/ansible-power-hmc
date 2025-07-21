@@ -2531,12 +2531,12 @@ class HmcRestClient:
             return None
 
     def PlatformUpdate(self, system_uuid, param):
-        # url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/PlatformUpdate"
-        # header = {
-        #     "X-API-Session": self.session,
-        #     "Accept": "application/json",
-        #     "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
-        # }
+        url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/PlatformUpdate"
+        header = {
+            "X-API-Session": self.session,
+            "Accept": "application/json",
+            "Content-Type": "application/vnd.ibm.powervm.web+json; type=JobRequest"
+        }
         payload = {
             "JobRequest": {
                 "Metadata": {
@@ -2565,28 +2565,36 @@ class HmcRestClient:
                 }
             }
         }
-        # try:
-        #     resp = open_url(
-        #             url,
-        #             headers=header,
-        #             method='PUT',
-        #             data=json.dumps(payload),
-        #             validate_certs=False,
-        #             timeout=3600
-        #         )
+        try:
+            resp = open_url(
+                url,
+                headers=header,
+                method='PUT',
+                data=json.dumps(payload),
+                validate_certs=False,
+                timeout=3600
+            )
 
-        #     if resp.code != 200:
-        #         logger.debug("LICQueryRepository failed. Response code: %d", resp.code)
-        #         return None
-        #     response = json.loads(resp.read())
-        #     logger.info(f"first {response}")
-        #     job_url = response['entry']['selfLink']
-        #     logger.info(f"job url {job_url}")
-        #     response = self._check_job_status_and_wait(job_url)
-        return payload
-        # except Exception as e:
-        #         logger.error("LICQueryRepository request failed: %s", str(e))
-        #         return None
+            if resp.code != 200:
+                logger.debug("Platform request failed. Response code: %d", resp.code)
+                return None
+            response = json.loads(resp.read())
+            job_url = response['entry']['selfLink']
+            response = self._check_job_status_and_wait(job_url)
+            status = response['entry']['content']['JobResponse']['Status']
+            result = response['entry']['content']['JobResponse']['Result']
+            for output in result:
+                if output.get("ParameterName") == "result":
+                    steps_json = json.loads(output["ParameterValue"])
+                    steps = steps_json.get("Steps", [])
+                    if status == "COMPLETED_WITH_ERROR":
+                        for step in steps:
+                            if step.get("CurrentStatus") == "COMPLETED_WITH_ERROR":
+                                return step
+                    return steps
+        except Exception as e:
+            logger.error("Platform request failed: %s", str(e))
+            return None
 
     def _check_job_status_and_wait(self, job_url):
         header = {
@@ -2611,7 +2619,10 @@ class HmcRestClient:
             if status == "RUNNING":
                 time.sleep(10)
                 return self._check_job_status_and_wait(job_url)
-            return result
+            if status in ["COMPLETED_OK", "COMPLETED_WITH_ERROR"]:
+                return result
+
+            raise HmcError(f"Unexpected job status: {status}")
         except Exception as e:
             logger.error("Failed to check job status: %s", e)
             return "Error"
