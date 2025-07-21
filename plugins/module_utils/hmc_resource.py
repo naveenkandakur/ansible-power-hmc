@@ -328,10 +328,13 @@ class Hmc():
             self.OPT['CHSYSSTATE']['-O']['ON']
         self.hmcconn.execute(chsysstateCmd)
 
-    def getManagedSystemDetails(self, cecName):
+    def getManagedSystemDetails(self, cecName, config_F=None):
         lssyscfgCmd = self.CMD['LSSYSCFG'] + \
             self.OPT['LSSYSCFG']['-R']['SYS'] + \
             self.OPT['LSSYSCFG']['-M'] + cecName
+        if filter is not None:
+            lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
+            return self.hmcconn.execute(lssyscfgCmd)
         result = self.hmcconn.execute(lssyscfgCmd)
         res_dict = self.cmdClass.parseCSV(result)
         res = dict((k.lower(), v) for k, v in res_dict.items())
@@ -971,6 +974,31 @@ class Hmc():
         if state == 'upgraded':
             updviosbk_cmd += self.OPT['UPDVIOS']['--DISK'] + str(configDict['disks'])
         return self.hmcconn.execute(updviosbk_cmd)
+
+    def create_svc_events(self, params):
+        svc_ticket_cmd = ''
+        svc_ticket_cmd += (
+            self.CMD['MKSVCEVENT']
+            + self.OPT['MKSVCEVENT']['-D']
+            + str(params['description'])
+            + self.OPT['MKSVCEVENT']['-T']
+            + str(params['types'])
+        )
+        if params['system'] is not None:
+            svc_ticket_cmd += self.OPT['MKSVCEVENT']['-M'] + str(params['system_name'])
+        if params['attributes']['service_file'] is not None:
+            csv_string = ",".join(params['attributes']['service_file'])
+            csv_string += '\\"'
+            params['attributes']['service_file'] = csv_string
+        option_map = {'title': '-TITLE', 'severity': '-SEVERITY', 'contact_name': '-NAME', 'service_file': '-SERVICE_FILE',
+                      'contact_phone': '-PHONE', 'contact_email': '-EMAIL', 'target_lpar_name': '-TARGET_LPAR_NAME', 'target_mtms': '-TARGET_MTMS',
+                      'lpar_name': '-LPAR_NAME'}
+        svc_ticket_cmd += self.OPT['MKSVCEVENT']['-A']
+        for key in option_map:
+            if params['attributes'][key] is not None:
+                svc_ticket_cmd += self.OPT['MKSVCEVENT'][option_map[key]] + str(params['attributes'][key])
+        svc_ticket_cmd += ",is_callhome=1"
+        return self.hmcconn.execute(svc_ticket_cmd)
 
     def create_viosecure_command(self, params, fields):
         option_map = {'port': '-PORT', 'interface': '-INTERFACE', 'remote': '-REMOTE', 'address': '-ADDRESS', 'timeout': '-TIMEOUT'}
