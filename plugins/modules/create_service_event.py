@@ -230,6 +230,7 @@ def validate_parameters(params):
 
 
 def create_svc_events(module, params):
+    created = []
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
@@ -238,6 +239,7 @@ def create_svc_events(module, params):
     validate_parameters(params)
     m_system = params['system_name']
     sys_list = hmc.list_all_managed_system_details("name") + hmc.list_all_managed_system_details("type_model*serial_num")
+    sys_list = [list(d.values())[0] for d in sys_list]
     if m_system not in sys_list:
         module.fail_json(msg="The managed system is not available in HMC")
     if hmc.getManagedSystemDetails(m_system, "advanced_hmc_automation_and_monitoring_capable").strip() != '1':
@@ -257,7 +259,8 @@ def create_svc_events(module, params):
     try:
         output = hmc.create_svc_events(params)
         changed = True
-        return changed, output, None
+        created.append(output)
+        return changed, created, None
     except Exception as e:
         return False, repr(e), None
 
