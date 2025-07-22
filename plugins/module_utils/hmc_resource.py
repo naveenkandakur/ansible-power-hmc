@@ -984,7 +984,7 @@ class Hmc():
             + self.OPT['MKSVCEVENT']['-T']
             + str(params['types'])
         )
-        if params['system'] is not None:
+        if params['system_name'] is not None:
             svc_ticket_cmd += self.OPT['MKSVCEVENT']['-M'] + str(params['system_name'])
         if params['attributes']['service_file'] is not None:
             csv_string = ",".join(params['attributes']['service_file'])
