@@ -2594,7 +2594,7 @@ class HmcRestClient:
                     return steps
         except Exception as e:
             logger.error("Platform request failed: %s", str(e))
-            return None
+            raise
 
     def _check_job_status_and_wait(self, job_url):
         header = {

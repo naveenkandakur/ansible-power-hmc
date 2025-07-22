@@ -625,7 +625,7 @@ def map_entries(data):
         "update_order": "UpdateOrder",
         "vios_name": "VIOSName",
         "update_type": "UpdateType",
-        "system_firware_update": "SystemFirmwareUpdate",
+        "system_firmware_update": "SystemFirmwareUpdate",
         "sriov_adapter_update": "SRIOVAdapterUpdate",
         "adapter_id": "AdapterID",
         "subtype": "SubType",
@@ -1044,6 +1044,11 @@ def run_module():
         changed, info, warning = facts(module)
     else:
         changed, info, warning = platform_update(module)
+        if info:
+            for data in info:
+                if data.get('CurrentStatus') == 'COMPLETED_WITH_ERROR':
+                    changed = False
+                    break
 
     result = {}
     result['changed'] = changed
