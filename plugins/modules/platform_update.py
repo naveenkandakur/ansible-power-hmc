@@ -846,7 +846,7 @@ def platform_update(module):
                         lines = output.split("\n")
                         for line in lines:
                             parts = line.split(",")
-                            if firm_level !='latest' and firm_level == parts[2]:
+                            if firm_level != 'latest' and firm_level == parts[2]:
                                 sysfirm_update['IsDestruptive'] = True
                                 break
 
