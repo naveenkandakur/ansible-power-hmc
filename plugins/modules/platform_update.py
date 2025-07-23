@@ -76,17 +76,13 @@ options:
                             - 'C(Update): Performs an update.'
                             - 'C(Upgrade): Performs an upgrade.'
                             - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
-                            - When set to C(NoUpdate), the fields C(is_distruptive), C(resource_type), and C(level) are not required.
+                            - When set to C(NoUpdate), C(resource_type), and C(level) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update', 'Upgrade']
                     update_order:
                         description:
                             - Optional order in which the update should be applied.
                         type: int
-                    is_distruptive:
-                        description:
-                            - Whether the update is disruptive (causes reboots/downtime).
-                        type: bool
                     resource_type:
                         description:
                             - Specifies the source repository for the update image.
@@ -397,7 +393,7 @@ def validate_sub_params(params, value):
         mandatoryList += ['subtype']
         unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
                             'io_adapter_update', 'device', 'repository', 'hmc_host', 'hmc_auth', 'update_type',
-                            'system_name', 'is_distruptive', 'vios_update']
+                            'system_name', 'vios_update']
 
         if params.get('all') and params.get('adapter_id'):
             raise ParameterError("Parameter all and adapter_id are mutually exculsive")
@@ -407,7 +403,7 @@ def validate_sub_params(params, value):
 
     if value == 'io_adapter_update':
         unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
-                            'io_adapter_update', 'hmc_host', 'hmc_auth', 'update_type', 'system_name', 'is_distruptive', 'vios_update']
+                            'io_adapter_update', 'hmc_host', 'hmc_auth', 'update_type', 'system_name', 'vios_update']
 
         if params.get('all'):
             if params.get('device'):
@@ -490,7 +486,7 @@ def validate_parameters(params):
             unsupported = [
                 'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'device',
                 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id', 'subtype',
-                'system_name', 'is_distruptive'
+                'system_name'
             ]
             if vios.get('update_type', '').lower() != 'noupdate':
                 mandatory.append('resource_type')
@@ -513,7 +509,7 @@ def validate_parameters(params):
         unsupported = [
             'update_type', 'update_order', 'vios_name', 'resource_type', 'io_adapter_update',
             'device', 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id',
-            'subtype', 'system_name', 'is_distruptive', 'level', 'vios_update'
+            'subtype', 'system_name', 'level', 'vios_update'
         ]
         for mig in partition_migs:
             check_params(mig, mandatory, unsupported, 'partition_migration')
@@ -527,7 +523,7 @@ def validate_parameters(params):
         unsupported = [
             'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
             'resource_type', 'io_adapter_update', 'id', 'device', 'repository', 'adapter_id',
-            'subtype', 'update_type', 'all', 'is_distruptive', 'platform_config', 'vios_update',
+            'subtype', 'update_type', 'all', 'platform_config', 'vios_update',
         ]
         check_params(params, mandatory, unsupported)
     else:
@@ -535,7 +531,7 @@ def validate_parameters(params):
         unsupported = [
             'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
             'resource_type', 'io_adapter_update', 'id', 'device', 'repository', 'adapter_id',
-            'subtype', 'update_type', 'all', 'is_distruptive', 'vios_update'
+            'subtype', 'update_type', 'all', 'vios_update'
         ]
         check_params(params, mandatory, unsupported)
 
@@ -636,7 +632,6 @@ def map_entries(data):
         "leave_partition_in_target": "LeavePartitionInTarget",
         "resource_type": "ResourceType",
         "name": "Name",
-        "is_distruptive": "IsDestruptive",
         "level": "Level",
         "all": "ALL"
     }
@@ -845,6 +840,15 @@ def platform_update(module):
                         f"is not found at the specified source location: {source_file}."
                     )
                     module.fail_json(msg=error_msg)
+                else:
+                    if output.get('ParameterValue'):
+                        output = output.get('ParameterValue')
+                        lines = output.split("\n")
+                        for line in lines:
+                            parts = line.split(",")
+                            if firm_level !='latest' and firm_level == parts[2]:
+                                sysfirm_update['IsDestruptive'] = True
+                                break
 
         # IO Adapter Update check
         if all_io_updates:
@@ -982,7 +986,6 @@ def run_module():
                     options=dict(
                         update_type=dict(type='str', choices=['NoUpdate', 'Update', 'Upgrade']),
                         update_order=dict(type='int'),
-                        is_distruptive=dict(type='bool'),
                         resource_type=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite'),
                         level=dict(type='str', default="latest"),
                         sriov_adapter_update=dict(
