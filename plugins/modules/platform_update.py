@@ -502,8 +502,9 @@ def validate_parameters(params):
                 vios['level'] = None
 
             io_adapters = vios.get('io_adapter_update', [])
-            for adapter in io_adapters:
-                validate_sub_params(adapter, 'io_adapter_update')
+            if io_adapters:
+                for adapter in io_adapters:
+                    validate_sub_params(adapter, 'io_adapter_update')
 
             check_params(vios, mandatory, unsupported, 'vios_update')
 
