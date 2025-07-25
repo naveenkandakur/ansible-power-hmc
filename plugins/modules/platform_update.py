@@ -239,7 +239,7 @@ EXAMPLES = '''
     system_name: "p910_system"
     platform_config:
       system_firmware_update:
-        update_type: NoUpdate
+        update_type: Update
         update_order: 1
 
 - name: Perform a System Firmware update using specified level (level 12)
@@ -251,7 +251,7 @@ EXAMPLES = '''
     system_name: "p910_system"
     platform_config:
       system_firmware_update:
-        update_type: NoUpdate
+        update_type: Update
         update_order: 1
         level: 12
 
