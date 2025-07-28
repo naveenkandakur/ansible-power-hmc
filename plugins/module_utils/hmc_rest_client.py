@@ -2240,7 +2240,7 @@ class HmcRestClient:
 
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            response = self._check_job_status_and_wait(job_url)
+            response = self.fetchJobStatusJSON(job_url)
             status = response['entry']['content']['JobResponse']['Status']
             result = response['entry']['content']['JobResponse']['Result']
             return status, result
@@ -2319,7 +2319,7 @@ class HmcRestClient:
 
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            response = self._check_job_status_and_wait(job_url)
+            response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
 
@@ -2426,7 +2426,7 @@ class HmcRestClient:
 
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            response = self._check_job_status_and_wait(job_url)
+            response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             value = ''
             for output in result:
@@ -2514,7 +2514,7 @@ class HmcRestClient:
 
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            response = self._check_job_status_and_wait(job_url)
+            response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
             value = {}
@@ -2580,7 +2580,7 @@ class HmcRestClient:
                 return None
             response = json.loads(resp.read())
             job_url = response['entry']['selfLink']
-            response = self._check_job_status_and_wait(job_url)
+            response = self.fetchJobStatusJSON(job_url)
             status = response['entry']['content']['JobResponse']['Status']
             result = response['entry']['content']['JobResponse']['Result']
             for output in result:
@@ -2596,7 +2596,7 @@ class HmcRestClient:
             logger.error("Platform request failed: %s", str(e))
             raise
 
-    def _check_job_status_and_wait(self, job_url):
+    def fetchJobStatusJSON(self, job_url):
         header = {
             "X-API-Session": self.session,
             "Accept": "application/json",
@@ -2618,7 +2618,7 @@ class HmcRestClient:
             status = result['entry']['content']['JobResponse']['Status']
             if status == "RUNNING":
                 time.sleep(10)
-                return self._check_job_status_and_wait(job_url)
+                return self.fetchJobStatusJSON(job_url)
             if status in ["COMPLETED_OK", "COMPLETED_WITH_ERROR"]:
                 return result
 
@@ -2626,3 +2626,4 @@ class HmcRestClient:
         except Exception as e:
             logger.error("Failed to check job status: %s", e)
             return "Error"
+            
