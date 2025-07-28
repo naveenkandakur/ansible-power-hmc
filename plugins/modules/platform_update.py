@@ -1049,10 +1049,8 @@ def run_module():
     else:
         changed, info, warning = platform_update(module)
         if info:
-            for data in info:
-                if data.get('CurrentStatus') == 'COMPLETED_WITH_ERROR':
-                    changed = False
-                    break
+            if all(data.get('CurrentStatus') == 'COMPLETED_WITH_ERROR' for data in info):
+                changed = False
 
     result = {}
     result['changed'] = changed
