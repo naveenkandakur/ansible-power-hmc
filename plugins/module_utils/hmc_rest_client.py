@@ -2626,4 +2626,3 @@ class HmcRestClient:
         except Exception as e:
             logger.error("Failed to check job status: %s", e)
             return "Error"
-            
