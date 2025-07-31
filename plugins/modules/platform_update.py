@@ -756,6 +756,7 @@ def platform_update(module):
     all_io_updates = []
     available_adapter_id = []
     available_io_updates = {"IOAdapterUpdate": {}}
+    global before_update_level, after_update_level
     if vios_updates:
         for entry in vios_updates:
             vios_name = entry.get("vios_name")
