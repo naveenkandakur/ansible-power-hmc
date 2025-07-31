@@ -377,6 +377,11 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client impo
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
 import sys
 import copy
+import json
+
+
+before_update_level = {}
+after_update_level = {}
 
 
 def init_logger():
@@ -648,6 +653,93 @@ def map_entries(data):
         return data
 
 
+def check_current_level(hmc_conn, hmc, data, system):
+    result = {
+        "firmware_level": None,
+        "sriov_levels": [],
+        "io_adapter_levels": [],
+        "vios_versions": []
+    }
+    try:
+        sysfw = data.get("SystemFirmwareUpdate")
+        if sysfw:
+            update_type = sysfw.get("UpdateType")
+            if update_type and update_type not in ("NoUpdate", ""):
+                try:
+                    result["firmware_level"] = hmc.get_firmware_level(system)
+                except Exception as e:
+                    logger.error("Failed to get firmware level for %s: %s", system, e)
+
+            sriov_updates = sysfw.get("SRIOVAdapterUpdate")
+            if sriov_updates and isinstance(sriov_updates, list):
+                for sriov in sriov_updates:
+                    adapter_id = sriov.get("AdapterID")
+                    if adapter_id:
+                        try:
+                            sriov_cmd = f"lslic -t sriov -m {system} -F adapter_id,active_adapter_driver_level,active_adapter_level"
+                            sriov_raw = hmc_conn.execute(sriov_cmd)
+                            for line in sriov_raw.strip().splitlines():
+                                if line.startswith(f"{adapter_id},"):
+                                    parts = line.split(",")
+                                    if len(parts) == 3:
+                                        result["sriov_levels"].append({
+                                            "adapter_id": parts[0],
+                                            "driver_level": parts[1],
+                                            "adapter_level": parts[2]
+                                        })
+                        except Exception as e:
+                            logger.error("Failed to get SRIOV adapter level for %s: %s", adapter_id, e)
+
+    except Exception as e:
+        logger.error("Error in SystemFirmwareUpdate parsing: %s", e)
+
+    try:
+        vios_updates = data.get("VIOSUpdate")
+        if vios_updates and isinstance(vios_updates, list):
+            for vios in vios_updates:
+                try:
+                    update_type = vios.get("UpdateType")
+                    vios_name = vios.get("VIOSName")
+
+                    if update_type and update_type not in ("NoUpdate", "") and vios_name:
+                        try:
+                            lpar_cmd = f"lssyscfg -r lpar -m {system} -F name,os_version"
+                            lpar_raw = hmc_conn.execute(lpar_cmd)
+                            for line in lpar_raw.strip().splitlines():
+                                if line.startswith(f"{vios_name},"):
+                                    name, os_version = line.split(",", 1)
+                                    result["vios_versions"].append({
+                                        "vios_name": name,
+                                        "os_version": os_version
+                                    })
+                        except Exception as e:
+                            logger.error("Failed to get OS version for VIOS %s: %s", vios_name, e)
+
+                    io_updates = vios.get("IOAdapterUpdate")
+                    if io_updates and isinstance(io_updates, list):
+                        for io in io_updates:
+                            try:
+                                adapter_id = io.get("Id")
+                                if adapter_id:
+                                    io_cmd = f"lslic -t io -m {system} -F device,current_level"
+                                    io_raw = hmc_conn.execute(io_cmd)
+                                    for line in io_raw.strip().splitlines():
+                                        if line.startswith(f"{adapter_id},"):
+                                            device, current_level = line.split(",", 1)
+                                            result["io_adapter_levels"].append({
+                                                "device": device,
+                                                "current_level": current_level
+                                            })
+                            except Exception as e:
+                                logger.error("Failed to get IO adapter level for %s: %s", adapter_id, e)
+                except Exception as e:
+                    logger.error("Error while processing individual VIOS update entry: %s", e)
+    except Exception as e:
+        logger.error("Error in VIOSUpdate parsing: %s", e)
+
+    return result
+
+
 def platform_update(module):
     params = module.params
     try:
@@ -866,7 +958,9 @@ def platform_update(module):
 
         cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
         mapped_data = map_entries(cleaned_data)
+        before_update_level = check_current_level(hmc_conn, hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
+        after_update_level = check_current_level(hmc_conn, hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
@@ -966,6 +1060,12 @@ def facts(module):
     return changed, adapter_info, None
 
 
+def compare_levels(before, after):
+    if before is not None and after is not None:
+        return json.dumps(before, sort_keys=True) == json.dumps(after, sort_keys=True)
+    return False
+
+
 def run_module():
     module_args = dict(
         hmc_host=dict(type='str', required=True),
@@ -1051,6 +1151,8 @@ def run_module():
         if info:
             if all(data.get('CurrentStatus') == 'COMPLETED_WITH_ERROR' for data in info):
                 changed = False
+        if compare_levels(before_update_level, after_update_level):
+            changed = False
 
     result = {}
     result['changed'] = changed
