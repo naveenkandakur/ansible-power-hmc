@@ -519,6 +519,27 @@ def validate_parameters(params):
         for mig in partition_migs:
             check_params(mig, mandatory, unsupported, 'partition_migration')
 
+    def validate_update_order_uniqueness(platform_config):
+        components = []
+
+        sfw_update = platform_config.get('system_firmware_update')
+        if sfw_update and 'update_order' in sfw_update:
+            order = sfw_update['update_order']
+            components.append(('system_firmware_update', order))
+
+        vios_updates = platform_config.get('vios_update', [])
+        if vios_updates:
+            for vios in vios_updates:
+                if 'update_order' in vios:
+                    components.append((f"vios_update:{vios.get('vios_name', 'unknown')}", vios['update_order']))
+
+        orders = [order for _unused, order in components]
+        duplicates = {order for order in orders if orders.count(order) > 1}
+
+        if duplicates:
+            dup_details = [name for name, order in components if order in duplicates]
+            raise ParameterError(f"'update_order' values must be unique across system_firmware_update and vios_update. Duplicate found in: {dup_details}")
+
     if params.get('state') and params.get('platform_config'):
         raise ParameterError("Invalid parameter combination: 'state' and 'platform_config' cannot be used together. Please provide only one of them.")
     elif not (params.get('state') or params.get('platform_config')):
@@ -557,6 +578,7 @@ def validate_parameters(params):
             if not (sfw_update or vios_updates):
                 raise ParameterError("Invalid usage: 'partition_migration' must be specified along with either 'vios_update' or 'system_firmware_update'")
             validate_partition_migration(partition_migs)
+        validate_update_order_uniqueness(platform_config)
 
 
 def cleanup_entries(data, sriov=None, io=None):
@@ -653,7 +675,7 @@ def map_entries(data):
         return data
 
 
-def check_current_level(hmc_conn, hmc, data, system):
+def check_current_level(hmc, data, system):
     result = {
         "firmware_level": None,
         "sriov_levels": [],
@@ -672,23 +694,11 @@ def check_current_level(hmc_conn, hmc, data, system):
 
             sriov_updates = sysfw.get("SRIOVAdapterUpdate")
             if sriov_updates and isinstance(sriov_updates, list):
-                for sriov in sriov_updates:
-                    adapter_id = sriov.get("AdapterID")
-                    if adapter_id:
-                        try:
-                            sriov_cmd = f"lslic -t sriov -m {system} -F adapter_id,active_adapter_driver_level,active_adapter_level"
-                            sriov_raw = hmc_conn.execute(sriov_cmd)
-                            for line in sriov_raw.strip().splitlines():
-                                if line.startswith(f"{adapter_id},"):
-                                    parts = line.split(",")
-                                    if len(parts) == 3:
-                                        result["sriov_levels"].append({
-                                            "adapter_id": parts[0],
-                                            "driver_level": parts[1],
-                                            "adapter_level": parts[2]
-                                        })
-                        except Exception as e:
-                            logger.error("Failed to get SRIOV adapter level for %s: %s", adapter_id, e)
+                try:
+                    sriov_data = hmc.get_io_sriov_level(system, 'sriov')
+                    result["sriov_levels"].append(sriov_data)
+                except Exception as e:
+                    logger.error("Failed to get SRIOV adapter level: %s", e)
 
     except Exception as e:
         logger.error("Error in SystemFirmwareUpdate parsing: %s", e)
@@ -700,38 +710,28 @@ def check_current_level(hmc_conn, hmc, data, system):
                 try:
                     update_type = vios.get("UpdateType")
                     vios_name = vios.get("VIOSName")
-
                     if update_type and update_type not in ("NoUpdate", "") and vios_name:
                         try:
-                            lpar_cmd = f"lssyscfg -r lpar -m {system} -F name,os_version"
-                            lpar_raw = hmc_conn.execute(lpar_cmd)
-                            for line in lpar_raw.strip().splitlines():
-                                if line.startswith(f"{vios_name},"):
-                                    name, os_version = line.split(",", 1)
-                                    result["vios_versions"].append({
-                                        "vios_name": name,
-                                        "os_version": os_version
-                                    })
+                            configDict = {
+                                "system_name": system,
+                                "vios_name": vios_name,
+                            }
+
+                            os_version = hmc.getviosversion(configDict).strip()
+                            result["vios_versions"].append({
+                                "vios_name": vios_name,
+                                "os_version": os_version
+                            })
                         except Exception as e:
                             logger.error("Failed to get OS version for VIOS %s: %s", vios_name, e)
 
                     io_updates = vios.get("IOAdapterUpdate")
                     if io_updates and isinstance(io_updates, list):
-                        for io in io_updates:
-                            try:
-                                adapter_id = io.get("Id")
-                                if adapter_id:
-                                    io_cmd = f"lslic -t io -m {system} -F device,current_level"
-                                    io_raw = hmc_conn.execute(io_cmd)
-                                    for line in io_raw.strip().splitlines():
-                                        if line.startswith(f"{adapter_id},"):
-                                            device, current_level = line.split(",", 1)
-                                            result["io_adapter_levels"].append({
-                                                "device": device,
-                                                "current_level": current_level
-                                            })
-                            except Exception as e:
-                                logger.error("Failed to get IO adapter level for %s: %s", adapter_id, e)
+                        try:
+                            io_data = hmc.get_io_sriov_level(system, 'io')
+                            result["io_adapter_levels"].append(io_data)
+                        except Exception as e:
+                            logger.error("Failed to get IO adapter levels: %s", e)
                 except Exception as e:
                     logger.error("Error while processing individual VIOS update entry: %s", e)
     except Exception as e:
@@ -959,9 +959,9 @@ def platform_update(module):
 
         cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
         mapped_data = map_entries(cleaned_data)
-        before_update_level = check_current_level(hmc_conn, hmc, mapped_data, system_name)
+        before_update_level = check_current_level(hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
-        after_update_level = check_current_level(hmc_conn, hmc, mapped_data, system_name)
+        after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
