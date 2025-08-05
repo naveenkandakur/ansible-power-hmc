@@ -213,7 +213,7 @@ def validate_parameters(params):
             'hmc': {'pedbgq4'},
             'vios': {'pedbgq4', 'vios'},
             'lpm': {'pedbgq4', 'lpmffdc'},
-            'cloudconn': {'pedbgq8'},
+            'cloudconnector': {'pedbgq8'},
         }
         selected_type = params['types']
         service_files = attributes['service_file']
