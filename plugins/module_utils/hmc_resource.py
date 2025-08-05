@@ -809,6 +809,25 @@ class Hmc():
         parsed_res = dict((k.lower(), v) for k, v in res_dict.items())
         return parsed_res
 
+    def get_io_sriov_level(self, system_name, lic_type):
+
+        if lic_type == 'sriov':
+            field_key = 'SRIOVLEVEL'
+            headers = "adapter_id,active_adapter_driver_level,active_adapter_level"
+        elif lic_type == 'io':
+            field_key = 'IOLEVEL'
+            headers = "logical_device,current_level"
+        else:
+            raise ValueError("Unsupported lic_type. Must be 'sriov' or 'io'.")
+
+        lslic_cmd = self.CMD['LSLIC'] + \
+            self.OPT['LSLIC']['-T'] + ' ' + lic_type + \
+            self.OPT['LSLIC']['-M'] + system_name + \
+            self.OPT['LSLIC']['-F'][field_key]
+
+        raw_result = self.hmcconn.execute(lslic_cmd)
+        return self.cmdClass.parseMultiLineCSV(raw_result, userConfig={'-F': headers})
+
     def list_all_managed_systems(self):
         lssysconn_cmd = self.CMD['LSSYSCONN'] +\
             self.OPT['LSSYSCONN']['-R']['ALL'] +\

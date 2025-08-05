@@ -377,6 +377,11 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client impo
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
 import sys
 import copy
+import json
+
+
+before_update_level = {}
+after_update_level = {}
 
 
 def init_logger():
@@ -514,6 +519,27 @@ def validate_parameters(params):
         for mig in partition_migs:
             check_params(mig, mandatory, unsupported, 'partition_migration')
 
+    def validate_update_order_uniqueness(platform_config):
+        components = []
+
+        sfw_update = platform_config.get('system_firmware_update')
+        if sfw_update and 'update_order' in sfw_update:
+            order = sfw_update['update_order']
+            components.append(('system_firmware_update', order))
+
+        vios_updates = platform_config.get('vios_update', [])
+        if vios_updates:
+            for vios in vios_updates:
+                if 'update_order' in vios:
+                    components.append((f"vios_update:{vios.get('vios_name', 'unknown')}", vios['update_order']))
+
+        orders = [order for _unused, order in components]
+        duplicates = {order for order in orders if orders.count(order) > 1}
+
+        if duplicates:
+            dup_details = [name for name, order in components if order in duplicates]
+            raise ParameterError(f"'update_order' values must be unique across system_firmware_update and vios_update. Duplicate found in: {dup_details}")
+
     if params.get('state') and params.get('platform_config'):
         raise ParameterError("Invalid parameter combination: 'state' and 'platform_config' cannot be used together. Please provide only one of them.")
     elif not (params.get('state') or params.get('platform_config')):
@@ -552,6 +578,7 @@ def validate_parameters(params):
             if not (sfw_update or vios_updates):
                 raise ParameterError("Invalid usage: 'partition_migration' must be specified along with either 'vios_update' or 'system_firmware_update'")
             validate_partition_migration(partition_migs)
+        validate_update_order_uniqueness(platform_config)
 
 
 def cleanup_entries(data, sriov=None, io=None):
@@ -648,6 +675,71 @@ def map_entries(data):
         return data
 
 
+def check_current_level(hmc, data, system):
+    result = {
+        "firmware_level": None,
+        "sriov_levels": [],
+        "io_adapter_levels": [],
+        "vios_versions": []
+    }
+    try:
+        sysfw = data.get("SystemFirmwareUpdate")
+        if sysfw:
+            update_type = sysfw.get("UpdateType")
+            if update_type and update_type not in ("NoUpdate", ""):
+                try:
+                    result["firmware_level"] = hmc.get_firmware_level(system)
+                except Exception as e:
+                    logger.error("Failed to get firmware level for %s: %s", system, e)
+
+            sriov_updates = sysfw.get("SRIOVAdapterUpdate")
+            if sriov_updates and isinstance(sriov_updates, list):
+                try:
+                    sriov_data = hmc.get_io_sriov_level(system, 'sriov')
+                    result["sriov_levels"].append(sriov_data)
+                except Exception as e:
+                    logger.error("Failed to get SRIOV adapter level: %s", e)
+
+    except Exception as e:
+        logger.error("Error in SystemFirmwareUpdate parsing: %s", e)
+
+    try:
+        vios_updates = data.get("VIOSUpdate")
+        if vios_updates and isinstance(vios_updates, list):
+            for vios in vios_updates:
+                try:
+                    update_type = vios.get("UpdateType")
+                    vios_name = vios.get("VIOSName")
+                    if update_type and update_type not in ("NoUpdate", "") and vios_name:
+                        try:
+                            configDict = {
+                                "system_name": system,
+                                "vios_name": vios_name,
+                            }
+
+                            os_version = hmc.getviosversion(configDict).strip()
+                            result["vios_versions"].append({
+                                "vios_name": vios_name,
+                                "os_version": os_version
+                            })
+                        except Exception as e:
+                            logger.error("Failed to get OS version for VIOS %s: %s", vios_name, e)
+
+                    io_updates = vios.get("IOAdapterUpdate")
+                    if io_updates and isinstance(io_updates, list):
+                        try:
+                            io_data = hmc.get_io_sriov_level(system, 'io')
+                            result["io_adapter_levels"].append(io_data)
+                        except Exception as e:
+                            logger.error("Failed to get IO adapter levels: %s", e)
+                except Exception as e:
+                    logger.error("Error while processing individual VIOS update entry: %s", e)
+    except Exception as e:
+        logger.error("Error in VIOSUpdate parsing: %s", e)
+
+    return result
+
+
 def platform_update(module):
     params = module.params
     try:
@@ -664,6 +756,7 @@ def platform_update(module):
     all_io_updates = []
     available_adapter_id = []
     available_io_updates = {"IOAdapterUpdate": {}}
+    global before_update_level, after_update_level
     if vios_updates:
         for entry in vios_updates:
             vios_name = entry.get("vios_name")
@@ -866,7 +959,9 @@ def platform_update(module):
 
         cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
         mapped_data = map_entries(cleaned_data)
+        before_update_level = check_current_level(hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
+        after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
@@ -966,6 +1061,12 @@ def facts(module):
     return changed, adapter_info, None
 
 
+def compare_levels(before, after):
+    if before is not None and after is not None:
+        return json.dumps(before, sort_keys=True) == json.dumps(after, sort_keys=True)
+    return False
+
+
 def run_module():
     module_args = dict(
         hmc_host=dict(type='str', required=True),
@@ -1051,6 +1152,8 @@ def run_module():
         if info:
             if all(data.get('CurrentStatus') == 'COMPLETED_WITH_ERROR' for data in info):
                 changed = False
+        if compare_levels(before_update_level, after_update_level):
+            changed = False
 
     result = {}
     result['changed'] = changed
