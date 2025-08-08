@@ -314,6 +314,17 @@ class Hmc():
             self.OPT['CHSYSCFG']['-O']['APPLY']
         self.hmcconn.execute(chsyscfgCmd)
 
+    def updateProfileName(self, system_name, lparName, prof_name):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['PROF'] + \
+            self.OPT['CHSYSCFG']['-M'] + system_name + \
+            self.OPT['CHSYSCFG']['--FORCE'] + \
+            "-i '" + self.OPT['CHSYSCFG']['-I']['NAME'] + "=default_profile," + \
+            self.OPT['CHSYSCFG']['-I']['LPAR_NAME'] + "=" + lparName + "," + \
+            self.OPT['CHSYSCFG']['-I']['NEW_NAME'] + "=" + prof_name + "'"
+
+        self.hmcconn.execute(chsyscfgCmd)
+
     def managedSystemShutdown(self, cecName):
         chsysstateCmd = self.CMD['CHSYSSTATE'] + \
             self.OPT['CHSYSSTATE']['-R']['SYS'] + \

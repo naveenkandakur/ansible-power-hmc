@@ -176,7 +176,9 @@ options:
         description:
             - Partition profile to be used to activate a partition.
             - If the user doesn't provide this option, the current configuration of partition will be used for activation.
-            - This option is valid only for C(poweron) I(action).
+            - This option is also used to update the profile name when creating a partition.
+            - If the user does not provide this option during partition creation, the partition will be created with the profile name C(default_profile).
+            - This option is valid for C(present), C(poweron) I(action).
         type: str
     keylock:
         description:
@@ -759,7 +761,7 @@ def validate_parameters(params):
 
     if opr == 'present':
         mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'os_type']
-        unsupportedList = ['prof_name', 'keylock', 'iIPLsource', 'retain_vios_cfg', 'delete_vdisks', 'advanced_info', 'install_settings',
+        unsupportedList = ['keylock', 'iIPLsource', 'retain_vios_cfg', 'delete_vdisks', 'advanced_info', 'install_settings',
                            'shutdown_option', 'restart_option']
     elif opr == 'poweron':
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
@@ -1354,6 +1356,15 @@ def create_partition(module, params):
         except Exception as logoff_error:
             error_msg = parse_error_response(logoff_error)
             logger.debug(error_msg)
+
+    # Update partition profile if given
+    if params.get('prof_name'):
+        prof_name = params.get('prof_name')
+        try:
+            hmc.updateProfileName(system_name, vm_name, prof_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
+        partition_prop["PartitionProfileName"] = prof_name
 
     return changed, partition_prop, warning_msg
 
