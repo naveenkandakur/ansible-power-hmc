@@ -463,7 +463,9 @@ def validate_parameters(params):
             'io_adapter_update', 'id', 'device', 'repository', 'hmc_host', 'hmc_auth', 'adapter_id',
             'subtype', 'system_name', 'vios_update'
         ]
-        update_type = sfw_update.get('update_type', '').lower()
+        update_type = sfw_update.get('update_type', '')
+        if update_type:
+            update_type = update_type.lower()
         sriov_updates = sfw_update.get('sriov_adapter_update', [])
         resource_type = sfw_update.get('resource_type')
 
@@ -493,7 +495,8 @@ def validate_parameters(params):
                 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id', 'subtype',
                 'system_name'
             ]
-            if vios.get('update_type', '').lower() != 'noupdate':
+            vios_update_type = vios.get('update_type', '')
+            if vios_update_type and vios_update_type.lower() != 'noupdate':
                 mandatory.append('resource_type')
             else:
                 if vios.get('resource_type'):
