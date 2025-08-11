@@ -2583,6 +2583,10 @@ class HmcRestClient:
             response = self.fetchJobStatusJSON(job_url)
             status = response['entry']['content']['JobResponse']['Status']
             result = response['entry']['content']['JobResponse']['Result']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return response
             for output in result:
                 if output.get("ParameterName") == "result":
                     steps_json = json.loads(output["ParameterValue"])
@@ -2619,7 +2623,7 @@ class HmcRestClient:
             if status == "RUNNING":
                 time.sleep(10)
                 return self.fetchJobStatusJSON(job_url)
-            if status in ["COMPLETED_OK", "COMPLETED_WITH_ERROR"]:
+            if status in ["COMPLETED_OK", "COMPLETED_WITH_ERROR", "FAILED_BEFORE_COMPLETION"]:
                 return result
 
             raise HmcError(f"Unexpected job status: {status}")

@@ -964,6 +964,8 @@ def platform_update(module):
         mapped_data = map_entries(cleaned_data)
         before_update_level = check_current_level(hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
+        if final_output.get('ResponseException'):
+            module.fail_json(final_output.get('ResponseException'))
         after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
