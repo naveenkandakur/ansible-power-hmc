@@ -679,8 +679,8 @@ def map_entries(data):
 
 
 def check_response_exception(output, module):
-    if output and output.get('ResponseException'):
-        module.fail_json(msg=output.get('ResponseException'))
+    if isinstance(output, dict) and output.get('ResponseException'):
+        module.fail_json(msg=output['ResponseException'])
 
 
 def check_current_level(hmc, data, system):

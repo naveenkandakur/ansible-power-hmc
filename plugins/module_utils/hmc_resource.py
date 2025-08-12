@@ -332,7 +332,7 @@ class Hmc():
         lssyscfgCmd = self.CMD['LSSYSCFG'] + \
             self.OPT['LSSYSCFG']['-R']['SYS'] + \
             self.OPT['LSSYSCFG']['-M'] + cecName
-        if filter is not None:
+        if config_F is not None:
             lssyscfgCmd += self.OPT['LSSYSCFG']['-F'] + config_F
             return self.hmcconn.execute(lssyscfgCmd)
         result = self.hmcconn.execute(lssyscfgCmd)
