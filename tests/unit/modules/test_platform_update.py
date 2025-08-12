@@ -81,8 +81,8 @@ platform_config_test_data = [
     # vios_update with NoUpdate and level not latest
     (
         {'hmc_host': '1.2.3.4', 'hmc_auth': {'username': 'user', 'password': 'pass'}, 'system_name': 'sys', 'state': None,
-         'platform_config': {'vios_update': [{'update_type': 'NoUpdate', 'vios_name': 'vios1', 'update_order': 1, 'level': 'fixpack-3'}]}},
-        "ParameterError: Parameter 'level' is not supported for vios_update when update_type = 'NoUpdate'"
+         'platform_config': {'vios_update': [{'update_type': 'NoUpdate', 'vios_name': 'vios1', 'update_order': 1, 'vios_image_name': 'fixpack-3'}]}},
+        "ParameterError: Parameter 'vios_image_name' is not supported for vios_update when update_type = 'NoUpdate'"
     ),
 
     # system_firmware_update with update_type=NoUpdate and no sriov_adapter_update
