@@ -146,7 +146,7 @@ options:
                             - Specifies the type of VIOS update to be performed.
                             - 'C(NoUpdate): No update will be applied to VIOS, but I/O adapter updates are still allowed'
                             - 'C(Update): Triggers a VIOS update using the provided configuration.'
-                            - When set to C(NoUpdate), the fields C(resource_type) and C(level) are not required.
+                            - When set to C(NoUpdate), the fields C(resource_type) and C(vios_image_name) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update']
                     vios_name:
@@ -162,12 +162,11 @@ options:
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
-                    level:
+                    vios_image_name:
                         description:
-                            - Specifies the VIOS version level to apply.
-                            - If not provided, the latest available version will be used by default.
+                            - Specifies the VIOS image name to apply.
+                            - The field is required if C(update_type) is C(update) or C(upgrade)
                         type: str
-                        default: 'latest'
                     io_adapter_update:
                         description: List of I/O adapters to update during VIOS update.
                         type: list
@@ -398,7 +397,7 @@ def validate_sub_params(params, value):
         mandatoryList += ['subtype']
         unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
                             'io_adapter_update', 'device', 'repository', 'hmc_host', 'hmc_auth', 'update_type',
-                            'system_name', 'vios_update']
+                            'system_name', 'vios_update', 'vios_image_name', 'level']
 
         if params.get('all') and params.get('adapter_id'):
             raise ParameterError("Parameter all and adapter_id are mutually exculsive")
@@ -408,7 +407,7 @@ def validate_sub_params(params, value):
 
     if value == 'io_adapter_update':
         unsupportedList += ['is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name', 'resource_type',
-                            'io_adapter_update', 'hmc_host', 'hmc_auth', 'update_type', 'system_name', 'vios_update']
+                            'io_adapter_update', 'hmc_host', 'hmc_auth', 'update_type', 'system_name', 'vios_update', 'vios_image_name']
 
         if params.get('all'):
             if params.get('device'):
@@ -461,7 +460,7 @@ def validate_parameters(params):
         unsupported = [
             'is_quick_evac', 'destination_managed_system', 'leave_partition_in_target', 'vios_name',
             'io_adapter_update', 'id', 'device', 'repository', 'hmc_host', 'hmc_auth', 'adapter_id',
-            'subtype', 'system_name', 'vios_update'
+            'subtype', 'system_name', 'vios_update', 'vios_image_name'
         ]
         update_type = sfw_update.get('update_type', '')
         if update_type:
@@ -475,7 +474,7 @@ def validate_parameters(params):
             if resource_type:
                 sfw_update['resource_type'] = None
             if sfw_update.get('level') != 'latest':
-                raise ParameterError("Parameter 'level' is not supported for system_firmware_update when update_type = 'noupdate'")
+                raise ParameterError("Parameter 'level' is not supported for system_firmware_update when update_type = 'NoUpdate'")
             sfw_update['level'] = None
         elif update_type in ['update', 'upgrade']:
             if sriov_updates:
@@ -498,12 +497,12 @@ def validate_parameters(params):
             vios_update_type = vios.get('update_type', '')
             if vios_update_type and vios_update_type.lower() != 'noupdate':
                 mandatory.append('resource_type')
+                mandatory.append('vios_image_name')
             else:
                 if vios.get('resource_type'):
                     vios['resource_type'] = None
-                if vios.get('level') != 'latest':
-                    raise ParameterError("Parameter 'level' is not supported for vios_update when update_type = 'noupdate'")
-                vios['level'] = None
+                if vios.get('vios_image_name'):
+                    raise ParameterError("Parameter 'vios_image_name' is not supported for vios_update when update_type = 'NoUpdate'")
 
             io_adapters = vios.get('io_adapter_update', [])
             if io_adapters:
@@ -517,7 +516,7 @@ def validate_parameters(params):
         unsupported = [
             'update_type', 'update_order', 'vios_name', 'resource_type', 'io_adapter_update',
             'device', 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id',
-            'subtype', 'system_name', 'level', 'vios_update'
+            'subtype', 'system_name', 'level', 'vios_update', 'vios_image_name'
         ]
         for mig in partition_migs:
             check_params(mig, mandatory, unsupported, 'partition_migration')
@@ -663,6 +662,7 @@ def map_entries(data):
         "resource_type": "ResourceType",
         "name": "Name",
         "level": "Level",
+        "vios_image_name": "Name",
         "all": "ALL"
     }
 
@@ -676,6 +676,11 @@ def map_entries(data):
         return [map_entries(item) for item in data]
     else:
         return data
+
+
+def check_response_exception(output, module):
+    if output and output.get('ResponseException'):
+        module.fail_json(msg=output.get('ResponseException'))
 
 
 def check_current_level(hmc, data, system):
@@ -822,6 +827,7 @@ def platform_update(module):
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
+            check_response_exception(result, module)
             if status == 'COMPLETED_OK':
                 logger.info("System readiness check Passed")
             else:
@@ -837,6 +843,7 @@ def platform_update(module):
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
+            check_response_exception(output, module)
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
                 module.fail_json(msg=error_msg)
@@ -858,6 +865,7 @@ def platform_update(module):
         # IO Adapter Avaiabillty check
         if all_io_updates:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
+            check_response_exception(output, module)
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
                 module.fail_json(msg=error_msg)
@@ -900,12 +908,13 @@ def platform_update(module):
                 if updateType in 'update':
                     vios_name = vios_info['vios_name']
                     source_file = vios_info['resource_type']
-                    vios_level = vios_info['level']
+                    vios_level = vios_info['vios_image_name']
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
+                    check_response_exception(output, module)
                     if output.strip() in ("[]", "", "None"):
-                        error_msg = f"Update file for {vios_name} not found at the specified source location: {source_file}."
+                        error_msg = f"Vios Image {vios_level} for {vios_name} not found at the specified source location: {source_file}."
                         module.fail_json(msg=error_msg)
-                    elif vios_level != 'latest' and vios_level not in output:
+                    elif vios_level not in output:
                         error_msg = (
                             f"Update file {vios_level} for vios {vios_name} "
                             f"is not found at the specified source location: {source_file}."
@@ -921,6 +930,7 @@ def platform_update(module):
                 source_file = sysfirm_update.get('resource_type').lower()
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                       type="sys", level=updateType)
+                check_response_exception(output, module)
                 if "No results" in output.get('ParameterValue'):
                     error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
                     module.fail_json(msg=error_msg)
@@ -952,6 +962,7 @@ def platform_update(module):
                 source_file = io_update.get('repository').lower()
                 vios_id = io_update.get('vios_id')
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
+                check_response_exception(output, module)
                 if available_io_updates:
                     adp_ids = vios_id
                 else:
@@ -964,8 +975,7 @@ def platform_update(module):
         mapped_data = map_entries(cleaned_data)
         before_update_level = check_current_level(hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
-        if final_output.get('ResponseException'):
-            module.fail_json(final_output.get('ResponseException'))
+        check_response_exception(final_output, module)
         after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -1040,9 +1050,11 @@ def facts(module):
             return value
 
         sriov_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
+        check_response_exception(sriov_output, module)
         sriov_adapters = extract_adapters(sriov_output, 'SRIOVAdapterUpdate')
 
         io_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
+        check_response_exception(io_output, module)
         io_adapters = extract_adapters(io_output, 'IOAdapterUpdate')
 
         vios_info = []
@@ -1122,7 +1134,7 @@ def run_module():
                         vios_name=dict(type='str'),
                         update_order=dict(type='int'),
                         resource_type=dict(type='str', choices=['IBMWebsite'], default='IBMWebsite'),
-                        level=dict(type='str', default="latest"),
+                        vios_image_name=dict(type='str'),
                         io_adapter_update=dict(
                             type='list',
                             elements='dict',

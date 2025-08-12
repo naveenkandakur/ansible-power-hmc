@@ -2243,6 +2243,10 @@ class HmcRestClient:
             response = self.fetchJobStatusJSON(job_url)
             status = response['entry']['content']['JobResponse']['Status']
             result = response['entry']['content']['JobResponse']['Result']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return None, response
             return status, result
 
         except Exception as e:
@@ -2322,6 +2326,10 @@ class HmcRestClient:
             response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return response
 
             value = ''
             for output in result:
@@ -2331,7 +2339,6 @@ class HmcRestClient:
                         return value
                 if output.get('ParameterName') == 'JOBRESULT_KEY_OUTPUT':
                     value = output.get('ParameterValue')
-                    break
 
             if type == 'sriov':
                 if 'No results' in value:
@@ -2428,11 +2435,15 @@ class HmcRestClient:
             job_url = response['entry']['selfLink']
             response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
+            status = response['entry']['content']['JobResponse']['Status']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return response
             value = ''
             for output in result:
                 if output.get('ParameterName') == 'Updates':
                     value = output.get('ParameterValue')
-                    break
             return value
         except Exception as e:
             logger.error("listViosUpdates request failed: %s", str(e))
@@ -2517,6 +2528,10 @@ class HmcRestClient:
             response = self.fetchJobStatusJSON(job_url)
             result = response['entry']['content']['JobResponse']['Result']
             status = response['entry']['content']['JobResponse']['Status']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return response
             value = {}
             for output in result:
                 if status == 'COMPLETED_WITH_ERROR':
