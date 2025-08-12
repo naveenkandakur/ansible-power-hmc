@@ -64,10 +64,10 @@ options:
             - C(vios) to report a problem with a Virtual I/O Server on managed-system.
             - C(lpm) to report a partition migration problem where managed-system is the source system for the partition migration operation.
             - C(hmc) to report a problem with this HMC.
-            - C(cloudconnector) to report a problem with the cloud connector on this HMC.
+            - C(cloudconn) to report a problem with the cloud connector on this HMC.
         required: true
         type: str
-        choices: ['cloudconnector', 'sys', 'lpm', 'vios', 'hmc']
+        choices: ['cloudconn', 'sys', 'lpm', 'vios', 'hmc']
     attributes:
         description:
             - The serviceable event attributes to set.
@@ -132,7 +132,7 @@ options:
 
 EXAMPLES = '''
 - name: Create a serviceable event for collection of vios logs
-  svcevent:
+  create_service_event:
     hmc_host: '{{ inventory_hostname }}'
     hmc_auth: "{{ curr_hmc_auth }}"
     system_name: <system name>
@@ -151,7 +151,7 @@ EXAMPLES = '''
     state: created
 
 - name: Create a serviceable event for collection of lpm logs
-  svcevent:
+  create_service_event:
     hmc_host: '{{ inventory_hostname }}'
     hmc_auth: "{{ curr_hmc_auth }}"
     system_name: <system name>
@@ -293,7 +293,7 @@ def run_module():
         state=dict(type='str', choices=['created']),
         system_name=dict(type='str', required=True),
         description=dict(type='str', required=True),
-        types=dict(required=True, type='str', choices=['cloudconnector', 'sys', 'lpm', 'vios', 'hmc']),
+        types=dict(required=True, type='str', choices=['cloudconn', 'sys', 'lpm', 'vios', 'hmc']),
         attributes=dict(type='dict', required=True,
                         options=dict(
                             title=dict(type='str', required=True,),
