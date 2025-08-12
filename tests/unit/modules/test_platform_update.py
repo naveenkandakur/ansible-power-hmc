@@ -82,7 +82,7 @@ platform_config_test_data = [
     (
         {'hmc_host': '1.2.3.4', 'hmc_auth': {'username': 'user', 'password': 'pass'}, 'system_name': 'sys', 'state': None,
          'platform_config': {'vios_update': [{'update_type': 'NoUpdate', 'vios_name': 'vios1', 'update_order': 1, 'level': 'fixpack-3'}]}},
-        "ParameterError: Parameter 'level' is not supported for vios_update when update_type = 'noupdate'"
+        "ParameterError: Parameter 'level' is not supported for vios_update when update_type = 'NoUpdate'"
     ),
 
     # system_firmware_update with update_type=NoUpdate and no sriov_adapter_update
@@ -140,7 +140,7 @@ platform_config_test_data = [
                  'sriov_adapter_update': [{'all': True, 'subtype': 'Adapter'}]
              }
         }},
-        "ParameterError: Parameter 'level' is not supported for system_firmware_update when update_type = 'noupdate'"
+        "ParameterError: Parameter 'level' is not supported for system_firmware_update when update_type = 'NoUpdate'"
     ),
 
     # sriov_adapter_update missing subtype (mandatory)
