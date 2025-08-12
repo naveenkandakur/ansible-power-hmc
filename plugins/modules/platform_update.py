@@ -412,8 +412,8 @@ def validate_sub_params(params, value):
         if params.get('all'):
             if params.get('device'):
                 raise ParameterError("'all' is mutually exclusive with 'device'.")
-        else:
-            mandatoryList += ['device']
+        if not (params.get('all') or params.get('device')):
+            raise ParameterError("either 'all' or 'device' parameter is required")
     collate = []
     for eachUnsupported in unsupportedList:
         if params.get(eachUnsupported):
@@ -803,6 +803,7 @@ def platform_update(module):
                             if io_adapters:
                                 for adapter in io_adapters:
                                     adapter["Id"] = vios_details[2].zfill(3)
+                                    adapter['repository'] = adapter.get("repository").lower()
                 else:
                     module.fail_json(msg=f"The VIOS {vios} is not available in HMC")
 

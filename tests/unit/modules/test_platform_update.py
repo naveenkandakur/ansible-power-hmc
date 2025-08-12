@@ -171,7 +171,7 @@ platform_config_test_data = [
         "ParameterError: 'all' is mutually exclusive with 'device'."
     ),
 
-    # io_adapter_update missing device (mandatory when all not given)
+    # io_adapter_update missing all or device
     (
         {'hmc_host': '1.2.3.4', 'hmc_auth': {'username': 'user', 'password': 'pass'}, 'system_name': 'sys', 'state': None,
          'platform_config': {
@@ -182,7 +182,7 @@ platform_config_test_data = [
                  'io_adapter_update': [{}]
              }]
         }},
-        "ParameterError: mandatory parameter device is missing for io_adapter_update"
+        "ParameterError: either 'all' or 'device' parameter is required"
     ),
 
     # partition_migration missing is_quick_evac (mandatory)
