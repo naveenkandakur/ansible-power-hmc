@@ -2606,10 +2606,6 @@ class HmcRestClient:
                 if output.get("ParameterName") == "result":
                     steps_json = json.loads(output["ParameterValue"])
                     steps = steps_json.get("Steps", [])
-                    if status == "COMPLETED_WITH_ERROR":
-                        for step in steps:
-                            if step.get("CurrentStatus") == "COMPLETED_WITH_ERROR":
-                                return step
                     return steps
         except Exception as e:
             logger.error("Platform request failed: %s", str(e))
