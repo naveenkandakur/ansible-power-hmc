@@ -840,7 +840,7 @@ def platform_update(module):
                 error_msg = f'system {system_name} is not in ready state, therefore the system firmware cannot be updated, Msg: {msg}'
                 module.fail_json(msg=error_msg)
 
-        # SRIOV Adapters Avaiability check
+        # SRIOV Adapters Avaiability Check
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
