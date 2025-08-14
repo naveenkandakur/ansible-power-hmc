@@ -76,7 +76,7 @@ install-unit-test-requirements:
 
 .PHONY: install-ansible-lint
 install-ansible-lint:
-	python -m pip install ansible-lint
+	python -m pip install ansible-lint ansible-compat==25.6.0
 
 ######################################################################################
 # testing targets
