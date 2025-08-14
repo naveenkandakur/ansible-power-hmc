@@ -112,7 +112,7 @@ platform_config_test_data = [
     # partition_migration without vios_update or system_firmware_update
     (
         {'hmc_host': '1.2.3.4', 'hmc_auth': {'username': 'user', 'password': 'pass'}, 'system_name': 'sys', 'state': None,
-            'platform_config': {'partition_migration': [{'is_quick_evac': True, 'destination_managed_system': 'ms1'}]}},
+            'platform_config': {'partition_migration': {'is_quick_evac': True, 'destination_managed_system': 'ms1'}}},
         "ParameterError: Invalid usage: 'partition_migration' must be specified along with either 'vios_update' or 'system_firmware_update'"
     ),
 
@@ -195,7 +195,7 @@ platform_config_test_data = [
                  'level': 'latest',
                  'sriov_adapter_update': [{'all': True, 'subtype': 'DriverOnly'}]
              },
-             'partition_migration': [{'destination_managed_system': 'sys2'}]
+             'partition_migration': {'destination_managed_system': 'sys2'}
         }},
         "ParameterError: mandatory parameter [is_quick_evac] is missing for partition_migration"
     ),
@@ -210,7 +210,7 @@ platform_config_test_data = [
                  'level': 'latest',
                  'sriov_adapter_update': [{'all': True, 'subtype': 'DriverOnly'}]
              },
-             'partition_migration': [{'is_quick_evac': True, 'destination_managed_system': 'sys2', 'vios_name': 'v1'}]
+             'partition_migration': {'is_quick_evac': True, 'destination_managed_system': 'sys2', 'vios_name': 'v1'}
         }},
         "ParameterError: unsupported parameter [vios_name] for partition_migration"
     ),
