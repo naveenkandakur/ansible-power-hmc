@@ -1216,7 +1216,7 @@ def run_module():
                     ok_count += 1
                 elif status == "COMPLETED_WITH_ERROR":
                     failureMsg = data.get('FailureMessage')
-                    if failureMsg and "no updates available" in failureMsg.lower():
+                    if failureMsg and "no updates" in failureMsg.lower():
                         ok_count += 1
                     else:
                         failed_count += 1
