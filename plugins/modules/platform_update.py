@@ -76,7 +76,7 @@ options:
                             - 'C(Update): Performs an update.'
                             - 'C(Upgrade): Performs an upgrade.'
                             - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
-                            - When set to C(NoUpdate), C(repository), and C(level) are not required.
+                            - When set to C(NoUpdate), the fields C(repository) and C(level) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update', 'Upgrade']
                     update_order:
@@ -123,8 +123,7 @@ options:
             partition_migration:
                 description:
                     - Configuration for migrating logical partitions.
-                type: list
-                elements: dict
+                type: dict
                 suboptions:
                     is_quick_evac:
                         description: Whether to enable quick evacuation.
@@ -268,9 +267,9 @@ EXAMPLES = '''
         update_order: 1
         repository: IBMWebsite
       partition_migration:
-        - is_quick_evac: true
-          destination_managed_system: "p920_system"
-          leave_partition_in_target: true
+        is_quick_evac: true
+        destination_managed_system: "p920_system"
+        leave_partition_in_target: true
 
 - name: Update VIOS to latest available level from IBM Fix Central
   platform_update:
@@ -522,8 +521,7 @@ def validate_parameters(params):
             'device', 'repository', 'sriov_adapter_update', 'hmc_host', 'hmc_auth', 'adapter_id',
             'subtype', 'system_name', 'level', 'vios_update', 'vios_image_name'
         ]
-        for mig in partition_migs:
-            check_params(mig, mandatory, unsupported, 'partition_migration')
+        check_params(partition_migs, mandatory, unsupported, 'partition_migration')
 
     def validate_update_order_uniqueness(platform_config):
         components = []
@@ -579,7 +577,7 @@ def validate_parameters(params):
         if vios_updates:
             validate_vios_update(vios_updates)
 
-        partition_migs = platform_config.get('partition_migration', [])
+        partition_migs = platform_config.get('partition_migration', {})
         if partition_migs:
             if not (sfw_update or vios_updates):
                 raise ParameterError("Invalid usage: 'partition_migration' must be specified along with either 'vios_update' or 'system_firmware_update'")
@@ -682,9 +680,11 @@ def map_entries(data):
         return data
 
 
-def check_response_exception(output, module):
+def check_response_exception(output, module, request):
     if isinstance(output, dict) and output.get('ResponseException'):
         module.fail_json(msg=output['ResponseException'])
+    if output is None:
+        module.fail_json(msg=f"{request} request failed")
 
 
 def check_current_level(hmc, data, system):
@@ -831,19 +831,16 @@ def platform_update(module):
         # Partition Migration Checks
         if attributes.get('partition_migration'):
             partition_migration = attributes.get('partition_migration')
-            if len(partition_migration) > 1:
-                module.fail_json(
-                    msg=f"Only one partition migration entry is allowed. Found {len(partition_migration)} entries."
-                )
-            destination_system = partition_migration[0].get('destination_managed_system')
+            destination_system = partition_migration.get('destination_managed_system')
             if destination_system not in [v for d in sys_list for v in d.values()]:
                 module.fail_json(msg=f"The managed system {destination_system} is not available in HMC")
+            attributes['partition_migration'] = [partition_migration]
 
         # System Readiness Check
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
-            check_response_exception(result, module)
+            check_response_exception(result, module, 'LicReadinessCheck')
             if status == 'COMPLETED_OK':
                 logger.info("System readiness check Passed")
             else:
@@ -859,7 +856,7 @@ def platform_update(module):
         sysfirm_update = attributes.get("system_firmware_update", {})
         if sysfirm_update:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
-            check_response_exception(output, module)
+            check_response_exception(output, module, 'LicQueryLevel')
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
                 module.fail_json(msg=error_msg)
@@ -881,7 +878,7 @@ def platform_update(module):
         # IO Adapter Avaiabillty check
         if all_io_updates:
             output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
-            check_response_exception(output, module)
+            check_response_exception(output, module, 'LicQueryLevel')
             if output.get('ParameterName'):
                 error_msg = output.get('ParameterValue')
                 module.fail_json(msg=error_msg)
@@ -926,7 +923,7 @@ def platform_update(module):
                     source_file = vios_info['resource_type']
                     vios_level = vios_info['vios_image_name']
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
-                    check_response_exception(output, module)
+                    check_response_exception(output, module,'listViosUpdates')
                     if output.strip() in ("[]", "", "None"):
                         error_msg = f"Vios Image {vios_level} for {vios_name} not found at the specified source location: {source_file}."
                         module.fail_json(msg=error_msg)
@@ -949,7 +946,7 @@ def platform_update(module):
                 sysfirm_update['Type'] = 'sys'
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                       type="sys", level=updateType)
-                check_response_exception(output, module)
+                check_response_exception(output, module, 'LICQueryRepository')
                 if "No results" in output.get('ParameterValue'):
                     error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
                     module.fail_json(msg=error_msg)
@@ -1004,7 +1001,7 @@ def platform_update(module):
                 source_file = io_update.get('repository').lower()
                 vios_id = io_update.get('vios_id')
                 output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
-                check_response_exception(output, module)
+                check_response_exception(output, module, 'LICQueryRepository')
                 if available_io_updates:
                     adp_ids = vios_id
                 else:
@@ -1017,7 +1014,7 @@ def platform_update(module):
         mapped_data = map_entries(cleaned_data)
         before_update_level = check_current_level(hmc, mapped_data, system_name)
         final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
-        check_response_exception(final_output, module)
+        check_response_exception(final_output, module, 'PlatformUpdate')
         after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
@@ -1092,11 +1089,11 @@ def facts(module):
             return value
 
         sriov_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
-        check_response_exception(sriov_output, module)
+        check_response_exception(sriov_output, module, 'LicQueryLevel')
         sriov_adapters = extract_adapters(sriov_output, 'SRIOVAdapterUpdate')
 
         io_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
-        check_response_exception(io_output, module)
+        check_response_exception(io_output, module, 'LicQueryLevel')
         io_adapters = extract_adapters(io_output, 'IOAdapterUpdate')
 
         vios_info = []
@@ -1160,8 +1157,7 @@ def run_module():
                     )
                 ),
                 partition_migration=dict(
-                    type='list',
-                    elements='dict',
+                    type='dict',
                     options=dict(
                         is_quick_evac=dict(type='bool'),
                         destination_managed_system=dict(type='str'),
@@ -1219,7 +1215,12 @@ def run_module():
                 if status == "COMPLETED_OK":
                     ok_count += 1
                 elif status == "COMPLETED_WITH_ERROR":
-                    failed_count += 1
+                    failureMsg = data.get('FailureMessage')
+                    if failureMsg:
+                        if "no updates available" in failureMsg.lower():
+                            ok_count += 1
+                    else:
+                        failed_count += 1
 
             if failed_count > 0 and ok_count == 0:
                 failed = failed_count
