@@ -923,7 +923,7 @@ def platform_update(module):
                     source_file = vios_info['resource_type']
                     vios_level = vios_info['vios_image_name']
                     output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
-                    check_response_exception(output, module,'listViosUpdates')
+                    check_response_exception(output, module, 'listViosUpdates')
                     if output.strip() in ("[]", "", "None"):
                         error_msg = f"Vios Image {vios_level} for {vios_name} not found at the specified source location: {source_file}."
                         module.fail_json(msg=error_msg)
