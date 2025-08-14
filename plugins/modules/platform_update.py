@@ -837,7 +837,7 @@ def platform_update(module):
                 )
             destination_system = partition_migration[0].get('destination_managed_system')
             if destination_system not in [v for d in sys_list for v in d.values()]:
-                module.fail_json(msg=f"The {destination_system} managed system is not available in HMC")
+                module.fail_json(msg=f"The managed system {destination_system} is not available in HMC")
 
         # System Readiness Check
         sysfirm_update = attributes.get("system_firmware_update", {})
