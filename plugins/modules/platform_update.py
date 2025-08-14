@@ -1057,8 +1057,15 @@ def facts(module):
         module.fail_json(msg="The managed system is not available in HMC")
     else:
         cmd = f"lssyscfg -r lpar -m {system_name} -F name,rmc_state,lpar_id,lpar_env | grep vioserver | grep -w active"
-        output = hmc_conn.execute(cmd).splitlines()
-        vios_list = [(line.split(',')[0], line.split(',')[2]) for line in output if line.strip()]
+        try:
+            output = hmc_conn.execute(cmd)
+        except Exception:
+            output = None
+        if output:
+            output = output.splitlines()
+            vios_list = [(line.split(',')[0], line.split(',')[2]) for line in output if line.strip()]
+        else:
+            vios_list = []
         if re.match(HmcConstants.MTMS_pattern, system_name):
             try:
                 system_name = hmc.getSystemNameFromMTMS(system_name)
