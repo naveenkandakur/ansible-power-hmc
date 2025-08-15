@@ -217,6 +217,290 @@ platform_config_test_data = [
 
 ]
 
+platform_config_test_data1 = [
+
+    # VIOS update with IO adapter update (list of devices)
+    (
+        {
+            'platform_config': {
+                'vios_update': [
+                    {
+                        'update_type': 'Update',
+                        'vios_name': 'vios2',
+                        'update_order': 2,
+                        'vios_image_name': 'image_name',
+                        'io_adapter_update': [
+                            {
+                                'all': None,
+                                'device': 'ent0',
+                                'repository': 'IBMWebsite'
+                            },
+                            {
+                                'all': None,
+                                'device': 'ent1',
+                                'repository': 'IBMWebsite'
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            'platform_config': {
+                'VIOSUpdate': [
+                    {
+                        'UpdateType': 'Update',
+                        'VIOSName': 'vios2',
+                        'UpdateOrder': 2,
+                        'Name': 'image_name',
+                        'IOAdapterUpdate': [
+                            {
+                                'Device': 'ent0',
+                                'Repository': 'IBMWebsite'
+                            },
+                            {
+                                'Device': 'ent1',
+                                'Repository': 'IBMWebsite'
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ),
+
+    # Multiple VIOS update
+    (
+        {
+            'platform_config': {
+                'vios_update': [
+                    {
+                        'update_type': 'Update',
+                        'vios_name': 'vios2',
+                        'update_order': 1,
+                        'vios_image_name': 'image_name',
+                        'io_adapter_update': [
+                            {
+                                'all': None,
+                                'device': ['ent0', 'ent1'],
+                                'repository': 'IBMWebsite'
+                            }
+                        ]
+                    },
+                    {
+                        'update_type': 'Update',
+                        'vios_name': 'vios1',
+                        'update_order': 2,
+                        'vios_image_name': 'image_name',
+                        'io_adapter_update': None
+                    }
+                ]
+            }
+        },
+        {
+            'platform_config': {
+                'VIOSUpdate': [
+                    {
+                        'UpdateType': 'Update',
+                        'VIOSName': 'vios2',
+                        'UpdateOrder': 1,
+                        'Name': 'image_name',
+                        'IOAdapterUpdate': [
+                            {
+                                'Device': ['ent0', 'ent1'],
+                                'Repository': 'IBMWebsite'
+                            }
+                        ]
+                    },
+                    {
+                        'UpdateType': 'Update',
+                        'VIOSName': 'vios1',
+                        'UpdateOrder': 2,
+                        'Name': 'image_name',
+                    }
+                ]
+            }
+        }
+    ),
+
+    # System firmware update
+    (
+        {
+            'platform_config': {
+                'system_firmware_update': {
+                    'update_type': 'Update',
+                    'update_order': 1,
+                    'repository': 'IBMWebsite',
+                    'level': 'latest',
+                    'sriov_adapter_update': None
+                }
+            }
+        },
+        {
+            'platform_config': {
+                'SystemFirmwareUpdate': {
+                    'UpdateType': 'Update',
+                    'UpdateOrder': 1,
+                    'Repository': 'IBMWebsite',
+                    'Level': 'latest',
+                }
+            }
+        }
+    ),
+
+    # Sriov Adapter Update
+    (
+        {
+            'platform_config': {
+                'system_firmware_update': {
+                    'update_type': 'NoUpdate',
+                    'update_order': 1,
+                    'repository': None,
+                    'level': 'latest',
+                    'sriov_adapter_update': [
+                        {
+                            'all': None,
+                            'adapter_id': '1',
+                            'subtype': 'Adapter'
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            'platform_config': {
+                'SystemFirmwareUpdate': {
+                    'UpdateType': 'NoUpdate',
+                    'UpdateOrder': 1,
+                    'Level': 'latest',
+                    'SRIOVAdapterUpdate': [
+                        {
+                            'AdapterID': '1',
+                            'SubType': 'adapterdriver,adapter'
+                        }
+                    ]
+                }
+            }
+        }
+    ),
+
+    # Multiple Sriov Adapter Update
+    (
+        {
+            'platform_config': {
+                'system_firmware_update': {
+                    'update_type': 'NoUpdate',
+                    'update_order': 1,
+                    'repository': None,
+                    'level': 'latest',
+                    'sriov_adapter_update': [
+                        {
+                            'all': None,
+                            'adapter_id': '1',
+                            'subtype': 'Adapter'
+                        },
+                        {
+                            'all': None,
+                            'adapter_id': '2',
+                            'subtype': 'DriverOnly'
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            'platform_config': {
+                'SystemFirmwareUpdate': {
+                    'UpdateType': 'NoUpdate',
+                    'UpdateOrder': 1,
+                    'Level': 'latest',
+                    'SRIOVAdapterUpdate': [
+                        {
+                            'AdapterID': '1',
+                            'SubType': 'adapterdriver,adapter'
+                        },
+                        {
+                            'AdapterID': '2',
+                            'SubType': 'adapterdriver'
+                        }
+                    ]
+                }
+            }
+        }
+    ),
+
+    # Partition migration with defaults
+    (
+        {
+            'platform_config': {
+                'partition_migration': {
+                    'is_quick_evac': True,
+                    'destination_managed_system': 'sysA',
+                    'leave_partition_in_target': False
+                }
+            }
+        },
+        {
+            'platform_config': {
+                'PartitionMigration': {
+                    'IsQuickEvac': True,
+                    'DestinationManagedSystem': 'sysA',
+                    'LeavePartitionInTarget': False
+                }
+            }
+        }
+    ),
+
+    # Mixed config: system firmware + VIOS update + partition migration
+    (
+        {
+            'platform_config': {
+                'system_firmware_update': {
+                    'update_type': 'Update',
+                    'update_order': 1,
+                    'repository': 'IBMWebsite',
+                    'level': 'FW940',
+                    'SRIOVAdapterUpdate': None
+                },
+                'vios_update': [
+                    {
+                        'update_type': 'Update',
+                        'vios_name': 'vios3',
+                        'update_order': 1
+                    }
+                ],
+                'partition_migration': {
+                    'is_quick_evac': True,
+                    'destination_managed_system': 'sysB',
+                    'LeavePartitionInTarget': False
+                }
+            }
+        },
+        {
+            'platform_config': {
+                'SystemFirmwareUpdate': {
+                    'UpdateType': 'Update',
+                    'UpdateOrder': 1,
+                    'Repository': 'IBMWebsite',
+                    'Level': 'FW940',
+                },
+                'VIOSUpdate': [
+                    {
+                        'UpdateType': 'Update',
+                        'VIOSName': 'vios3',
+                        'UpdateOrder': 1
+                    }
+                ],
+                'PartitionMigration': {
+                    'IsQuickEvac': True,
+                    'DestinationManagedSystem': 'sysB',
+                    'LeavePartitionInTarget': False
+                }
+            }
+        }
+    )
+]
+
 
 def common_mock_setup(mocker):
     hmc_platform_update = importlib.import_module(IMPORT_HMC_PLATFORM_UPDATE)
@@ -250,3 +534,12 @@ def test_call_platform_config(mocker, platform_config_test_input, expectedError)
 
     assert "ParameterError:" in str(excinfo.value)
     assert expectedError in str(excinfo.value)
+
+
+@pytest.mark.parametrize("platform_config_test_input, expected", platform_config_test_data1)
+def test_call_platform_config_payload(mocker, platform_config_test_input, expected):
+    hmc_module = common_mock_setup(mocker)
+
+    cleanup_data = hmc_module.cleanup_entries(platform_config_test_input)
+    result = hmc_module.map_entries(cleanup_data)
+    assert result == expected

@@ -20,6 +20,9 @@ short_description: Performs consolidated system firmware, VIOS, SR-IOV, and I/O 
 notes:
   - The current version supports IBM Fix Central website as the update source .
   - Support for additional update sources will be added in future releases.
+  - For any update operation, if the Ansible response status is C(ok) with C(changed) set to C(false)
+    and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
+    it means the target is already up-to-date.
 description:
     - This module allows updating System Firmware, VIOS, SR-IOV adapters, and I/O adapters either individually or through a single consolidated update flow.
     - This operations can be configured using I(platform_config) parameter.
@@ -112,7 +115,7 @@ options:
                                 description:
                                     - ID of the specific adapter to be updated.
                                     - Required only when C(all) is not specified.
-                                type: str
+                                type: int
                             subtype:
                                 description:
                                     - Specifies the level of update to apply.
@@ -126,7 +129,9 @@ options:
                 type: dict
                 suboptions:
                     is_quick_evac:
-                        description: Whether to enable quick evacuation.
+                        description:
+                            - Indicates whether to perform a quick evacuation during partition migration.
+                            - Must always be set to C(true) when performing partition migration.
                         type: bool
                     destination_managed_system:
                         description: Target managed system name.
@@ -211,7 +216,7 @@ EXAMPLES = '''
         update_type: NoUpdate
         update_order: 1
         sriov_adapter_update:
-          - adapter_id: "ent0"
+          - adapter_id: 1
             subtype: DriverOnly
 
 - name: Update all SR-IOV adapters (Adapter) using IBM Fix Central (No Firware Update)
@@ -867,13 +872,16 @@ def platform_update(module):
                     module.fail_json(msg=error_msg)
 
                 for adapter in sriov_update:
+                    if adapter.get('all') is False:
+                        adapter['all'] = None
                     if adapter.get('all'):
                         available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
                     else:
                         adapter_id = adapter.get("adapter_id")
-                        if int(adapter_id) not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
+                        if adapter_id not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                             error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
                             module.fail_json(msg=error_msg)
+                        adapter_id['adapter_id'] = str(adapter_id)
 
         # IO Adapter Avaiabillty check
         if all_io_updates:
@@ -1157,7 +1165,7 @@ def run_module():
                             elements='dict',
                             options=dict(
                                 all=dict(type="bool"),
-                                adapter_id=dict(type='str'),
+                                adapter_id=dict(type='int'),
                                 subtype=dict(type='str', choices=['DriverOnly', 'Adapter'])
                             )
                         )
