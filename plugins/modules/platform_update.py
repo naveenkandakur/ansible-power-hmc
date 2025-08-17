@@ -881,7 +881,7 @@ def platform_update(module):
                         if adapter_id not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
                             error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
                             module.fail_json(msg=error_msg)
-                        adapter_id['adapter_id'] = str(adapter_id)
+                        adapter['adapter_id'] = str(adapter_id)
 
         # IO Adapter Avaiabillty check
         if all_io_updates:
