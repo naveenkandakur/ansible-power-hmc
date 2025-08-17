@@ -900,7 +900,7 @@ def platform_update(module):
                     if output.get('IOAdapterUpdate', {}).get(vios_id, []):
                         available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
                     else:
-                        error_msg = f"No available I/O adapters found for VIOS {output.get('vios_name')}"
+                        error_msg = f"No available I/O adapters found for VIOS {io_update.get('vios_name')}"
                         module.fail_json(msg=error_msg)
                 else:
                     io_id = str(io_update.get('vios_id')).zfill(3)
