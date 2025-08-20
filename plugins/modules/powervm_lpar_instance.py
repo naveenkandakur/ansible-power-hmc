@@ -1696,7 +1696,7 @@ def install_aix_os(module, params):
         rmc_state, vm_property, ref_code = hmc.checkForOSToBootUpFully(system_name, vm_name, timeout)
         if rmc_state:
             changed = True
-        elif ref_code in ['', '00']:
+        elif ref_code in ['', '00', 'Linux ppc64le']:
             changed = True
             warn_msg = "AIX/Linux installation has been successfull but RMC didnt come up, please check the HMC firewall and security"
         elif vm_mac and "linux" in vm_property['os_version'].lower():
