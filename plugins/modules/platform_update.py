@@ -381,13 +381,13 @@ EXAMPLES = '''
               repository: IBMWebsite
 
 - name: Facts
-    platform_update:
-        hmc_host: <host>
-        hmc_auth:
-        username: <hscroot>
-        password: <hmcpass>
-        system_name: <system_name>
-        state: facts
+  platform_update:
+    hmc_host: "10.0.0.10"
+    hmc_auth:
+      username: "hscroot"
+      password: "hmcpass"
+    system_name: "p910_system"
+    state: facts
 '''
 
 RETURN = '''
