@@ -90,6 +90,7 @@ options:
                         description:
                             - Specifies the source repository for the update image.
                             - currently only supports C(IBMWebsite).
+                            - If not specified, it defaults to C(IBMWebsite).
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
@@ -126,6 +127,8 @@ options:
             partition_migration:
                 description:
                     - Configuration for migrating logical partitions.
+                    - This option cannot be used alone.
+                    - Must be specified along with either C(vios_update) or C(system_firmware_update).
                 type: dict
                 suboptions:
                     is_quick_evac:
@@ -164,6 +167,7 @@ options:
                         description:
                             - Specifies the source repository for the update image.
                             - Currently only supports C(IBMWebsite).
+                            - If not specified, it defaults to C(IBMWebsite).
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
@@ -193,6 +197,7 @@ options:
                                 description:
                                     - Specifies the source repository for the update image.
                                     - Currently only supports C(IBMWebsite).
+                                    - If not specified, it defaults to C(IBMWebsite).
                                 type: str
                                 choices: ['IBMWebsite']
                                 default: 'IBMWebsite'
