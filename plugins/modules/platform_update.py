@@ -16,21 +16,27 @@ DOCUMENTATION = '''
 module: platform_update
 author:
     - Chiranthan M V (@chiranthanmv)
-short_description: Performs consolidated system firmware, VIOS, SR-IOV, and I/O adapter updates, including partition migration.
+short_description: Performs Consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
 notes:
-  - The current version supports IBM Fix Central website as the update source .
-  - Support for additional update sources will be added in future releases.
-  - For any update operation, if the Ansible response status is C(ok) with C(changed) set to C(false)
-    and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
-    it means the target is already up-to-date.
+  - The current version supports IBM Fix Central website as the update/upgrade source .
+  - Support for additional update/upgrade sources will be added in future releases.
+  - Supports defining the order in which update/upgrade are applied across components.
+  - To perform configuration operations, you do not need to specify a separate state or action.
+    Supplying values under C(platform_config) is sufficient to apply the changes directly to the HMC.
+  - When performing an update or upgrade operation via C(IBMWebsite) with C(level='latest'),
+    if the Ansible response status is C(ok) and C(changed) is C(false), and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
+    it indicates that no newer update images are available or the target is already up-to-date.
 description:
-    - This module allows updating System Firmware, VIOS, SR-IOV adapters, and I/O adapters either individually or through a single consolidated update flow.
-    - This operations can be configured using I(platform_config) parameter.
-    - It supports both 'DriverOnly' and 'Adapter' update strategies for SR-IOV adapters and currently allows upgrade/updates from IBM Fix Central website.
-    - Supports defining the order in which updates are applied across components.
+    - This module performs updates and upgrades for various system components as part of system maintenance or automation workflows.
+      It supports:
+        - System Firmware: both updates and upgrades
+        - VIOS and I/O Adapters: updates only
+        - SR-IOV Adapters: updates based on supported system firmware levels
+    - All updates/upgrades can be performed independently or combined in a single consolidated update operation.
+    - Supports C(state=facts) to retrieve information about available adapters without making any changes.
 version_added: 1.0.0
 requirements:
-- Python >= 3
+- Python >= 3.9
 options:
     hmc_host:
         description:
@@ -60,22 +66,21 @@ options:
         type: str
     platform_config:
         description:
-            - Defines the configuration for the operation to be performed, such as system firmware updates
+            - Defines the configuration for the operation to be performed, such as system firmware update/upgrade
               (including SR-IOV adapter updates) or VIOS updates (including I/O adapter updates).
             - Also supports performing partition migrations.
-            - This option applies changes to the HMC.
         required: false
         type: dict
         suboptions:
             system_firmware_update:
                 description:
-                    - System firmware update configuration.
+                    - System firmware update/upgrade configuration.
                 type: dict
                 suboptions:
                     update_type:
                         description:
-                            - Type of firmware update operation.
-                            - 'C(NoUpdate): System firmware update is skipped, but SR-IOV adapter updates are still allowed'
+                            - Type of firmware update/upgrade operation.
+                            - 'C(NoUpdate): System firmware update/upgrade is skipped, but SR-IOV adapter updates are still allowed'
                             - 'C(Update): Performs an update.'
                             - 'C(Upgrade): Performs an upgrade.'
                             - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
@@ -84,7 +89,7 @@ options:
                         choices: ['NoUpdate', 'Update', 'Upgrade']
                     update_order:
                         description:
-                            - Optional order in which the update should be applied.
+                            - Priority order in which the update/upgrade should be applied.
                         type: int
                     repository:
                         description:
@@ -103,7 +108,7 @@ options:
                     sriov_adapter_update:
                         description:
                             - List of SR-IOV adapter update configurations.
-                            - This option must not be provided if C(update_type) is set to C(Update) or C(Upgrade)
+                            - This option must not be provided if C(update_type) is set to C(Update) or C(Upgrade) in C(system_firmware_update)
                         type: list
                         elements: dict
                         suboptions:
@@ -140,7 +145,9 @@ options:
                         description: Target managed system name.
                         type: str
                     leave_partition_in_target:
-                        description: Whether to keep the partition in the target after platform update.
+                        description:
+                            - Whether to keep the partition in the target after platform update.
+                            - If not specified, the default is C(False).
                         type: bool
                         default: False
             vios_update:
@@ -161,7 +168,7 @@ options:
                         description: Name of the VIOS partition.
                         type: str
                     update_order:
-                        description: Priority/order of update among multiple VIOS.
+                        description: Priority order in which the update should be applied.
                         type: int
                     resource_type:
                         description:
@@ -174,7 +181,7 @@ options:
                     vios_image_name:
                         description:
                             - Specifies the VIOS image name to apply.
-                            - The field is required if C(update_type) is C(update) or C(upgrade)
+                            - The field is required if C(update_type) is C(update).
                         type: str
                     io_adapter_update:
                         description: List of I/O adapters to update during VIOS update.
@@ -211,11 +218,11 @@ options:
 EXAMPLES = '''
 - name: Update a SR-IOV adapters (DriverOnly) using IBM Fix Central
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       system_firmware_update:
         update_type: NoUpdate
@@ -226,11 +233,11 @@ EXAMPLES = '''
 
 - name: Update all SR-IOV adapters (Adapter) using IBM Fix Central (No Firware Update)
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       system_firmware_update:
         update_type: NoUpdate
@@ -241,11 +248,11 @@ EXAMPLES = '''
 
 - name: Perform a System Firmware update using default level
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       system_firmware_update:
         update_type: Update
@@ -253,11 +260,11 @@ EXAMPLES = '''
 
 - name: Perform a System Firmware update using specified level (level 12)
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       system_firmware_update:
         update_type: Update
@@ -266,11 +273,11 @@ EXAMPLES = '''
 
 - name: Migrate a partition to a different managed system and Perform a System Firmware update
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       system_firmware_update:
         update_type: Update
@@ -283,11 +290,11 @@ EXAMPLES = '''
 
 - name: Update VIOS to latest available level from IBM Fix Central
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       vios_update:
         - update_type: Update
@@ -298,15 +305,15 @@ EXAMPLES = '''
 
 - name: Update selected I/O adapters only (no VIOS update)
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       vios_update:
         - update_type: NoUpdate
-          vios_name: "vios1"
+          vios_name: <vios1>
           update_order: 1
           repository: IBMWebsite
           io_adapter_update:
@@ -317,15 +324,15 @@ EXAMPLES = '''
 
 - name: Update VIOS to specific level and all I/O adapters from IBM Fix Central
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       vios_update:
         - update_type: NoUpdate
-          vios_name: "vios1"
+          vios_name: <vios1>
           update_order: 1
           resource_type: IBMWebsite
           level: 13
@@ -335,32 +342,54 @@ EXAMPLES = '''
 
 - name: Update multiple VIOS instances to the latest available level from IBM Fix Central
   platform_update:
-    hmc_host: "10.0.0.10"
+    hmc_host: <host>
     hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
     platform_config:
       vios_update:
         - update_type: Update
-          vios_name: "vios1"
+          vios_name: <vios1>
           update_order: 1
           vios_image_name: "name"
           resource_type: IBMWebsite
         - update_type: Update
-          vios_name: "vios2"
+          vios_name: <vios2>
           update_order: 2
-          vios_image_name: "name"
+          vios_image_name: <name>
           resource_type: IBMWebsite
 
-- name: Facts
+- name: Updates System Firmware To latest and Vios to latest latest available level along with all I/O adapters from IBM Fix Central
   platform_update:
-    hmc_host: "10.0.0.10"
-    hmc_auth:
-      username: "hscroot"
-      password: "hmcpass"
-    system_name: "p910_system"
-    state: facts
+  hmc_host: <host>
+  hmc_auth:
+    username: <hscroot>
+    password: <hmcpass>
+  system_name: <system_name>
+  platform_config:
+    system_firmware_update:
+      update_type: Update
+      update_order: 1
+      repository: IBMWebsite
+    vios_update:
+      - update_type: Update
+        vios_name: <vios1>
+        update_order: 1
+        vios_image_name: "name"
+        resource_type: IBMWebsite
+        io_adapter_update:
+          - all: true
+            repository: IBMWebsite
+
+- name: Facts
+    platform_update:
+        hmc_host: <host>
+        hmc_auth:
+        username: <hscroot>
+        password: <hmcpass>
+        system_name: <system_name>
+        state: facts
 '''
 
 RETURN = '''
