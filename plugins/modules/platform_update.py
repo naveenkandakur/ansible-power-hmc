@@ -26,14 +26,13 @@ notes:
   - When performing an update or upgrade operation via C(IBMWebsite) with C(level='latest'),
     if the Ansible response status is C(ok) and C(changed) is C(false), and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
     it indicates that no newer update images are available or the target is already up-to-date.
-description:
-    - This module performs updates and upgrades for various system components as part of system maintenance or automation workflows.
-      It supports:
-        - System Firmware: both updates and upgrades
-        - VIOS and I/O Adapters: updates only
-        - SR-IOV Adapters: updates based on supported system firmware levels
-    - All updates/upgrades can be performed independently or combined in a single consolidated update operation.
-    - Supports C(state=facts) to retrieve information about available adapters without making any changes.
+description: |
+  This module performs updates and upgrades for various system components as part of system maintenance or automation workflows. It supports:
+    - System Firmware: updates and upgrades
+    - VIOS and I/O Adapters: updates only
+    - SR-IOV Adapters: updates based on supported system firmware levels
+  All updates and upgrades can be performed independently or combined in a single consolidated update operation.
+  Supports C(state=facts) to retrieve information about available adapters without making any changes.
 version_added: 1.0.0
 requirements:
 - Python >= 3.9
@@ -322,7 +321,7 @@ EXAMPLES = '''
                 - "device 2"
               repository: IBMWebsite
 
-- name: Update VIOS to specific level and all I/O adapters from IBM Fix Central
+- name: Update VIOS to specific image and all I/O adapters from IBM Fix Central
   platform_update:
     hmc_host: <host>
     hmc_auth:
@@ -335,7 +334,6 @@ EXAMPLES = '''
           vios_name: <vios1>
           update_order: 1
           resource_type: IBMWebsite
-          level: 13
           io_adapter_update:
             - all: true
               repository: IBMWebsite
@@ -362,25 +360,25 @@ EXAMPLES = '''
 
 - name: Updates System Firmware To latest and Vios to latest latest available level along with all I/O adapters from IBM Fix Central
   platform_update:
-  hmc_host: <host>
-  hmc_auth:
-    username: <hscroot>
-    password: <hmcpass>
-  system_name: <system_name>
-  platform_config:
-    system_firmware_update:
-      update_type: Update
-      update_order: 1
-      repository: IBMWebsite
-    vios_update:
-      - update_type: Update
-        vios_name: <vios1>
+    hmc_host: <host>
+    hmc_auth:
+      username: <hscroot>
+      password: <hmcpass>
+    system_name: <system_name>
+    platform_config:
+      system_firmware_update:
+        update_type: Update
         update_order: 1
-        vios_image_name: "name"
-        resource_type: IBMWebsite
-        io_adapter_update:
-          - all: true
-            repository: IBMWebsite
+        repository: IBMWebsite
+      vios_update:
+        - update_type: Update
+          vios_name: <vios1>
+          update_order: 1
+          vios_image_name: "name"
+          resource_type: IBMWebsite
+          io_adapter_update:
+            - all: true
+              repository: IBMWebsite
 
 - name: Facts
     platform_update:
