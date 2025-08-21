@@ -26,6 +26,7 @@ notes:
   - When performing an update or upgrade operation via C(IBMWebsite) with C(level='latest'),
     if the Ansible response status is C(ok) and C(changed) is C(false), and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
     it indicates that no newer update images are available or the target is already up-to-date.
+  - The module supports idempotency for System Firmware Update/Upgrade, VIOS Update, SR-IOV Adapter Update, and I/O Adapter Update operations.
 description: |
   This module performs updates and upgrades for various system components as part of system maintenance or automation workflows. It supports:
     - System Firmware: updates and upgrades
