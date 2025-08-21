@@ -26,7 +26,7 @@ notes:
 description:
     - This module allows updating System Firmware, VIOS, SR-IOV adapters, and I/O adapters either individually or through a single consolidated update flow.
     - This operations can be configured using I(platform_config) parameter.
-    - It supports both 'DriverOnly' and 'Adapter' update strategies for SR-IOV adapters and allows updates from IBM Fix Central website when specified.
+    - It supports both 'DriverOnly' and 'Adapter' update strategies for SR-IOV adapters and currently allows upgrade/updates from IBM Fix Central website.
     - Supports defining the order in which updates are applied across components.
 version_added: 1.0.0
 requirements:
@@ -163,7 +163,7 @@ options:
                     resource_type:
                         description:
                             - Specifies the source repository for the update image.
-                            - Currentlt only supports C(IBMWebsite).
+                            - Currently only supports C(IBMWebsite).
                         type: str
                         choices: ['IBMWebsite']
                         default: 'IBMWebsite'
@@ -192,13 +192,13 @@ options:
                             repository:
                                 description:
                                     - Specifies the source repository for the update image.
-                                    - Currentlt only supports C(IBMWebsite).
+                                    - Currently only supports C(IBMWebsite).
                                 type: str
                                 choices: ['IBMWebsite']
                                 default: 'IBMWebsite'
     state:
         description:
-            - It gathers and returns information about available SR-IOV adapters, Virtual I/O Servers (VIOS), and I/O adapters without making any changes.
+            - C(facts) gathers and returns information about available SR-IOV adapters, Virtual I/O Servers (VIOS), and I/O adapters without making any changes.
         type: str
         choices: ['facts']
 '''
@@ -259,7 +259,7 @@ EXAMPLES = '''
         update_order: 1
         level: 12
 
-- name: Migrate a partition to a different managed system
+- name: Migrate a partition to a different managed system and Perform a System Firmware update
   platform_update:
     hmc_host: "10.0.0.10"
     hmc_auth:
@@ -360,12 +360,20 @@ EXAMPLES = '''
 
 RETURN = '''
 result:
-    description: The result dictionary containing the status and details of the operation.
+    description: >
+        Dictionary containing the outcome of the operation.
+        Always includes `changed` indicating if the operation made any changes.
+        The `command_output` key contains a dictionary with operation-specific details.
+        The keys and values in `command_output` depend on the type of operation performed.
     type: dict
     returned: always
     sample: {
         "changed": true,
-        "msg": "System firmware updated successfully"
+        "command_output": {
+            "Key1": "Value1",
+            "Key2": "Value2",
+            "...": "..."
+        }
     }
 '''
 
