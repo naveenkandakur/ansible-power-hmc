@@ -19,12 +19,14 @@ author:
 short_description: Manages the update and upgrade of the VIOS from the HMC
 notes:
     - All Operations support passwordless authentication.
+    - Module will not satisfy the idempotency requirement of Ansible, even though it partially confirms it.
+      For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
+      go ahead with the operation and finally the changed state will be reported as false.
 description:
     - When the Virtual I/O Server (VIOS) partition is running and has an active Resource Monitoring and Control (RMC) connection,
-      this module enables the updating or upgrading of VIOS directly from the Hardware Management Console (HMC)
-    - Updates the VIOS by installing the VIOS installation image located on an NFS/SFTP/HMC hard disk.
+      this module enables the updating or upgrading of VIOS.
+    - Updates the VIOS by installing the VIOS installation image located on an NFS/SFTP/HMC hard disk/IBM Fix Central website.
     - Upgrades the VIOS by obtaining  the required  files  from NFS/SFTP/HMC hard disk.
-    - Update the VIOS from IBM Fix Central website.
 version_added: 1.0.0
 options:
     hmc_host:
