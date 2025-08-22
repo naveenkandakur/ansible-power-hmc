@@ -26,7 +26,7 @@ notes:
   - When performing an update or upgrade operation via C(IBMWebsite) with C(level='latest'),
     if the Ansible response status is C(ok) and C(changed) is C(false), and the result is C(COMPLETED_WITH_ERROR) with the reason C("update not available"),
     it indicates that no newer update images are available or the target is already up-to-date.
-  - The module supports idempotency for System Firmware Update/Upgrade, VIOS Update, SR-IOV Adapter Update, and I/O Adapter Update operations.
+  - Idempotency is not fully supported and may vary based on the specific operation.
 description: |
   This module performs updates and upgrades for various system components as part of system maintenance or automation workflows. It supports:
     - System Firmware: updates and upgrades
@@ -359,7 +359,7 @@ EXAMPLES = '''
           vios_image_name: <name>
           resource_type: IBMWebsite
 
-- name: Updates System Firmware To latest and Vios to latest latest available level along with all I/O adapters from IBM Fix Central
+- name: Updates System Firmware To latest and Vios to latest available level along with all I/O adapters from IBM Fix Central
   platform_update:
     hmc_host: <host>
     hmc_auth:
