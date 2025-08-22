@@ -19,7 +19,7 @@
       state: present
   delegate_to: "{{ groups['hmcs'][0] }}"
 
-- name: Retrieve the MAC address and fail with custom message if no network adapters
+- name: Retrieve the MAC address of network adapter
   run_once: true
   connection: local
   collections:

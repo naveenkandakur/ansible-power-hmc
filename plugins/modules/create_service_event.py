@@ -25,7 +25,7 @@ description:
       or this HMC and to request service to repair it.
 version_added: 1.0.0
 requirements:
-- Python >= 3
+- Python >= 3.9
 options:
     hmc_host:
         description:
@@ -49,7 +49,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system for which to create the serviceable event.
+            - The name or mtms (machine type model serial) of the managed system.
         required: true
         type: str
     description:
@@ -102,7 +102,7 @@ options:
                 type: int
             target_lpar_name:
                 description:
-                    - The target partition name for the serviceable event.
+                    - The target logical partition name for the serviceable event.
                     - Required for C(lpm)
                 type: str
             target_mtms:
@@ -112,13 +112,19 @@ options:
                 type: str
             lpar_name:
                 description:
-                    - The partition name for the serviceable event.
+                    - The logical partition name for the serviceable event.
                     - Required for C(lpm) and C(vios)
                 type: str
             service_file:
                 description:
                     - The partition name for the serviceable event.
                     - Required for C(lpm) and C(vios)
+                    - C(pedbgq4) HMC pedbg data. Valid with 'sys/hmc/vios/lpm' type.
+                    - C(pedbgq8) Cloud connector pedbg data. Valid with 'cloudconn' type.
+                    - C(vios) VIOS snap data. Valid with 'vios' type.
+                    - C(lpmffdc) Partition migration debug data. Valid with 'lpm' type.
+                    - C(rscdump) Non-disruptive system dump. Valid with 'sys' type.
+                    - C(spdump) Service processor dump . Valid with 'sys' type.
                 type: list
                 elements: str
                 required: true
