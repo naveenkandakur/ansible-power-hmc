@@ -16,7 +16,7 @@ DOCUMENTATION = '''
 module: vios_secure
 author:
     - Sreenidhi S(@SreenidhiS1)
-short_description: Configures security hardening rules and firewall
+short_description: Configures firewall settings and applies security hardening rules.
 notes:
     - This module requires the HMC login user to have specific permissions.
       To achieve this, the user should create a task role based on hmcsuperadmin with additional permissions,
@@ -50,8 +50,8 @@ notes:
       ViewDumps+ViewPowerManagement+ViewSPP)
     - Create a user with the above created task role.
 description:
-    - Configuring security hardening rules.
-    - Configures and unconfigures the firewall settings of the network.
+    - Applies security hardening rules.
+    - Configures and removes the firewall settings of the network.
 version_added: 1.0.0
 requirements:
 - Python >= 3.9
@@ -162,7 +162,7 @@ options:
                 choices: ['allow', 'deny', 'ALLOW', 'DENY']
     state:
         description:
-            - C(setting_security) ensures the new security hardening rules are configured.
+            - C(setting_security) ensures the new security hardening rules are applied.
             - C(firewall_facts) does not change anything on the HMC and returns the firewall settings information.
             - C(setting_firewall) ensures the firewall settings are configured.
         type: str
@@ -188,7 +188,7 @@ EXAMPLES = '''
     ip_version: IPV6
   state: firewall_facts
 
-- name: Apply firewall rule for port 2000 with interface en0
+- name: Configure firewall rule for port 2000 with interface en0
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ curr_hmc_auth }}'

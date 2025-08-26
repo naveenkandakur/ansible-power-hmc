@@ -17,12 +17,12 @@ DOCUMENTATION = '''
 module: create_service_event
 author:
     - Sreenidhi S(@SreenidhiS1)
-short_description: Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on managed-system.
+short_description: Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on the managed system.
 notes:
-    - This module requires the HMC which has Power10 systems licensed for advanced automation and monitoring or for Power11 systems.
+    - This module requires an HMC connected to either Power10 systems licensed for advanced automation and monitoring, or to Power11 systems.
 description:
-    - Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on managed-system
-      or this HMC and to request service to repair it.
+    - Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred
+      on either the managed system or the HMC itself, and initiates a service request for repair.
 version_added: 1.0.0
 requirements:
 - Python >= 3.9
@@ -117,7 +117,7 @@ options:
                 type: str
             service_file:
                 description:
-                    - The partition name for the serviceable event.
+                    - The name of the log file which is attached to the serviceable event.
                     - Required for C(lpm) and C(vios)
                     - C(pedbgq4) HMC pedbg data. Valid with 'sys/hmc/vios/lpm' type.
                     - C(pedbgq8) Cloud connector pedbg data. Valid with 'cloudconn' type.

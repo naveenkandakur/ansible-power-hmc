@@ -16,7 +16,7 @@ DOCUMENTATION = '''
 module: platform_update
 author:
     - Chiranthan M V (@chiranthanmv)
-short_description: Performs Consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
+short_description: Applies consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
 notes:
   - The current version supports IBM Fix Central website as the update/upgrade source .
   - Support for additional update/upgrade sources will be added in future releases.
@@ -30,11 +30,12 @@ notes:
     For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
     go ahead with the operation and finally the changed state will be reported as false.
 description: |
-  This module performs updates and upgrades for various system components as part of system maintenance or automation workflows. It supports:
-    - System Firmware: updates and upgrades
-    - VIOS and I/O Adapters: updates only
-    - SR-IOV Adapters: updates based on supported system firmware levels
-  All updates and upgrades can be performed independently or combined in a single consolidated update operation.
+  This module performs update and upgrade for various system components as part of system maintenance or automation workflows.
+  It supports:
+    - System Firmware update and upgrade
+    - VIOS and I/O Adapters update only
+    - SR-IOV Adapters update based on supported system firmware levels
+  All update and upgrade can be performed independently or combined in a single consolidated update operation.
   Supports C(state=facts) to retrieve information about available adapters without making any changes.
 version_added: 1.0.0
 requirements:
@@ -83,8 +84,8 @@ options:
                         description:
                             - Type of firmware update/upgrade operation.
                             - 'C(NoUpdate): System firmware update/upgrade is skipped, but SR-IOV adapter updates are still allowed'
-                            - 'C(Update): Performs an update.'
-                            - 'C(Upgrade): Performs an upgrade.'
+                            - 'C(Update): Applies an update.'
+                            - 'C(Upgrade): Applies an upgrade.'
                             - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
                             - When set to C(NoUpdate), the fields C(repository) and C(level) are not required.
                         type: str
@@ -127,8 +128,8 @@ options:
                             subtype:
                                 description:
                                     - Specifies the level of update to apply.
-                                    - C(DriverOnly) applies only the driver update.
-                                    - C(Adapter) applies both the adapter firmware and driver updates.
+                                    - C(DriverOnly) perform only the driver update.
+                                    - C(Adapter) perform both the adapter firmware and driver updates.
                                 type: str
                                 choices: ['DriverOnly', 'Adapter']
             partition_migration:
@@ -162,7 +163,7 @@ options:
                         description:
                             - Specifies the type of VIOS update to be performed.
                             - 'C(NoUpdate): No update will be applied to VIOS, but I/O adapter updates are still allowed'
-                            - 'C(Update): Triggers a VIOS update using the provided configuration.'
+                            - 'C(Update): Applies a VIOS update using the provided configuration. The I/O adapter update is performed implicitly'
                             - When set to C(NoUpdate), the fields C(resource_type) and C(vios_image_name) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update']
