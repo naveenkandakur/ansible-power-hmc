@@ -29,7 +29,8 @@ notes:
   - Module will not satisfy the idempotency requirement of Ansible, even though it partially confirms it.
     For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
     go ahead with the operation and finally the changed state will be reported as false.
-  - Upgrade the Power server after successfully evacuating the partition to the destination system, and ensure the partition is not returned to the original server.
+  - Upgrade the Power server after successfully evacuating the partition to the destination system,
+    and ensure the partition is not returned to the original server.
 description: |
   This module performs update and upgrade for various system components as part of system maintenance or automation workflows.
   It supports:
