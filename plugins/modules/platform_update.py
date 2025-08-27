@@ -16,9 +16,9 @@ DOCUMENTATION = '''
 module: platform_update
 author:
     - Chiranthan M V (@chiranthanmv)
-short_description: Performs Consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
+short_description: Applies consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
 notes:
-  - The current version supports IBM Fix Central website as the update/upgrade source .
+  - The current version supports only IBM Fix Central website as the update/upgrade source .
   - Support for additional update/upgrade sources will be added in future releases.
   - Supports defining the order in which update/upgrade are applied across components.
   - To perform configuration operations, you do not need to specify a separate state or action.
@@ -29,12 +29,16 @@ notes:
   - Module will not satisfy the idempotency requirement of Ansible, even though it partially confirms it.
     For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
     go ahead with the operation and finally the changed state will be reported as false.
+  - Upgrade the Power server after successfully evacuating the partition to the destination system,
+    and ensure the partition is not returned to the original server.
 description: |
-  This module performs updates and upgrades for various system components as part of system maintenance or automation workflows. It supports:
-    - System Firmware: updates and upgrades
-    - VIOS and I/O Adapters: updates only
-    - SR-IOV Adapters: updates based on supported system firmware levels
-  All updates and upgrades can be performed independently or combined in a single consolidated update operation.
+  This module performs update and upgrade for various system components as part of system maintenance or automation workflows.
+  It supports:
+    - System Firmware update and upgrade
+    - VIOS and I/O Adapters update only
+    - SR-IOV Adapters update based on supported system firmware levels
+    - Logical Partition migration
+  All update and upgrade can be performed independently or combined in a single consolidated update operation.
   Supports C(state=facts) to retrieve information about available adapters without making any changes.
 version_added: 1.0.0
 requirements:
@@ -83,8 +87,8 @@ options:
                         description:
                             - Type of firmware update/upgrade operation.
                             - 'C(NoUpdate): System firmware update/upgrade is skipped, but SR-IOV adapter updates are still allowed'
-                            - 'C(Update): Performs an update.'
-                            - 'C(Upgrade): Performs an upgrade.'
+                            - 'C(Update): Applies an update.'
+                            - 'C(Upgrade): Applies an upgrade.'
                             - When set to C(Update) or C(Upgrade), the C(sriov_adapter_update) will be implicit.
                             - When set to C(NoUpdate), the fields C(repository) and C(level) are not required.
                         type: str
@@ -127,8 +131,8 @@ options:
                             subtype:
                                 description:
                                     - Specifies the level of update to apply.
-                                    - C(DriverOnly) applies only the driver update.
-                                    - C(Adapter) applies both the adapter firmware and driver updates.
+                                    - C(DriverOnly) perform only the driver update.
+                                    - C(Adapter) perform both the adapter firmware and driver updates.
                                 type: str
                                 choices: ['DriverOnly', 'Adapter']
             partition_migration:
@@ -162,7 +166,7 @@ options:
                         description:
                             - Specifies the type of VIOS update to be performed.
                             - 'C(NoUpdate): No update will be applied to VIOS, but I/O adapter updates are still allowed'
-                            - 'C(Update): Triggers a VIOS update using the provided configuration.'
+                            - 'C(Update): Applies a VIOS update using the provided configuration. The I/O adapter update is performed implicitly'
                             - When set to C(NoUpdate), the fields C(resource_type) and C(vios_image_name) are not required.
                         type: str
                         choices: ['NoUpdate', 'Update']
@@ -198,7 +202,7 @@ options:
                             device:
                                 description:
                                     - List of I/O adapter device names to be updated.
-                                    - Specify one or more device names as a list (e.g., C(['ent0', 'fcs0'])).
+                                    - Specify one or more device names as a list (e.g., C(['ent0', 'ent1'])).
                                     - Required only when C(all) is not specified.
                                 type: list
                                 elements: str
@@ -273,7 +277,7 @@ EXAMPLES = '''
         update_order: 1
         level: 12
 
-- name: Migrate a partition to a different managed system and Perform a System Firmware update
+- name: Migrate a partition to a different managed system and perform a System Firmware update
   platform_update:
     hmc_host: <host>
     hmc_auth:
@@ -320,8 +324,8 @@ EXAMPLES = '''
           repository: IBMWebsite
           io_adapter_update:
             - device:
-                - "device 1"
-                - "device 2"
+                - "ent0"
+                - "ent1"
               repository: IBMWebsite
 
 - name: Update VIOS to specific image and all I/O adapters from IBM Fix Central
@@ -341,7 +345,7 @@ EXAMPLES = '''
             - all: true
               repository: IBMWebsite
 
-- name: Update multiple VIOS instances to the latest available level from IBM Fix Central
+- name: Update multiple VIOS instances to the latest available level from IBM Fix Central with vios1 update first and then vios2
   platform_update:
     hmc_host: <host>
     hmc_auth:
