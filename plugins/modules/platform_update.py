@@ -18,7 +18,7 @@ author:
     - Chiranthan M V (@chiranthanmv)
 short_description: Applies consolidated system firmware (update/upgrade), VIOS, SR-IOV, and I/O adapter updates, including optional partition migration.
 notes:
-  - The current version supports IBM Fix Central website as the update/upgrade source .
+  - The current version supports only IBM Fix Central website as the update/upgrade source .
   - Support for additional update/upgrade sources will be added in future releases.
   - Supports defining the order in which update/upgrade are applied across components.
   - To perform configuration operations, you do not need to specify a separate state or action.
@@ -29,12 +29,14 @@ notes:
   - Module will not satisfy the idempotency requirement of Ansible, even though it partially confirms it.
     For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
     go ahead with the operation and finally the changed state will be reported as false.
+  - Upgrade the Power server after successfully evacuating the partition to the destination system, and ensure the partition is not returned to the original server.
 description: |
   This module performs update and upgrade for various system components as part of system maintenance or automation workflows.
   It supports:
     - System Firmware update and upgrade
     - VIOS and I/O Adapters update only
     - SR-IOV Adapters update based on supported system firmware levels
+    - Logical Partition migration
   All update and upgrade can be performed independently or combined in a single consolidated update operation.
   Supports C(state=facts) to retrieve information about available adapters without making any changes.
 version_added: 1.0.0
@@ -199,7 +201,7 @@ options:
                             device:
                                 description:
                                     - List of I/O adapter device names to be updated.
-                                    - Specify one or more device names as a list (e.g., C(['ent0', 'fcs0'])).
+                                    - Specify one or more device names as a list (e.g., C(['ent0', 'ent1'])).
                                     - Required only when C(all) is not specified.
                                 type: list
                                 elements: str
@@ -274,7 +276,7 @@ EXAMPLES = '''
         update_order: 1
         level: 12
 
-- name: Migrate a partition to a different managed system and Perform a System Firmware update
+- name: Migrate a partition to a different managed system and perform a System Firmware update
   platform_update:
     hmc_host: <host>
     hmc_auth:
@@ -321,8 +323,8 @@ EXAMPLES = '''
           repository: IBMWebsite
           io_adapter_update:
             - device:
-                - "device 1"
-                - "device 2"
+                - "ent0"
+                - "ent1"
               repository: IBMWebsite
 
 - name: Update VIOS to specific image and all I/O adapters from IBM Fix Central
@@ -342,7 +344,7 @@ EXAMPLES = '''
             - all: true
               repository: IBMWebsite
 
-- name: Update multiple VIOS instances to the latest available level from IBM Fix Central
+- name: Update multiple VIOS instances to the latest available level from IBM Fix Central with vios1 update first and then vios2
   platform_update:
     hmc_host: <host>
     hmc_auth:

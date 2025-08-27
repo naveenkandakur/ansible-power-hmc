@@ -19,10 +19,10 @@ author:
     - Sreenidhi S(@SreenidhiS1)
 short_description: Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on the managed system.
 notes:
-    - This module requires an HMC connected to either Power10 systems licensed for advanced automation and monitoring, or to Power11 systems.
+    - This module requires the HMC which has Power10 or Power 11 systems licensed for advanced automation and monitoring.
 description:
     - Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred
-      on either the managed system or the HMC itself, and initiates a service request for repair.
+      on either the power server or the HMC itself, and initiates a service request for repair.
 version_added: 1.0.0
 requirements:
 - Python >= 3.9
@@ -119,12 +119,12 @@ options:
                 description:
                     - The name of the log file which is attached to the serviceable event.
                     - Required for C(lpm) and C(vios)
-                    - C(pedbgq4) HMC pedbg data. Valid with 'sys/hmc/vios/lpm' type.
-                    - C(pedbgq8) Cloud connector pedbg data. Valid with 'cloudconn' type.
-                    - C(vios) VIOS snap data. Valid with 'vios' type.
-                    - C(lpmffdc) Partition migration debug data. Valid with 'lpm' type.
-                    - C(rscdump) Non-disruptive system dump. Valid with 'sys' type.
-                    - C(spdump) Service processor dump . Valid with 'sys' type.
+                    - C(pedbgq4) HMC pedbg data. Valid with I(sys/hmc/vios/lpm) type.
+                    - C(pedbgq8) Cloud connector pedbg data. Valid with I(cloudconn) type.
+                    - C(vios) VIOS snap data. Valid with I(vios) type.
+                    - C(lpmffdc) Partition migration debug data. Valid with I(lpm) type.
+                    - C(rscdump) Non-disruptive system dump. Valid with I(sys) type.
+                    - C(spdump) Service processor dump . Valid with I(sys) type.
                 type: list
                 elements: str
                 required: true

@@ -179,7 +179,7 @@ EXAMPLES = '''
     level: low
     state: setting_security
 
-- name: Get firewall information for ipv6
+- name: Get firewall information for ipv6 of VIOS
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ curr_hmc_auth }}'
@@ -188,7 +188,7 @@ EXAMPLES = '''
     ip_version: IPV6
   state: firewall_facts
 
-- name: Configure firewall rule for port 2000 with interface en0
+- name: Configure firewall rule for port 2000 with interface en0 on VIOS
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ curr_hmc_auth }}'
