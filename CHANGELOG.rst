@@ -304,3 +304,24 @@ Notes
 
 .. _GitHub v1.12.0:
    https://github.com/IBM/ansible-power-hmc/releases/download/v1.12.0/ibm-power_hmc-1.12.0.tar.gz
+
+
+Version 1.13.0
+-------------
+Notes
+  * create_service_event: P11: Support for Automated Log collection and upload
+  * platform_update: P11: Automated Power Platform Update
+  * vios_secure: Configures security hardening rules and firewall
+  * hmc_update_upgrade: Support for SSH based HMC reboot status check (Issue: #142)
+  * powervm_lpar_instance: Fix auto identification of Power System name issue (Issue: #152)
+  * redhat_linux_install: Introduced a role for RHEL install on PowerVM
+
+  Availability
+    * `Galaxy v1.13.0`_
+    * `GitHub v1.13.0`_
+
+.. _Galaxy v1.13.0:
+   https://galaxy.ansible.com/download/ibm-power_hmc-1.13.0.tar.gz
+
+.. _GitHub v1.13.0:
+   https://github.com/IBM/ansible-power-hmc/releases/download/v1.13.0/ibm-power_hmc-1.13.0.tar.gz

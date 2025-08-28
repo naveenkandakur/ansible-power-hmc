@@ -235,12 +235,15 @@ options:
         description:
             - C(facts) fetch details of specified I(VIOS).
             - C(present) creates VIOS with specified I(settings).
+            - C(listimages) list the VIOS images present in HMC
         type: str
         choices: ['facts', 'present', 'listimages']
     action:
         description:
             - C(install) install VIOS through NIM Server or disk.
             - C(accept_license) Accept license after fresh installation of VIOS.
+            - C(copy) copies VIOS images from NFS/SFTP server to the HMC.
+            - C(delete) deletes VIOS images present in the HMC.
         type: str
         choices: ['install', 'accept_license', 'copy', 'delete']
 '''
