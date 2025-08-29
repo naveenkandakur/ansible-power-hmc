@@ -238,7 +238,6 @@ EXAMPLES = '''
           username: '{{ ansible_user }}'
           password: '{{ hmc_password }}'
       action: listupg
-
 '''
 
 RETURN = '''
