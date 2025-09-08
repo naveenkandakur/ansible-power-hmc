@@ -178,7 +178,7 @@ options:
             - If the user doesn't provide this option, the current configuration of partition will be used for activation.
             - This option is also used to update the profile name when creating a partition.
             - If the user does not provide this option during partition creation, the partition will be created with the profile name C(default_profile).
-            - This option is valid for C(present), C(poweron) I(action).
+            - This option is valid for C(present) I(state), C(poweron) I(action).
         type: str
     keylock:
         description:
@@ -1361,7 +1361,8 @@ def create_partition(module, params):
     if params.get('prof_name'):
         prof_name = params.get('prof_name')
         try:
-            hmc.updateProfileName(system_name, vm_name, prof_name)
+            next_profile_name = 'default_profile'
+            hmc.updateProfileName(system_name, vm_name, prof_name, next_profile_name)
         except HmcError as on_system_error:
             return changed, repr(on_system_error), None
         partition_prop["PartitionProfileName"] = prof_name
