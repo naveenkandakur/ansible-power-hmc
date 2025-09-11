@@ -36,6 +36,7 @@ description:
     - "Restart specified AIX/Linux or IBMi partition on specified system"
     - "Facts of the specified AIX/Linux or IBMi partition of specified system"
     - "Install of PowerVM Partition"
+    - "Rename a logical partition name"
 
 version_added: "1.2.0"
 requirements:
@@ -438,6 +439,16 @@ options:
             - Default value is C(Immediate).
         type: str
         choices: ['Immediate', 'OperatingSystem', 'OSImmediate', 'Dump', 'DumpRetry']
+    update_config:
+        description:
+            - Update partition configuration.
+        type: dict
+        suboptions:
+            new_name:
+                description:
+                    - Specify the new logical partition name
+                    - This option is valid only for C(modify_lpar) I(action)
+                type: str
     state:
         description:
             - C(present) creates a partition of the specified I(os_type), I(vm_name), I(proc) and I(memory) on specified I(system_name).
@@ -451,8 +462,9 @@ options:
             - C(poweron) poweron a partition of the specified I(vm_name) with specified I(prof_name), I(keylock), I(iIPLsource) on specified I(system_name).
             - C(restart) restart a partition of the specified I(vm_name) on specified I(system_name).
             - C(install_os) install Aix/Linux OS through NIM Server on specified I(vm_name).
+            - C(modify_lpar) rename a partition.
         type: str
-        choices: ['poweron', 'shutdown', 'restart', 'install_os']
+        choices: ['poweron', 'shutdown', 'restart', 'install_os', 'modify_lpar']
 '''
 
 EXAMPLES = '''
@@ -618,6 +630,18 @@ EXAMPLES = '''
                  capacity: 20
                  hosting_partition: <vios_name>
       state: present
+
+- name: Change the name of partition
+  powervm_lpar_instance:
+      hmc_host: '{{ inventory_hostname }}'
+      hmc_auth:
+          username: '{{ ansible_user }}'
+          password: '{{ hmc_password }}'
+      system_name: <system_name/mtms>
+      vm_name: <vm_name>
+      update_config:
+          new_name: <new_name>
+      action: modify_lpar
 '''
 
 RETURN = '''
@@ -760,43 +784,49 @@ def validate_parameters(params):
     if opr == 'present':
         mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'os_type']
         unsupportedList = ['prof_name', 'keylock', 'iIPLsource', 'retain_vios_cfg', 'delete_vdisks', 'advanced_info', 'install_settings',
-                           'shutdown_option', 'restart_option']
+                           'shutdown_option', 'restart_option', 'update_config']
     elif opr == 'poweron':
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'volume_config', 'virt_network_config', 'retain_vios_cfg', 'delete_vdisks',
                            'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
                            'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'install_settings',
-                           'vnic_config', 'shutdown_option', 'restart_option']
+                           'vnic_config', 'shutdown_option', 'restart_option', 'update_config']
     elif opr == 'absent':
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
                            'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
                            'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'install_settings',
-                           'vnic_config', 'shutdown_option', 'restart_option']
+                           'vnic_config', 'shutdown_option', 'restart_option', 'update_config']
     elif opr == 'facts':
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
                            'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
                            'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'install_settings',
-                           'vnic_config', 'shutdown_option', 'restart_option']
+                           'vnic_config', 'shutdown_option', 'restart_option', 'update_config']
     elif opr == 'install_os':
         mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'install_settings']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config', 'retain_vios_cfg',
                            'delete_vdisks', 'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
                            'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'vnic_config',
-                           'shutdown_option', 'restart_option']
+                           'shutdown_option', 'restart_option', 'update_config']
     elif opr == 'shutdown':
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
                            'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc',
                            'min_proc_unit', 'max_proc_unit', 'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem',
-                           'vm_id', 'install_settings', 'vnic_config', 'restart_option']
+                           'vm_id', 'install_settings', 'vnic_config', 'restart_option', 'update_config']
+    elif opr == 'modify_lpar':
+        mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name', 'update_config']
+        unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
+                           'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
+                           'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'install_settings',
+                           'vnic_config', 'shutdown_option', 'restart_option', 'force', 'physical_io', 'advanced_info']
     else:
         mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
                            'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc',
                            'min_proc_unit', 'max_proc_unit', 'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem',
-                           'vm_id', 'install_settings', 'vnic_config', 'shutdown_option']
+                           'vm_id', 'install_settings', 'vnic_config', 'shutdown_option', 'update_config']
 
     collate = []
     for eachMandatory in mandatoryList:
@@ -1358,6 +1388,71 @@ def create_partition(module, params):
     return changed, partition_prop, warning_msg
 
 
+def rename_partition(module, params):
+    logger.debug("Reached atleasr here")
+    validate_parameters(params)
+    hmc_host = params['hmc_host']
+    hmc_user = params['hmc_auth']['username']
+    password = params['hmc_auth']['password']
+    system_name = params['system_name']
+    vm_name = params['vm_name']
+    changed = False
+    lpar_uuid = None
+    lpar_uuid_new = None
+    new_name = params['update_config']['new_name']
+    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+    hmc = Hmc(hmc_conn)
+    lparConfig = {}
+
+    if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
+        try:
+            system_name = hmc.getSystemNameFromMTMS(system_name)
+        except HmcError as on_system_error:
+            return changed, repr(on_system_error), None
+    try:
+        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+    except Exception as error:
+        logger.debug(repr(error))
+        module.fail_json(msg="Logon to HMC failed")
+
+    if system_name:
+        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+    else:
+        system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
+        if system_name == 1:
+            warn_msg = "Logical Partition Name:'{0}' not found in any of the managed systems".format(vm_name)
+            return False, None, warn_msg
+        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+    if not system_uuid:
+        module.fail_json(msg="Given system is not present")
+
+    lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+    if lpar_response is not None:
+        lpar_quick_list = json.loads(lpar_response)
+        for eachLpar in lpar_quick_list:
+            if eachLpar['PartitionName'] == vm_name:
+                lpar_uuid = eachLpar['UUID']
+                break
+            if eachLpar['PartitionName'] == new_name:
+                lpar_uuid_new = eachLpar['UUID']
+                break
+    else:
+        module.fail_json(msg="There are no Logical Partitions present on the system")
+    if not lpar_uuid:
+        if lpar_uuid_new:
+            return changed, None, None
+        else:
+            module.fail_json(msg="Given Logical Partition is not present on the system")
+
+    lparConfig.update({'NAME': vm_name, 'NEW_NAME': new_name})
+    try:
+        result = hmc.update_lpar(system_name, lparConfig)
+        changed = True
+        return changed, result, None
+    except Exception as e:
+        return False, repr(e), None
+
+
 def remove_partition(module, params):
     validate_parameters(params)
     hmc_host = params['hmc_host']
@@ -1828,6 +1923,7 @@ def perform_task(module):
         "poweron": poweron_partition,
         "restart": poweroff_partition,
         "install_os": install_aix_os,
+        "modify_lpar": rename_partition,
     }
 
     oper = 'state'
@@ -1847,6 +1943,7 @@ def run_module():
                      client_adapter_id=dict(type='int'),
                      server_adapter_id=dict(type='int')
                      )
+    update_args = dict(new_name=dict(type='str'))
     virt_network_args = dict(network_name=dict(type='str', required=True),
                              slot_number=dict(type='int')
                              )
@@ -1936,10 +2033,13 @@ def run_module():
                          ),
         shutdown_option=dict(type='str', choices=['Delayed', 'Immediate', 'OperatingSystem', 'OSImmediate']),
         restart_option=dict(type='str', choices=['Immediate', 'OperatingSystem', 'OSImmediate', 'Dump', 'DumpRetry']),
+        update_config=dict(type='dict',
+                           options=update_args
+                           ),
         state=dict(type='str',
                    choices=['present', 'absent', 'facts']),
         action=dict(type='str',
-                    choices=['shutdown', 'poweron', 'restart', 'install_os'])
+                    choices=['shutdown', 'poweron', 'restart', 'install_os', 'modify_lpar'])
     )
 
     module = AnsibleModule(
@@ -1953,6 +2053,7 @@ def run_module():
                      ['action', 'poweron', ['hmc_host', 'hmc_auth', 'vm_name']],
                      ['action', 'restart', ['hmc_host', 'hmc_auth', 'vm_name']],
                      ['action', 'install_os', ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'install_settings']],
+                     ['action', 'modify_lpar', ['hmc_host', 'hmc_auth', 'vm_name', 'update_config']]
                      ],
         required_by=dict(
             proc_unit=('proc', ),
