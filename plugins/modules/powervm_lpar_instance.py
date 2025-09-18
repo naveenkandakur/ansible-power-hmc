@@ -36,7 +36,7 @@ description:
     - "Restart specified AIX/Linux or IBMi partition on specified system"
     - "Facts of the specified AIX/Linux or IBMi partition of specified system"
     - "Install of PowerVM Partition"
-    - "Rename a logical partition name"
+    - "Rename a logical partition"
 
 version_added: "1.2.0"
 requirements:
@@ -441,7 +441,7 @@ options:
         choices: ['Immediate', 'OperatingSystem', 'OSImmediate', 'Dump', 'DumpRetry']
     update_config:
         description:
-            - Update partition configuration.
+            - Update logical partition configuration
         type: dict
         suboptions:
             new_vm_name:
@@ -462,7 +462,7 @@ options:
             - C(poweron) poweron a partition of the specified I(vm_name) with specified I(prof_name), I(keylock), I(iIPLsource) on specified I(system_name).
             - C(restart) restart a partition of the specified I(vm_name) on specified I(system_name).
             - C(install_os) install Aix/Linux OS through NIM Server on specified I(vm_name).
-            - C(modify_lpar) rename a partition.
+            - C(modify_lpar) rename a logical partition.
         type: str
         choices: ['poweron', 'shutdown', 'restart', 'install_os', 'modify_lpar']
 '''
@@ -631,7 +631,7 @@ EXAMPLES = '''
                  hosting_partition: <vios_name>
       state: present
 
-- name: Change the name of partition
+- name: Change the name of logical partition
   powervm_lpar_instance:
       hmc_host: '{{ inventory_hostname }}'
       hmc_auth:
@@ -1389,7 +1389,6 @@ def create_partition(module, params):
 
 
 def rename_partition(module, params):
-    logger.debug("Reached atleasr here")
     validate_parameters(params)
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
