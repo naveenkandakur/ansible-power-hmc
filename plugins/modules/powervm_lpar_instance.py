@@ -444,7 +444,7 @@ options:
             - Update partition configuration.
         type: dict
         suboptions:
-            new_name:
+            new_vm_name:
                 description:
                     - Specify the new logical partition name
                     - This option is valid only for C(modify_lpar) I(action)
@@ -640,7 +640,7 @@ EXAMPLES = '''
       system_name: <system_name/mtms>
       vm_name: <vm_name>
       update_config:
-          new_name: <new_name>
+          new_vm_name: <new_name>
       action: modify_lpar
 '''
 
@@ -1399,7 +1399,7 @@ def rename_partition(module, params):
     changed = False
     lpar_uuid = None
     lpar_uuid_new = None
-    new_name = params['update_config']['new_name']
+    new_name = params['update_config']['new_vm_name']
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
     lparConfig = {}
@@ -1943,7 +1943,7 @@ def run_module():
                      client_adapter_id=dict(type='int'),
                      server_adapter_id=dict(type='int')
                      )
-    update_args = dict(new_name=dict(type='str'))
+    update_args = dict(new_vm_name=dict(type='str'))
     virt_network_args = dict(network_name=dict(type='str', required=True),
                              slot_number=dict(type='int')
                              )
