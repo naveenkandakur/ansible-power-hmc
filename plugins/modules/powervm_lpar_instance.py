@@ -1442,7 +1442,8 @@ def rename_partition(module, params):
             return changed, None, None
         else:
             module.fail_json(msg="Given Logical Partition is not present on the system")
-
+    if vm_name == new_name:
+        return changed, None, None
     lparConfig.update({'NAME': vm_name, 'NEW_NAME': new_name})
     try:
         result = hmc.update_lpar(system_name, lparConfig)
