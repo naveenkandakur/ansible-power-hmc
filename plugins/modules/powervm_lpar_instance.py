@@ -447,7 +447,7 @@ options:
             new_vm_name:
                 description:
                     - Specify the new logical partition name
-                    - This option is valid only for C(modify_lpar) I(action)
+                    - This option is valid only for C(modify_vm) I(action)
                 type: str
     state:
         description:
@@ -462,9 +462,9 @@ options:
             - C(poweron) poweron a partition of the specified I(vm_name) with specified I(prof_name), I(keylock), I(iIPLsource) on specified I(system_name).
             - C(restart) restart a partition of the specified I(vm_name) on specified I(system_name).
             - C(install_os) install Aix/Linux OS through NIM Server on specified I(vm_name).
-            - C(modify_lpar) rename a logical partition.
+            - C(modify_vm) rename a logical partition.
         type: str
-        choices: ['poweron', 'shutdown', 'restart', 'install_os', 'modify_lpar']
+        choices: ['poweron', 'shutdown', 'restart', 'install_os', 'modify_vm']
 '''
 
 EXAMPLES = '''
@@ -641,7 +641,7 @@ EXAMPLES = '''
       vm_name: <vm_name>
       update_config:
           new_vm_name: <new_name>
-      action: modify_lpar
+      action: modify_vm
 '''
 
 RETURN = '''
@@ -815,8 +815,8 @@ def validate_parameters(params):
                            'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'advanced_info', 'min_proc', 'max_proc',
                            'min_proc_unit', 'max_proc_unit', 'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem',
                            'vm_id', 'install_settings', 'vnic_config', 'restart_option', 'update_config']
-    elif opr == 'modify_lpar':
-        mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name', 'update_config']
+    elif opr == 'modify_vm':
+        mandatoryList = ['hmc_host', 'hmc_auth', 'vm_name', 'system_name', 'update_config']
         unsupportedList = ['proc', 'mem', 'os_type', 'proc_unit', 'prof_name', 'keylock', 'iIPLsource', 'volume_config', 'virt_network_config',
                            'retain_vios_cfg', 'delete_vdisks', 'all_resources', 'max_virtual_slots', 'min_proc', 'max_proc', 'min_proc_unit', 'max_proc_unit',
                            'proc_mode', 'weight', 'proc_compatibility_mode', 'shared_proc_pool', 'min_mem', 'max_mem', 'vm_id', 'install_settings',
@@ -1416,12 +1416,6 @@ def rename_partition(module, params):
 
     if system_name:
         system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    else:
-        system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
-        if system_name == 1:
-            warn_msg = "Logical Partition Name:'{0}' not found in any of the managed systems".format(vm_name)
-            return False, None, warn_msg
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
     if not system_uuid:
         module.fail_json(msg="Given system is not present")
 
@@ -1923,7 +1917,7 @@ def perform_task(module):
         "poweron": poweron_partition,
         "restart": poweroff_partition,
         "install_os": install_aix_os,
-        "modify_lpar": rename_partition,
+        "modify_vm": rename_partition,
     }
 
     oper = 'state'
@@ -2039,7 +2033,7 @@ def run_module():
         state=dict(type='str',
                    choices=['present', 'absent', 'facts']),
         action=dict(type='str',
-                    choices=['shutdown', 'poweron', 'restart', 'install_os', 'modify_lpar'])
+                    choices=['shutdown', 'poweron', 'restart', 'install_os', 'modify_vm'])
     )
 
     module = AnsibleModule(
@@ -2053,7 +2047,7 @@ def run_module():
                      ['action', 'poweron', ['hmc_host', 'hmc_auth', 'vm_name']],
                      ['action', 'restart', ['hmc_host', 'hmc_auth', 'vm_name']],
                      ['action', 'install_os', ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'install_settings']],
-                     ['action', 'modify_lpar', ['hmc_host', 'hmc_auth', 'vm_name', 'update_config']]
+                     ['action', 'modify_vm', ['hmc_host', 'hmc_auth', 'vm_name', 'system_name', 'update_config']]
                      ],
         required_by=dict(
             proc_unit=('proc', ),
