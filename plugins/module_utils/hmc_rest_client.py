@@ -1260,22 +1260,40 @@ class HmcRestClient:
         vios_dict = {vios['PartitionID']: vios['PartitionName'] for vios in vios_list}
 
         try:
-            vios_fc_xml = xml_strip_namespace(self.getVirtualIOServers(system_uuid, 'ViosFCMapping'))
+            vios_fc_xml = xml_strip_namespace(
+                self.getVirtualIOServers(system_uuid, 'ViosFCMapping')
+            )
             vios_fcs = vios_fc_xml.xpath('//VirtualFibreChannelMapping')
-            for vios_fc_raw in vios_fcs:
+            for vios_fc in vios_fcs: 
                 vfc_dict = {}
-                vios_fc = etree.ElementTree(vios_fc_raw)
-                if vios_fc.find('//ClientAdapter') is None:
+                if not vios_fc.xpath('./ClientAdapter'):
                     continue
-                part_id = vios_fc.xpath('//ClientAdapter/LocalPartitionID')[0].text
+                part_id_nodes = vios_fc.xpath('./ClientAdapter/LocalPartitionID')
+                if not part_id_nodes:
+                    continue
+                part_id = part_id_nodes[0].text
                 if str(lpar_id) == str(part_id):
-                    vios_id = int(vios_fc.xpath('//ClientAdapter/ConnectingPartitionID')[0].text)
-                    vfc_dict['PortName'] = vios_fc.xpath('//ServerAdapter/PhysicalPort/PortName')[0].text
-                    vfc_dict['vios'] = vios_dict[vios_id]
-                    vfc_dict['LocationCode'] = vios_fc.xpath('//ServerAdapter/PhysicalPort/LocationCode')[0].text
-                    vfc_dict['WWPNs'] = vios_fc.xpath('//ClientAdapter/WWPNs')[0].text
-                    vfc_dict['ClientVirtualSlotNumber'] = vios_fc.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
-                    vfc_dict['ServerVirtualSlotNumber'] = vios_fc.xpath('//ClientAdapter/ConnectingVirtualSlotNumber')[0].text
+                    logger.info(etree.tostring(vios_fc, pretty_print=True).decode())
+                    vios_id_nodes = vios_fc.xpath('./ClientAdapter/ConnectingPartitionID')
+                    if not vios_id_nodes:
+                        continue
+                    vios_id = int(vios_id_nodes[0].text)
+                    vfc_dict['vios'] = vios_dict.get(vios_id)
+                    port_nodes = vios_fc.xpath('./ServerAdapter/PhysicalPort/PortName')
+                    if port_nodes:
+                        vfc_dict['PortName'] = port_nodes[0].text
+                    loc_nodes = vios_fc.xpath('./ServerAdapter/PhysicalPort/LocationCode')
+                    if loc_nodes:
+                        vfc_dict['LocationCode'] = loc_nodes[0].text
+                    wwpn_nodes = vios_fc.xpath('./ClientAdapter/WWPNs')
+                    if wwpn_nodes:
+                        vfc_dict['WWPNs'] = wwpn_nodes[0].text
+                    client_slot_nodes = vios_fc.xpath('./ClientAdapter/VirtualSlotNumber')
+                    if client_slot_nodes:
+                        vfc_dict['ClientVirtualSlotNumber'] = client_slot_nodes[0].text
+                    server_slot_nodes = vios_fc.xpath('./ClientAdapter/ConnectingVirtualSlotNumber')
+                    if server_slot_nodes:
+                        vfc_dict['ServerVirtualSlotNumber'] = server_slot_nodes[0].text
                     vfcs.append(vfc_dict)
         except Exception:
             pass
