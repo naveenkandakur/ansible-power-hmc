@@ -26,6 +26,8 @@ notes:
       For instance, if the module is tasked to update/upgrade the HMC to the same level, it will still
       go ahead with the operation and finally the changed state will be reported as false.
     - All Operations support passwordless authentication.
+    - By default, the HMC update/upgrade completion status is verified using Ping. To check the status via SSH,
+      playbook must be executed in passwordless authentication mode.
 description:
     - Updates the HMC by installing a corrective service package located on an FTP/SFTP/NFS server/Ansible Controller Node/HMC hard disk.
     - Upgrades the HMC by obtaining  the required  files  from a remote server or from the HMC hard disk. The files are transferred

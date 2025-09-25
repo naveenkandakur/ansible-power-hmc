@@ -16,7 +16,7 @@ DOCUMENTATION = '''
 module: vios_secure
 author:
     - Sreenidhi S(@SreenidhiS1)
-short_description: Configures security hardening rules and firewall
+short_description: Configures firewall settings and applies security hardening rules.
 notes:
     - This module requires the HMC login user to have specific permissions.
       To achieve this, the user should create a task role based on hmcsuperadmin with additional permissions,
@@ -50,11 +50,11 @@ notes:
       ViewDumps+ViewPowerManagement+ViewSPP)
     - Create a user with the above created task role.
 description:
-    - Configuring security hardening rules.
-    - Configures and unconfigures the firewall settings of the network.
+    - Applies security hardening rules.
+    - Configures and removes the firewall settings of the network.
 version_added: 1.0.0
 requirements:
-- Python >= 3
+- Python >= 3.9
 options:
     hmc_host:
         description:
@@ -90,35 +90,42 @@ options:
         description:
             - Specifies the security rules file to be applied.
             - Mutually exclusive with I(level).
+            - This option is only valid for C(setting_security) state.
         type: str
     rule:
         description:
             - Specifies the name of the rule to be applied.
+            - This option is only valid for C(setting_security) state.
         type: str
     level:
         description:
             - Specifies the security level settings to choose.
             - Specifying C(high) security level might cause stability or serviceability issues especially in a cluster environment.
             - Mutually exclusive with I(file).
+            - This option is only valid for C(setting_security) state.
         type: str
         choices: ['low', 'medium', 'high', 'default']
     ip_version:
         description:
             - Specifies the version for firewall state and rules.
+            - This option is only valid for C(setting_firewall) and C(firewall_facts) state.
         type: str
         choices: ['ipv4', 'ipv6', 'IPV4', 'IPV6']
     active:
         description:
             - Specifies the state of the firewall.
+            - This option is only valid for C(setting_firewall) state.
         type: bool
     reload:
         description:
             - Specifies this option for deleting ODM rules and the default values are loaded from the /home/ios/security/viosecure.ctl file
             - For enabling the firewall rules for first time this option is required along with C(active) option.
+            - This option is only valid for C(setting_firewall) state.
         type: bool
     firewall_config:
         description:
             - Specifies the firewall state and rules.
+            - This option is only valid for C(setting_firewall) state.
         type: list
         elements: dict
         suboptions:
@@ -155,14 +162,14 @@ options:
                 choices: ['allow', 'deny', 'ALLOW', 'DENY']
     state:
         description:
-            - C(setting_security) ensures the new security hardening rules are configured.
+            - C(setting_security) ensures the new security hardening rules are applied.
             - C(firewall_facts) does not change anything on the HMC and returns the firewall settings information.
             - C(setting_firewall) ensures the firewall settings are configured.
         type: str
         choices: ['setting_security', 'firewall_facts', 'setting_firewall']
 '''
 EXAMPLES = '''
-- name: Apply the single rule lls_maxage
+- name: Apply the security rule lls_maxage to VIOS
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ hmc_auth }}'
@@ -172,7 +179,7 @@ EXAMPLES = '''
     level: low
     state: setting_security
 
-- name: Get firewall information for ipv6
+- name: Get firewall information for ipv6 of VIOS
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ curr_hmc_auth }}'
@@ -181,7 +188,7 @@ EXAMPLES = '''
     ip_version: IPV6
   state: firewall_facts
 
-- name: Apply firewall rule for port 2000 with interface en0
+- name: Configure firewall rule for port 2000 with interface en0 on VIOS
   vios_secure:
     hmc_host: '{{ hmc_ip }}'
     hmc_auth: '{{ curr_hmc_auth }}'

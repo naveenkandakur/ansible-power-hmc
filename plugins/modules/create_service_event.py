@@ -17,15 +17,15 @@ DOCUMENTATION = '''
 module: create_service_event
 author:
     - Sreenidhi S(@SreenidhiS1)
-short_description: Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on managed-system.
+short_description: Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on the managed system.
 notes:
-    - This module requires the HMC which has Power10 systems licensed for advanced automation and monitoring or for Power11 systems.
+    - This module requires the HMC which has Power10 or Power 11 systems licensed for advanced automation and monitoring.
 description:
-    - Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred on managed-system
-      or this HMC and to request service to repair it.
+    - Creates a serviceable event on the Hardware Management Console (HMC) to report a problem that occurred
+      on either the power server or the HMC itself, and initiates a service request for repair.
 version_added: 1.0.0
 requirements:
-- Python >= 3
+- Python >= 3.9
 options:
     hmc_host:
         description:
@@ -49,7 +49,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system for which to create the serviceable event.
+            - The name or mtms (machine type model serial) of the managed system.
         required: true
         type: str
     description:
@@ -102,7 +102,7 @@ options:
                 type: int
             target_lpar_name:
                 description:
-                    - The target partition name for the serviceable event.
+                    - The target logical partition name for the serviceable event.
                     - Required for C(lpm)
                 type: str
             target_mtms:
@@ -112,13 +112,19 @@ options:
                 type: str
             lpar_name:
                 description:
-                    - The partition name for the serviceable event.
+                    - The logical partition name for the serviceable event.
                     - Required for C(lpm) and C(vios)
                 type: str
             service_file:
                 description:
-                    - The partition name for the serviceable event.
+                    - The name of the log file which is attached to the serviceable event.
                     - Required for C(lpm) and C(vios)
+                    - C(pedbgq4) HMC pedbg data. Valid with I(sys/hmc/vios/lpm) type.
+                    - C(pedbgq8) Cloud connector pedbg data. Valid with I(cloudconn) type.
+                    - C(vios) VIOS snap data. Valid with I(vios) type.
+                    - C(lpmffdc) Partition migration debug data. Valid with I(lpm) type.
+                    - C(rscdump) Non-disruptive system dump. Valid with I(sys) type.
+                    - C(spdump) Service processor dump . Valid with I(sys) type.
                 type: list
                 elements: str
                 required: true
