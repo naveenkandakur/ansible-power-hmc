@@ -1039,3 +1039,10 @@ class Hmc():
             if str(params['ip_version']).lower() == 'ipv6':
                 viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
         return viosecure_cmd
+
+    def update_lpar(self, cecName, lparConfig):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['LPAR'] + \
+            self.OPT['CHSYSCFG']['-M'] + cecName
+        chsyscfgCmd += self.cmdClass.i_a_ConfigBuilder('CHSYSCFG', '-I', lparConfig)
+        self.hmcconn.execute(chsyscfgCmd)
