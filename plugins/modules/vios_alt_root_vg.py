@@ -121,7 +121,7 @@ EXAMPLES = '''
     system_name: <system-name>
     vios_name: <vios-name>
     targets:
-         - hdisk1
+      - hdisk1
     state: copy
 
 - name: Copy the rootvg to multiple disks hdisk1 and hdisk2
@@ -131,8 +131,8 @@ EXAMPLES = '''
     system_name: <system-name>
     vios_name: <vios-name>
     targets:
-         - hdisk1
-         - hdisk2
+      - hdisk1
+      - hdisk2
     state: copy
 
 - name: Copy the rootvg using minimize disk_size_policy

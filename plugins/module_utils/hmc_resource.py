@@ -913,7 +913,7 @@ class Hmc():
             files = ','.join(files)
 
         if options:
-            options = f'"ver={options}"'
+            options = '"ver={}"'.format(options)
 
         if media == 'sftp':
             sftp_user = params['sftp_auth']['sftp_username']

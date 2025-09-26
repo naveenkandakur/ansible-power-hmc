@@ -357,7 +357,7 @@ class HmcRestClient:
         return uuid, managedsystem_root.xpath("//ManagedSystem")[0]
 
     def getManagementConsole(self):
-        url = f"https://{self.hmc_ip}/rest/api/uom/ManagementConsole"
+        url = "https://{}/rest/api/uom/ManagementConsole".format(self.hmc_ip)
         header = {'X-API-Session': self.session,
                   'Accept': 'application/json'}
         try:

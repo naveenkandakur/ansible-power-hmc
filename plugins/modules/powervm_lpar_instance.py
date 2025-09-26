@@ -628,9 +628,9 @@ EXAMPLES = '''
             port_vlan_priority: 6
             allowed_vlanids: ALL
             backing_devices:
-               - location_code: <location_code>
-                 capacity: 20
-                 hosting_partition: <vios_name>
+                - location_code: <location_code>
+                  capacity: 20
+                  hosting_partition: <vios_name>
       state: present
 
 - name: Change the name of logical partition
