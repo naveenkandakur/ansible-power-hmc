@@ -196,9 +196,9 @@ EXAMPLES = '''
     vios_name: <vios>
     ip_version: IPV6
     firewall_config:
-        - port: 2000
-          present: allow
-          interface: en0
+      - port: 2000
+        present: allow
+        interface: en0
     state: setting_firewall
 '''
 

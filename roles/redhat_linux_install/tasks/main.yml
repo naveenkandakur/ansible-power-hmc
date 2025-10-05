@@ -86,6 +86,7 @@
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Install dhcp in pxe server
+  when: not dhcpd_running
   block:
       - name: Install dhcp in pxe server
         ansible.builtin.dnf:
@@ -96,6 +97,7 @@
 
       - name: Calculate DHCP range from IP (assuming /24 subnet) using bash only
         ansible.builtin.shell: |
+            set -o pipefail
             ip="{{ host_subnet }}"
             # Assume /24 subnet
             cidr=24
@@ -131,6 +133,7 @@
             echo "dhcp_range_start=$start_ip"
             echo "dhcp_range_end=$end_ip"
         register: dhcp_range_output
+        changed_when: false
 
       - name: Set DHCP range facts
         ansible.builtin.set_fact:
@@ -155,15 +158,15 @@
         delegate_to: "{{ groups['pxe'][0] }}"
 
       - name: Open DHCP ports in firewall
-        firewalld:
+        ansible.posix.firewalld:
             service: dhcp
             permanent: true
             state: enabled
             immediate: true
         delegate_to: "{{ groups['pxe'][0] }}"
-  when: not dhcpd_running
 
 - name: Install tftp in pxe server
+  when: not tftp_running
   block:
       - name: Install tftp in pxe server
         ansible.builtin.dnf:
@@ -210,13 +213,12 @@
         delegate_to: "{{ groups['pxe'][0] }}"
 
       - name: Open TFTP ports in firewall
-        firewalld:
+        ansible.posix.firewalld:
             service: tftp
             permanent: true
             state: enabled
             immediate: true
         delegate_to: "{{ groups['pxe'][0] }}"
-  when: not tftp_running
 
 - name: Create Kickstart file name
   ansible.builtin.set_fact:
@@ -227,6 +229,7 @@
   ansible.builtin.template:
       src: templates/ks.j2
       dest: "/var/www/html/{{ ks_file }}"
+      mode: '0777'
   delegate_to: "{{ groups['repo'][0] }}"
 
 - name: Remove any existing tftp boot folder in PXE server for this VM
@@ -237,8 +240,9 @@
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Calculate cutdir value
-  ansible.builtin.shell: echo "{{ repo_dir }}" | tr '/' '\n' | grep -v "^$" | wc -l
+  ansible.builtin.shell: set -o pipefail && echo "{{ repo_dir }}" | tr '/' '\n' | grep -v "^$" | wc -l
   register: cut_dir
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Print the value of dest_dir
@@ -246,55 +250,70 @@
   ansible.builtin.debug:
       msg: "Destination directory is: {{ dest_dir }}"
 
+# ansible-lint: ignore=command-instead-of-module
 - name: Download files from /boot and /ppc directory in Repository Server to the PXE server tftp path(hardware address)
   run_once: true
-  ansible.builtin.shell: wget -r --reject="index.html*" --no-parent -nH --cut-dir={{ cut_dir.stdout | int + 1 }} http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/boot/ -P {{ dest_dir }}
+  ansible.builtin.shell: >
+    wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/boot/ -P {{ dest_dir }}
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
+  # noqa command-instead-of-module
 
+# ansible-lint: ignore=command-instead-of-module
 - name: Download files from /boot and /ppc directory in Repository Server to the PXE server tftp path(hardware address)
   run_once: true
-  shell: wget -r --reject="index.html*" --no-parent -nH --cut-dir={{ cut_dir.stdout | int + 1 }}   http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/ppc/ -P {{ dest_dir }}
+  ansible.builtin.shell: >
+    wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/ppc/ -P {{ dest_dir }}
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
+  # noqa command-instead-of-module
 
 - name: Create netboot directory in PXE server under tftp path
   run_once: true
-  shell: grub2-mknetdir --net-directory={{ base_dir }} --subdir={{ mac_address }}/boot/grub/
+  ansible.builtin.shell: grub2-mknetdir --net-directory={{ base_dir }} --subdir={{ mac_address }}/boot/grub/
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
+  # noqa command-instead-of-shell
 
 - name: Create grub.cfg and copy to boot directory in PXE server
-  run_once: true 
-  template:
+  run_once: true
+  ansible.builtin.template:
       src: templates/grub_conf.j2
       dest: "{{ dest_dir }}/boot/grub/grub.cfg"
+      mode: "0777"
   delegate_to: "{{ groups['pxe'][0] }}"
 
-- name: copy to grub.cfg to boot directory in PXE server
+- name: Copy to grub.cfg to boot directory in PXE server
   run_once: true
-  shell: cp "{{ dest_dir }}/boot/grub/grub.cfg" "{{ dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
+  ansible.builtin.command: cp "{{ dest_dir }}/boot/grub/grub.cfg" "{{ dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Backup the dhcp file , if in case this blocks add any errors
   run_once: true
-  shell: cp /etc/dhcp/dhcpd.conf /tmp/dhcpd.conf
+  ansible.builtin.command: cp /etc/dhcp/dhcpd.conf /tmp/dhcpd.conf
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: DHCP block file to add lpar entry into dhcpd.conf
   run_once: true
-  blockinfile:
-    dest: /etc/dhcp/dhcpd.conf
-    marker: "#{mark} Ansible module dhcp entry"
-    block: "{{ lookup('template', 'dhcpd_conf.j2') }}"
-    state: present
+  ansible.builtin.blockinfile:
+      dest: /etc/dhcp/dhcpd.conf
+      marker: "#{mark} Ansible module dhcp entry"
+      block: "{{ lookup('template', 'dhcpd_conf.j2') }}"
+      state: present
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Restart dhcp-server
   run_once: true
   ansible.builtin.systemd:
-    name: dhcpd
-    state: restarted
+      name: dhcpd
+      state: restarted
   delegate_to: "{{ groups['pxe'][0] }}"
 
-- name: Lparnetboot operation on target lpar
+- name: Lparnetboot operation on target lpar # noqa: ignore-errors
   run_once: true
   connection: local
   collections:
@@ -312,48 +331,49 @@
           vm_mac: "{{ mac_address }}"
           timeout: 11
       action: install_os
-  ignore_errors: yes
+  ignore_errors: true
   delegate_to: "{{ groups['hmcs'][0] }}"
 
 - name: Revert the DHCP configuration changes in PXE server, take a backup of configuration file
   run_once: true
-  shell: cp /etc/dhcp/dhcpd.conf /tmp/dhcpd.conf
+  ansible.builtin.command: cp /etc/dhcp/dhcpd.conf /tmp/dhcpd.conf
+  changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
-- name: block file
+- name: Block file
   run_once: true
-  blockinfile:
-    dest: /etc/dhcp/dhcpd.conf
-    marker: "#{mark} Ansible module dhcp entry"
-    block: "{{ lookup('template', 'dhcpd_conf.j2') }}"
-    state: absent
+  ansible.builtin.blockinfile:
+      dest: /etc/dhcp/dhcpd.conf
+      marker: "#{mark} Ansible module dhcp entry"
+      block: "{{ lookup('template', 'dhcpd_conf.j2') }}"
+      state: absent
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Restart dhcp-server
   run_once: true
   ansible.builtin.systemd:
-    name: dhcpd
-    state: restarted
+      name: dhcpd
+      state: restarted
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Wait for host SSH to become available after install
   run_once: true
-  wait_for_connection:
-    timeout: 10
-    sleep: 5
+  ansible.builtin.wait_for_connection:
+      timeout: 10
+      sleep: 5
   vars:
       ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
       ansible_host: "{{ host_ip }}"
 
 - name: Ensure system facts are gathered from the VM
   run_once: true
-  setup:
+  ansible.builtin.setup:
   vars:
       ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   delegate_to: "{{ groups['vm'][0] }}"
 
 - name: Print OS info from the VM
   run_once: true
-  debug:
-    msg: "Distribution: {{ ansible_facts['distribution'] }}, Version: {{ ansible_facts['distribution_version'] }}"
+  ansible.builtin.debug:
+      msg: "Distribution: {{ ansible_facts['distribution'] }}, Version: {{ ansible_facts['distribution_version'] }}"
   delegate_to: "{{ groups['vm'][0] }}"

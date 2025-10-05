@@ -314,6 +314,17 @@ class Hmc():
             self.OPT['CHSYSCFG']['-O']['APPLY']
         self.hmcconn.execute(chsyscfgCmd)
 
+    def updateProfileName(self, system_name, lparName, prof_name, next_profile_name):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['PROF'] + \
+            self.OPT['CHSYSCFG']['-M'] + system_name + \
+            self.OPT['CHSYSCFG']['--FORCE'] + \
+            "-i '" + self.OPT['CHSYSCFG']['-I']['NAME'] + f"={next_profile_name}," + \
+            self.OPT['CHSYSCFG']['-I']['LPAR_NAME'] + "=" + lparName + "," + \
+            self.OPT['CHSYSCFG']['-I']['NEW_NAME'] + "=" + prof_name + "'"
+
+        self.hmcconn.execute(chsyscfgCmd)
+
     def managedSystemShutdown(self, cecName):
         chsysstateCmd = self.CMD['CHSYSSTATE'] + \
             self.OPT['CHSYSSTATE']['-R']['SYS'] + \
@@ -902,7 +913,7 @@ class Hmc():
             files = ','.join(files)
 
         if options:
-            options = f'"ver={options}"'
+            options = '"ver={}"'.format(options)
 
         if media == 'sftp':
             sftp_user = params['sftp_auth']['sftp_username']
@@ -1039,3 +1050,10 @@ class Hmc():
             if str(params['ip_version']).lower() == 'ipv6':
                 viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
         return viosecure_cmd
+
+    def update_lpar(self, cecName, lparConfig):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['LPAR'] + \
+            self.OPT['CHSYSCFG']['-M'] + cecName
+        chsyscfgCmd += self.cmdClass.i_a_ConfigBuilder('CHSYSCFG', '-I', lparConfig)
+        self.hmcconn.execute(chsyscfgCmd)
