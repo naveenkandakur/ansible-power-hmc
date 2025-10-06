@@ -1876,6 +1876,8 @@ def partition_details(module, params):
             partition_prop['DedicatedVirtualNICs'] = rest_conn.fetchDedicatedVirtualNICs(system_uuid, lpar_uuid, vm_name, vios_list)
 
             lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_uuid=lpar_uuid)
+            network_info = rest_conn.partition_fetch_virtualnetwrok_info(system_uuid, partition_uuid=lpar_uuid)
+            partition_prop['VirtualNetworkAdapters'] = network_info['VirtualNetworkAdapters']
             partition_prop['MinimumMemory'] = partition_dom.xpath("//MinimumMemory")[0].text
             partition_prop['MaximumMemory'] = partition_dom.xpath("//MaximumMemory")[0].text
             isDedicatedProc = rest_conn.isDedicatedProcConfig(partition_dom)
