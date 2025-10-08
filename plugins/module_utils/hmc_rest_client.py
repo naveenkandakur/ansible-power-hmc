@@ -1264,7 +1264,7 @@ class HmcRestClient:
                 self.getVirtualIOServers(system_uuid, 'ViosFCMapping')
             )
             vios_fcs = vios_fc_xml.xpath('//VirtualFibreChannelMapping')
-            for vios_fc in vios_fcs: 
+            for vios_fc in vios_fcs:
                 vfc_dict = {}
                 if not vios_fc.xpath('./ClientAdapter'):
                     continue
