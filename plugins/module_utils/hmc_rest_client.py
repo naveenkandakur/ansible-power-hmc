@@ -1273,7 +1273,6 @@ class HmcRestClient:
                     continue
                 part_id = part_id_nodes[0].text
                 if str(lpar_id) == str(part_id):
-                    logger.info(etree.tostring(vios_fc, pretty_print=True).decode())
                     vios_id_nodes = vios_fc.xpath('./ClientAdapter/ConnectingPartitionID')
                     if not vios_id_nodes:
                         continue
