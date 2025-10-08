@@ -516,7 +516,7 @@ class HmcRestClient:
         response = resp.read()
         return response
 
-    def partition_get_request(self, url):
+    def get_request(self, url):
         try:
             header = {
                 'X-API-Session': self.session,
@@ -546,7 +546,7 @@ class HmcRestClient:
             for link in client_adapter_links:
                 try:
                     adapter_href = link.get('href')
-                    adapter_dom = self.partition_get_request(adapter_href)
+                    adapter_dom = self.get_request(adapter_href)
                     if not adapter_dom:
                         continue
                     mac_addr_nodes = adapter_dom.xpath(".//MACAddress")
@@ -563,7 +563,7 @@ class HmcRestClient:
                     if not adapter_links:
                         continue
                     url = adapter_links[0].get('href')
-                    network_dom = self.partition_get_request(url)
+                    network_dom = self.get_request(url)
                     if not network_dom:
                         continue
                     network_name_nodes = network_dom.xpath(".//NetworkName")
