@@ -529,7 +529,7 @@ class HmcRestClient:
                             force_basic_auth=True,
                             timeout=300)
             if resp.code != 200:
-                logger.debug("Get of Logical Partition failed. Respsonse code: %d", resp.code)
+                logger.debug(f"Request failed with response code: {resp.code}")
                 return None
             response = resp.read()
             dom = xml_strip_namespace(response)
