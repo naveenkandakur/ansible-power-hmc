@@ -357,7 +357,7 @@ class HmcRestClient:
         return uuid, managedsystem_root.xpath("//ManagedSystem")[0]
 
     def getManagementConsole(self):
-        url = f"https://{self.hmc_ip}/rest/api/uom/ManagementConsole"
+        url = "https://{}/rest/api/uom/ManagementConsole".format(self.hmc_ip)
         header = {'X-API-Session': self.session,
                   'Accept': 'application/json'}
         try:
@@ -515,6 +515,72 @@ class HmcRestClient:
             return None
         response = resp.read()
         return response
+
+    def get_request(self, url):
+        try:
+            header = {
+                'X-API-Session': self.session,
+                'Accept': '*/*'
+            }
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            if resp.code != 200:
+                logger.debug("Request failed with response code: %s", resp.code)
+                return None
+            response = resp.read()
+            dom = xml_strip_namespace(response)
+            return dom
+        except Exception as e:
+            logger.debug("Error making GET request to %s: %s", url, str(e))
+            return None
+
+    def partition_fetch_virtualnetwrok_info(self, system_uuid, partition_name=None, partition_uuid=None):
+        network_info_list = []
+        lpar_uuid, partition_dom = self.getLogicalPartition(system_uuid, partition_uuid=partition_uuid)
+        client_adapter_links = partition_dom.findall('.//ClientNetworkAdapters/link')
+        if client_adapter_links:
+            for link in client_adapter_links:
+                try:
+                    adapter_href = link.get('href')
+                    adapter_dom = self.get_request(adapter_href)
+                    if not adapter_dom:
+                        continue
+                    mac_addr_nodes = adapter_dom.xpath(".//MACAddress")
+                    slot_number_nodes = adapter_dom.xpath(".//VirtualSlotNumber")
+                    port_vlanid_nodes = adapter_dom.xpath(".//PortVLANID")
+                    switch_name_nodes = adapter_dom.xpath(".//VirtualSwitchName")
+                    if not mac_addr_nodes or not slot_number_nodes or not port_vlanid_nodes or not switch_name_nodes:
+                        continue
+                    mac_addr = mac_addr_nodes[0].text
+                    slot_number = slot_number_nodes[0].text
+                    port_vlanid = port_vlanid_nodes[0].text
+                    virtual_swtich_name = switch_name_nodes[0].text
+                    adapter_links = adapter_dom.findall('.//VirtualNetworks/link')
+                    if not adapter_links:
+                        continue
+                    url = adapter_links[0].get('href')
+                    network_dom = self.get_request(url)
+                    if not network_dom:
+                        continue
+                    network_name_nodes = network_dom.xpath(".//NetworkName")
+                    if not network_name_nodes:
+                        continue
+                    network_name = network_name_nodes[0].text
+                    network_info_list.append({
+                        'virtual_network_name': network_name,
+                        'mac_address': mac_addr,
+                        'slot_number': slot_number,
+                        'port_vlan_id': port_vlanid,
+                        'switch_name': virtual_swtich_name
+                    })
+                except Exception as e:
+                    logger.debug("Error processing adapter: %s", str(e))
+                    continue
+        return {"VirtualNetworkAdapters": network_info_list}
 
     def getSystemPCMpreferences(self, system_uuid):
         url = "https://{0}/rest/api/pcm/ManagedSystem/{1}/preferences".format(self.hmc_ip, system_uuid)
