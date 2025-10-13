@@ -207,38 +207,43 @@ def is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_
     if level_is_numeric:
         level = int(level)
 
-    if level in ('latest', 'latestconcurrent'):
-        repo_latest_level = hmc.get_latest_firmware_level(
-            system_name,
-            upgrade=is_upgrade,
-            repo=repo,
-            level=level,
-            remote_repo=remote_repo
-        )
-        if isinstance(repo_latest_level, str):
-            module.fail_json(msg=repo_latest_level)
-
-        latest_level = repo_latest_level.get('level') if repo_latest_level else None
-        latest_level = normalize(latest_level)
-        if isinstance(latest_level, int) and isinstance(current_level, int):
-            if latest_level < current_level:
-                module.fail_json(
-                    msg=f"Downgrade not supported: current level is {current_level}, latest level available is {latest_level}"
-                )
-
-        if latest_level == current_level:
-            return True
-
-    elif isinstance(level, int) and isinstance(current_level, int):
-        if level < current_level:
-            module.fail_json(
-                msg=f"Downgrade not supported: current level is {current_level}, requested level is {level}"
+    if not is_upgrade:
+        if level in ('latest', 'latestconcurrent'):
+            repo_latest_level = hmc.get_latest_firmware_level(
+                system_name,
+                upgrade=is_upgrade,
+                repo=repo,
+                level=level,
+                remote_repo=remote_repo
             )
-        if level == current_level:
-            return True
+            if isinstance(repo_latest_level, str):
+                module.fail_json(msg=repo_latest_level)
 
-    elif level == current_level:
-        return True
+            latest_level = repo_latest_level.get('level') if repo_latest_level else None
+            latest_level = normalize(latest_level)
+            if isinstance(latest_level, int) and isinstance(current_level, int):
+                if latest_level < current_level:
+                    module.fail_json(
+                        msg=f"Downgrade not supported: current level is {current_level}, latest level available is {latest_level}"
+                    )
+
+            if latest_level == current_level:
+                return True
+
+        elif isinstance(level, int) and isinstance(current_level, int):
+            if level < current_level:
+                module.fail_json(
+                    msg=f"Downgrade not supported: current level is {current_level}, requested level is {level}"
+                )
+            if level == current_level:
+                return True
+
+        elif level == current_level:
+            return True
+    else:
+        ecnumber = initial_level.get('ecnumber', '').lower()
+        if isinstance(level, str) and ecnumber and ecnumber in level.lower():
+            return True
 
     return False
 
