@@ -1141,10 +1141,17 @@ def create_partition(module, params):
     physical_io = params['physical_io']
     proc_compatibility_mode = params['proc_compatibility_mode']
     shared_proc_pool = params['shared_proc_pool']
+    prof_name = params['prof_name']
     vios_name = None
     temp_template_name = "ansible_powervm_create_{0}".format(str(randint(1000, 9999)))
     temp_copied = False
     fcports_config = None
+
+    if prof_name:
+        if not re.match(HmcConstants.PROFILE_PATTERN, prof_name):
+            module.fail_json(
+                msg="Provide a valid profile name: up to 31 chars, start with letter/digit, allowed symbols: @#^/;:~,-_=+{}"
+            )
 
     cli_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(cli_conn)
@@ -1388,8 +1395,7 @@ def create_partition(module, params):
             logger.debug(error_msg)
 
     # Update partition profile if given
-    if params.get('prof_name'):
-        prof_name = params.get('prof_name')
+    if prof_name:
         try:
             next_profile_name = 'default_profile'
             hmc.updateProfileName(system_name, vm_name, prof_name, next_profile_name)
@@ -1876,6 +1882,8 @@ def partition_details(module, params):
             partition_prop['DedicatedVirtualNICs'] = rest_conn.fetchDedicatedVirtualNICs(system_uuid, lpar_uuid, vm_name, vios_list)
 
             lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_uuid=lpar_uuid)
+            network_info = rest_conn.partition_fetch_virtualnetwrok_info(system_uuid, partition_uuid=lpar_uuid)
+            partition_prop['VirtualNetworkAdapters'] = network_info['VirtualNetworkAdapters']
             partition_prop['MinimumMemory'] = partition_dom.xpath("//MinimumMemory")[0].text
             partition_prop['MaximumMemory'] = partition_dom.xpath("//MaximumMemory")[0].text
             isDedicatedProc = rest_conn.isDedicatedProcConfig(partition_dom)

@@ -516,6 +516,72 @@ class HmcRestClient:
         response = resp.read()
         return response
 
+    def get_request(self, url):
+        try:
+            header = {
+                'X-API-Session': self.session,
+                'Accept': '*/*'
+            }
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            if resp.code != 200:
+                logger.debug("Request failed with response code: %s", resp.code)
+                return None
+            response = resp.read()
+            dom = xml_strip_namespace(response)
+            return dom
+        except Exception as e:
+            logger.debug("Error making GET request to %s: %s", url, str(e))
+            return None
+
+    def partition_fetch_virtualnetwrok_info(self, system_uuid, partition_name=None, partition_uuid=None):
+        network_info_list = []
+        lpar_uuid, partition_dom = self.getLogicalPartition(system_uuid, partition_uuid=partition_uuid)
+        client_adapter_links = partition_dom.findall('.//ClientNetworkAdapters/link')
+        if client_adapter_links:
+            for link in client_adapter_links:
+                try:
+                    adapter_href = link.get('href')
+                    adapter_dom = self.get_request(adapter_href)
+                    if not adapter_dom:
+                        continue
+                    mac_addr_nodes = adapter_dom.xpath(".//MACAddress")
+                    slot_number_nodes = adapter_dom.xpath(".//VirtualSlotNumber")
+                    port_vlanid_nodes = adapter_dom.xpath(".//PortVLANID")
+                    switch_name_nodes = adapter_dom.xpath(".//VirtualSwitchName")
+                    if not mac_addr_nodes or not slot_number_nodes or not port_vlanid_nodes or not switch_name_nodes:
+                        continue
+                    mac_addr = mac_addr_nodes[0].text
+                    slot_number = slot_number_nodes[0].text
+                    port_vlanid = port_vlanid_nodes[0].text
+                    virtual_swtich_name = switch_name_nodes[0].text
+                    adapter_links = adapter_dom.findall('.//VirtualNetworks/link')
+                    if not adapter_links:
+                        continue
+                    url = adapter_links[0].get('href')
+                    network_dom = self.get_request(url)
+                    if not network_dom:
+                        continue
+                    network_name_nodes = network_dom.xpath(".//NetworkName")
+                    if not network_name_nodes:
+                        continue
+                    network_name = network_name_nodes[0].text
+                    network_info_list.append({
+                        'virtual_network_name': network_name,
+                        'mac_address': mac_addr,
+                        'slot_number': slot_number,
+                        'port_vlan_id': port_vlanid,
+                        'switch_name': virtual_swtich_name
+                    })
+                except Exception as e:
+                    logger.debug("Error processing adapter: %s", str(e))
+                    continue
+        return {"VirtualNetworkAdapters": network_info_list}
+
     def getSystemPCMpreferences(self, system_uuid):
         url = "https://{0}/rest/api/pcm/ManagedSystem/{1}/preferences".format(self.hmc_ip, system_uuid)
         header = {'X-API-Session': self.session,
@@ -1260,22 +1326,39 @@ class HmcRestClient:
         vios_dict = {vios['PartitionID']: vios['PartitionName'] for vios in vios_list}
 
         try:
-            vios_fc_xml = xml_strip_namespace(self.getVirtualIOServers(system_uuid, 'ViosFCMapping'))
+            vios_fc_xml = xml_strip_namespace(
+                self.getVirtualIOServers(system_uuid, 'ViosFCMapping')
+            )
             vios_fcs = vios_fc_xml.xpath('//VirtualFibreChannelMapping')
-            for vios_fc_raw in vios_fcs:
+            for vios_fc in vios_fcs:
                 vfc_dict = {}
-                vios_fc = etree.ElementTree(vios_fc_raw)
-                if vios_fc.find('//ClientAdapter') is None:
+                if not vios_fc.xpath('./ClientAdapter'):
                     continue
-                part_id = vios_fc.xpath('//ClientAdapter/LocalPartitionID')[0].text
+                part_id_nodes = vios_fc.xpath('./ClientAdapter/LocalPartitionID')
+                if not part_id_nodes:
+                    continue
+                part_id = part_id_nodes[0].text
                 if str(lpar_id) == str(part_id):
-                    vios_id = int(vios_fc.xpath('//ClientAdapter/ConnectingPartitionID')[0].text)
-                    vfc_dict['PortName'] = vios_fc.xpath('//ServerAdapter/PhysicalPort/PortName')[0].text
-                    vfc_dict['vios'] = vios_dict[vios_id]
-                    vfc_dict['LocationCode'] = vios_fc.xpath('//ServerAdapter/PhysicalPort/LocationCode')[0].text
-                    vfc_dict['WWPNs'] = vios_fc.xpath('//ClientAdapter/WWPNs')[0].text
-                    vfc_dict['ClientVirtualSlotNumber'] = vios_fc.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
-                    vfc_dict['ServerVirtualSlotNumber'] = vios_fc.xpath('//ClientAdapter/ConnectingVirtualSlotNumber')[0].text
+                    vios_id_nodes = vios_fc.xpath('./ClientAdapter/ConnectingPartitionID')
+                    if not vios_id_nodes:
+                        continue
+                    vios_id = int(vios_id_nodes[0].text)
+                    vfc_dict['vios'] = vios_dict.get(vios_id)
+                    port_nodes = vios_fc.xpath('./ServerAdapter/PhysicalPort/PortName')
+                    if port_nodes:
+                        vfc_dict['PortName'] = port_nodes[0].text
+                    loc_nodes = vios_fc.xpath('./ServerAdapter/PhysicalPort/LocationCode')
+                    if loc_nodes:
+                        vfc_dict['LocationCode'] = loc_nodes[0].text
+                    wwpn_nodes = vios_fc.xpath('./ClientAdapter/WWPNs')
+                    if wwpn_nodes:
+                        vfc_dict['WWPNs'] = wwpn_nodes[0].text
+                    client_slot_nodes = vios_fc.xpath('./ClientAdapter/VirtualSlotNumber')
+                    if client_slot_nodes:
+                        vfc_dict['ClientVirtualSlotNumber'] = client_slot_nodes[0].text
+                    server_slot_nodes = vios_fc.xpath('./ClientAdapter/ConnectingVirtualSlotNumber')
+                    if server_slot_nodes:
+                        vfc_dict['ServerVirtualSlotNumber'] = server_slot_nodes[0].text
                     vfcs.append(vfc_dict)
         except Exception:
             pass
