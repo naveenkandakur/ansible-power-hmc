@@ -48,7 +48,7 @@ This repository contains some example best practices for open source repositorie
 
 ### Supported Environment Variables
 
-- SSH_PRIVTAE_KEY_FILE = Can be used to set the ssh private key file with absolute path for passwordless ssh connection
+- ANSIBLE_PRIVTAE_KEY_FILE = Can be used to set the ssh private key file with absolute path for passwordless ssh connection
 - ANSIBLE_HOST_KEY_CHECKING = Can be used to set the 'StrictHostKeyChecking' to 'No' during ssh connection(supported values are False/false/No/no) 
 
 ## Resources
