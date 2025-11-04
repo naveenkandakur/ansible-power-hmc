@@ -221,6 +221,7 @@ def add_physical_io(rest_conn, server_dom, lpar_template_dom, drcnames):
                         <Metadata>
                             <Atom/>
                         </Metadata>
+                        <isAssigned kxe="false" kb="CUD">true</isAssigned>
                         <drcIndex kxe="false" kb="CUD">{0}</drcIndex>
                         <locationCode kb="CUD" kxe="false">{1}</locationCode>
                     </ProfileIOSlot>'''.format(drc_index, location_code)
