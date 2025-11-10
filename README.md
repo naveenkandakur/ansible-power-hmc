@@ -47,9 +47,9 @@ This repository contains some example best practices for open source repositorie
 - lxml
 
 ### Supported Environment Variables
-
-- ANSIBLE_PRIVTAE_KEY_FILE = Can be used to set the ssh private key file with absolute path for passwordless ssh connection
-- ANSIBLE_HOST_KEY_CHECKING = Can be used to set the 'StrictHostKeyChecking' to 'No' during ssh connection(supported values are False/false/No/no) 
+The following environment variables are supported for configuring SSH behavior in Ansible. No other Ansible parameters apply for these actions:
+- ANSIBLE_PRIVATE_KEY_FILE = Specifies the absolute path to the SSH private key file. This enables passwordless SSH connections
+- ANSIBLE_HOST_KEY_CHECKING = Controls whether host key checking is performed during SSH connections. Supported values: False, false, No, no Setting this disables StrictHostKeyChecking.
 
 ## Resources
 
