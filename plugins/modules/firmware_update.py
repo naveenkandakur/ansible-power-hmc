@@ -12,7 +12,9 @@ module: firmware_update
 short_description: Change firmware level on Managed Systems
 notes:
     - All operations support passwordless authentication.
-version_added: "1.1.0"
+    - The module is idempotent. If tasked with updating or upgrading the HMC to a level equal to the current level,
+      it will skip the operation and report the state as unchanged. If a lower level is requested (downgrade), the module
+      will fail with an appropriate message.
 description:
     - Update/Upgrade a managed system.
 options:
@@ -191,12 +193,70 @@ def extract_updlic_options(params):
     return system_name, repo, level, remote_repo
 
 
+def is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module, is_upgrade=True):
+    current_level = initial_level.get('level')
+
+    def normalize(val):
+        if isinstance(val, str) and val.isdigit():
+            return int(val)
+        return val
+
+    current_level = normalize(current_level)
+
+    level_is_numeric = isinstance(level, str) and level.isdigit()
+    if level_is_numeric:
+        level = int(level)
+
+    if not is_upgrade:
+        if level in ('latest', 'latestconcurrent'):
+            repo_latest_level = hmc.get_latest_firmware_level(
+                system_name,
+                upgrade=is_upgrade,
+                repo=repo,
+                level=level,
+                remote_repo=remote_repo
+            )
+            if isinstance(repo_latest_level, str):
+                module.fail_json(msg=repo_latest_level)
+
+            latest_level = repo_latest_level.get('level') if repo_latest_level else None
+            latest_level = normalize(latest_level)
+            if isinstance(latest_level, int) and isinstance(current_level, int):
+                if latest_level < current_level:
+                    module.fail_json(
+                        msg=f"Downgrade not supported: current level is {current_level}, latest level available is {latest_level}"
+                    )
+
+            if latest_level == current_level:
+                return True
+
+        elif isinstance(level, int) and isinstance(current_level, int):
+            if level < current_level:
+                module.fail_json(
+                    msg=f"Downgrade not supported: current level is {current_level}, requested level is {level}"
+                )
+            if level == current_level:
+                return True
+
+        elif level == current_level:
+            return True
+    else:
+        ecnumber = initial_level.get('ecnumber', '').lower()
+        if isinstance(level, str) and ecnumber and ecnumber in level.lower():
+            return True
+
+    return False
+
+
 def update_system(module, params):
     hmc = create_hmc_conn(module, params)
     system_name, repo, level, remote_repo = extract_updlic_options(params)
     ret_dict = {}
     try:
         initial_level = hmc.get_firmware_level(system_name)
+        if is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module, is_upgrade=False):
+            ret_dict['msg'] = f"{system_name} is already at the latest firmware level."
+            return False, ret_dict, None
         hmc.update_managed_system(system_name, False, repo, level, remote_repo)
         ret_dict = {'msg': 'system update finished'}
         new_level = hmc.get_firmware_level(system_name)
@@ -221,6 +281,9 @@ def upgrade_system(module, params):
     ret_dict = {}
     try:
         initial_level = hmc.get_firmware_level(system_name)
+        if is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module):
+            ret_dict['msg'] = f"{system_name} is already at the latest firmware level."
+            return False, ret_dict, None
         hmc.update_managed_system(system_name, True, repo, level, remote_repo)
         ret_dict = {'msg': 'system upgrade finished'}
         new_level = hmc.get_firmware_level(system_name)
