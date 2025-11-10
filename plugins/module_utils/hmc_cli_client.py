@@ -40,14 +40,22 @@ class HmcCliConnection:
         stdout = None
 
         host_key_ignore = ''
+        ssh_private_key_file = None
         # This env 'ANSIBLE_HOST_KEY_CHECKING' only will work in case if it is set as environment variable
         # All other options like from ansible config file or inventory file wont work
         if os.environ.get('ANSIBLE_HOST_KEY_CHECKING') in ['False', 'false', 'FALSE', '0', 'no', 'No', 'NO']:
             host_key_ignore = ' -o StrictHostKeyChecking=no '
 
+        # This env 'ANSIBLE_PRIVTAE_KEY_FILE' takes the input of ssh private key file with absolute path
+        if os.environ.get('ANSIBLE_PRIVATE_KEY_FILE'):
+            ssh_private_key_file = os.environ.get('ANSIBLE_PRIVATE_KEY_FILE')
+
         logger.debug("COMMAND: %s", cmd)
+
         if self.pwd:
             ssh_hmc_cmd = "sshpass -p  '{0}' ssh '{1}'@{2} {3} '{4}'".format(self.pwd, self.user, self.ip, host_key_ignore, cmd)
+        elif ssh_private_key_file:
+            ssh_hmc_cmd = "ssh -i '{0}' '{1}'@{2} {3} '{4}'".format(ssh_private_key_file, self.user, self.ip, host_key_ignore, cmd)
         else:
             ssh_hmc_cmd = "ssh '{0}'@{1} {2} '{3}'".format(self.user, self.ip, host_key_ignore, cmd)
 

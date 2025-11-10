@@ -45,6 +45,12 @@ This repository contains some example best practices for open source repositorie
 
 - Requires Python 3
 - lxml
+
+### Supported Environment Variables
+The following environment variables are supported for configuring SSH behavior in Ansible. No other Ansible parameters apply for these actions:
+- ANSIBLE_PRIVATE_KEY_FILE = Specifies the absolute path to the SSH private key file. This enables passwordless SSH connections
+- ANSIBLE_HOST_KEY_CHECKING = Controls whether host key checking is performed during SSH connections. Supported values: False, false, No, no Setting this disables StrictHostKeyChecking.
+
 ## Resources
 
 Documentation of modules is generated on [GitHub Pages][pages].
