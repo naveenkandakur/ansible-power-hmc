@@ -339,6 +339,8 @@ def perform_task(module):
 
 
 def validate_parameters(params):
+    if params.get('action') is None and params.get('state') is None:
+        raise ParameterError("Required parameter missing: either 'state' or 'action' must be provided.")
     remote_repo = params['remote_repo']
     if remote_repo:
         passwd = remote_repo['passwd']
