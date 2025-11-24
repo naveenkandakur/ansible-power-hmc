@@ -95,6 +95,7 @@ options:
             -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC updates, even if disruptive.
                The level specified in each entry indicates the desired level
                for all components which are running the release specified in the entry.
+            -  The level value must be enclosed in double quotes.
         type: str
         default: latest
     state:
@@ -342,6 +343,10 @@ def validate_parameters(params):
     if params.get('action') is None and params.get('state') is None:
         raise ParameterError("Required parameter missing: either 'state' or 'action' must be provided.")
     remote_repo = params['remote_repo']
+    required_fields = ["hostname", "userid", "directory"]
+    if params.get('state'):
+        if not params.get('level'):
+            params['level'] = 'latest'
     if remote_repo:
         passwd = remote_repo['passwd']
         sshkey = remote_repo['sshkey_file']
@@ -352,6 +357,9 @@ def validate_parameters(params):
             raise ParameterError("'repository:ftp' and 'sshkey_file' are  incompatible")
         if repository == 'ibmwebsite':
             raise ParameterError("Value 'ibmwebsite' is incompatible with any 'remote_repo' arguments")
+        missing_fields = [f for f in required_fields if not remote_repo.get(f)]
+        if missing_fields:
+            raise ParameterError(f"Missing required fields in remote_repo: {', '.join(missing_fields)}")
 
 
 def run_module():
@@ -371,11 +379,11 @@ def run_module():
         level=dict(type='str', default='latest'),
         repository=dict(type='str', default='ibmwebsite', choices=['ibmwebsite', 'ftp', 'sftp']),
         remote_repo=dict(type='dict', options=dict(
-                              hostname=dict(type='str', required=True),
-                              userid=dict(type='str', required=True),
+                              hostname=dict(type='str'),
+                              userid=dict(type='str'),
                               passwd=dict(type='str', no_log=True),
                               sshkey_file=dict(type='str'),
-                              directory=dict(type='str', required=True), )
+                              directory=dict(type='str'), )
                          )
     )
 
