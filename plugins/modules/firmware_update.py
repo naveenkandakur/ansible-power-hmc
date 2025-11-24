@@ -58,14 +58,13 @@ options:
                 description:
                     - The hostname or IP address of the remote server where the
                       firmware image is located.
-                required: true
+                      This value is required when using a remote FTP or SFTP server.
                 type: str
             userid:
                 description:
                     - The user ID to use to log in to the remote FTP or SFTP server.
                       This option is required when the firmware image is located on a remote FTP or SFTP server
                       Otherwise, this option is not valid.
-                required: true
                 type: str
             passwd:
                 description:
@@ -81,7 +80,7 @@ options:
             directory:
                 description:
                     - Location where the images are stored.
-                required: true
+                    - Required when a remote location is used.
                 type: str
     level:
         description:
