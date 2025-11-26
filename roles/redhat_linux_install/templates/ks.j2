@@ -1,7 +1,7 @@
 %pre
 %end
 # Use network installation
-url --url="http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ repo_port }}/{{ repo_dir }}/BaseOS"
+url --url="http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/BaseOS"
 
 # Use text mode install
 text
@@ -13,7 +13,7 @@ keyboard --vckeymap=us --xlayouts='us'
 lang en_US.UTF-8
 
 # Root password
-rootpw --plaintext {{ host_password }}
+rootpw --plaintext {{ redhat_linux_install_host_password }}
 
 # Do not configure the X Window System
 skipx
