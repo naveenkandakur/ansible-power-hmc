@@ -187,7 +187,7 @@ def create_hmc_conn(module, params):
 def extract_updlic_options(params):
     system_name = params['system_name']
     repo = params['repository']
-    level = params['level']
+    level = params.get("level") or "latest"
     remote_repo = params['remote_repo']
 
     return system_name, repo, level, remote_repo
@@ -343,9 +343,6 @@ def validate_parameters(params):
         raise ParameterError("Required parameter missing: either 'state' or 'action' must be provided.")
     remote_repo = params['remote_repo']
     required_fields = ["hostname", "userid", "directory"]
-    if params.get('state'):
-        if not params.get('level'):
-            params['level'] = 'latest'
     if remote_repo:
         passwd = remote_repo['passwd']
         sshkey = remote_repo['sshkey_file']
