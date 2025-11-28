@@ -238,6 +238,7 @@
     http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ redhat_linux_install_repo_dir }}/boot/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
+  # noqa: command-instead-of-module wget
 
 - name: Download files from /boot and /ppc directory in Repository Server to the PXE server tftp path(hardware address)
   run_once: true
@@ -246,10 +247,14 @@
     http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ redhat_linux_install_repo_dir }}/ppc/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
+  # noqa: command-instead-of-module wget
 
 - name: Create netboot directory in PXE server under tftp path
   run_once: true
-  ansible.builtin.shell: grub2-mknetdir --net-directory={{ redhat_linux_install_base_dir }} --subdir={{ mac_address }}/boot/grub/
+  ansible.builtin.command: >
+    grub2-mknetdir
+    --net-directory={{ redhat_linux_install_base_dir }}
+    --subdir={{ mac_address }}/boot/grub/
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
@@ -261,9 +266,11 @@
       mode: "0777"
   delegate_to: "{{ groups['pxe'][0] }}"
 
-- name: Copy to grub.cfg to boot directory in PXE server
+- name: Copy grub.cfg to PXE server boot directory
   run_once: true
-  ansible.builtin.command: cp "{{ redhat_linux_install_dest_dir }}/boot/grub/grub.cfg" "{{ redhat_linux_install_dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
+  ansible.builtin.command: >
+    cp "{{ redhat_linux_install_dest_dir }}/boot/grub/grub.cfg"
+       "{{ redhat_linux_install_dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
