@@ -241,7 +241,8 @@ def is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_
         elif level == current_level:
             return True
     else:
-        ecnumber = initial_level.get('ecnumber', '').lower()
+        ec_raw = initial_level.get('ecnumber', '')
+        ecnumber = ec_raw.lower() if isinstance(ec_raw, str) else ''
         if isinstance(level, str) and ecnumber and ecnumber in level.lower():
             return True
 
