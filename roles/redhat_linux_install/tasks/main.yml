@@ -235,7 +235,7 @@
   run_once: true
   ansible.builtin.shell: >
     wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
-    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ redhat_linux_install_repo_dir }}/boot/ -P {{ redhat_linux_install_dest_dir }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/boot/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
   # noqa: command-instead-of-module wget
@@ -244,7 +244,7 @@
   run_once: true
   ansible.builtin.shell: >
     wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
-    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ redhat_linux_install_repo_dir }}/ppc/ -P {{ redhat_linux_install_dest_dir }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/ppc/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
   # noqa: command-instead-of-module wget
