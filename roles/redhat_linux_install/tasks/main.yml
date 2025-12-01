@@ -6,62 +6,43 @@
       - ibm.power_hmc
   powervm_lpar_instance:
       hmc_host: "{{ hostvars['hmc_server'].ansible_host }}"
-      hmc_auth: '{{ curr_hmc_auth }}'
-      system_name: "{{ managed_system }}"
-      vm_name: "{{ lpar_name }}"
+      hmc_auth: '{{ redhat_linux_install_curr_hmc_auth }}'
+      system_name: "{{ redhat_linux_install_managed_system }}"
+      vm_name: "{{ redhat_linux_install_lpar_name }}"
       os_type: linux
-      proc: "{{ proc }}"
-      mem: "{{ mem }}"
+      proc: "{{ redhat_linux_install_proc }}"
+      mem: "{{ redhat_linux_install_mem }}"
       virt_network_config:
-          - network_name: "{{ network_name }}"
+          - network_name: "{{ redhat_linux_install_network_name }}"
       volume_config:
-          - volume_size: "{{ disk_size }}"
+          - volume_size: "{{ redhat_linux_install_disk_size }}"
       state: present
   delegate_to: "{{ groups['hmcs'][0] }}"
 
-- name: Retrieve the MAC address of network adapter
+- name: Facts of the partition
   run_once: true
   connection: local
   collections:
       - ibm.power_hmc
-  block:
-      - name: Checking if any adapter is pingable
-        hmc_command:
-            hmc_host: "{{ hostvars['hmc_server'].ansible_host }}"
-            hmc_auth: '{{ curr_hmc_auth }}'
-            cmd: >
-              lpar_netboot -A -M -n -D -t ent
-              -S {{ hostvars[groups['pxe'][0]].ansible_host }}
-              -G {{ host_gw }}
-              -K {{ host_netmask }}
-              -C {{ host_ip }}
-              {{ lpar_name }} default_profile {{ managed_system }}
-        register: mac_command_result
-        failed_when: false
+  powervm_lpar_instance:
+      hmc_host: "{{ hostvars['hmc_server'].ansible_host }}"
+      hmc_auth: '{{ redhat_linux_install_curr_hmc_auth }}'
+      system_name: "{{ redhat_linux_install_managed_system }}"
+      vm_name: "{{ redhat_linux_install_lpar_name }}"
+      advanced_info: true
+      state: facts
+  register: facts_output
 
-      - name: Fail if no network adapters found or no successful adapter
-        ansible.builtin.fail:
-            msg: "There are no network adapters pingable or no successful adapters found for LPAR {{ lpar_name }}."
-        when: >
-          mac_command_result.command_output is not defined or
-          ('No network adapters found' in (mac_command_result.command_output | default([]) | join('\n'))) or
-          ('Unable to obtain network adapter information' in (mac_command_result.msg | default(''))) or
-          (((mac_command_result.command_output | default([]) | join('\n')) |
-          regex_findall('ent[\s\t]+\S+[\s\t]+([0-9a-fA-F]{12})[\s\t]+\S+[\s\t]+successful')) | length == 0)
+- name: Find MAC address for specific network
+  ansible.builtin.set_fact:
+      mac_address: "{{ item.mac_address }}"
+  when: item.virtual_network_name == redhat_linux_install_network_name
+  loop: "{{ facts_output.partition_info.VirtualNetworkAdapters }}"
 
-      - name: Set MAC address fact
-        ansible.builtin.set_fact:
-            mac_address: >-
-              {{
-                (
-                  (mac_command_result.command_output | default([]) | join('\n'))
-                  | regex_findall('ent[\s\t]+\S+[\s\t]+([0-9a-fA-F]{12})[\s\t]+\S+[\s\t]+successful')
-                )[0] | lower
-              }}
-        when: >
-          mac_command_result.command_output is defined and
-          (((mac_command_result.command_output | default([]) | join('\n')) |
-          regex_findall('ent[\s\t]+\S+[\s\t]+([0-9a-fA-F]{12})[\s\t]+\S+[\s\t]+successful')) | length > 0)
+- name: Fail if MAC address is empty
+  ansible.builtin.fail:
+      msg: "MAC address not found for network: {{ redhat_linux_install_network_name }}"
+  when: mac_address is not defined or mac_address | length == 0
 
 - name: Convert MAC address in colon format from fact variable
   ansible.builtin.set_fact:
@@ -98,7 +79,7 @@
       - name: Calculate DHCP range from IP (assuming /24 subnet) using bash only
         ansible.builtin.shell: |
             set -o pipefail
-            ip="{{ host_subnet }}"
+            ip="{{ redhat_linux_install_host_subnet }}"
             # Assume /24 subnet
             cidr=24
             netmask="255.255.255.0"
@@ -222,7 +203,7 @@
 
 - name: Create Kickstart file name
   ansible.builtin.set_fact:
-      ks_file: "{{ distro | regex_replace('\\.', '') }}_{{ hardware_ethernet }}.ks"
+      ks_file: "{{ redhat_linux_install_distro | regex_replace('\\.', '') }}_{{ hardware_ethernet }}.ks"
 
 - name: Create a kickstart file in Repository server
   run_once: true
@@ -235,12 +216,12 @@
 - name: Remove any existing tftp boot folder in PXE server for this VM
   run_once: true
   ansible.builtin.file:
-      path: "{{ dest_dir }}"
+      path: "{{ redhat_linux_install_dest_dir }}"
       state: absent
   delegate_to: "{{ groups['pxe'][0] }}"
 
 - name: Calculate cutdir value
-  ansible.builtin.shell: set -o pipefail && echo "{{ repo_dir }}" | tr '/' '\n' | grep -v "^$" | wc -l
+  ansible.builtin.shell: set -o pipefail && echo "{{ redhat_linux_install_repo_dir }}" | tr '/' '\n' | grep -v "^$" | wc -l
   register: cut_dir
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
@@ -248,46 +229,48 @@
 - name: Print the value of dest_dir
   run_once: true
   ansible.builtin.debug:
-      msg: "Destination directory is: {{ dest_dir }}"
+      msg: "Destination directory is: {{ redhat_linux_install_dest_dir }}"
 
-# ansible-lint: ignore=command-instead-of-module
 - name: Download files from /boot and /ppc directory in Repository Server to the PXE server tftp path(hardware address)
   run_once: true
   ansible.builtin.shell: >
     wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
-    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/boot/ -P {{ dest_dir }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/boot/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
-  # noqa command-instead-of-module
+  # noqa: command-instead-of-module wget
 
-# ansible-lint: ignore=command-instead-of-module
 - name: Download files from /boot and /ppc directory in Repository Server to the PXE server tftp path(hardware address)
   run_once: true
   ansible.builtin.shell: >
     wget -r --reject="index.html*" --no-parent -nH --cut-dirs={{ cut_dir.stdout | int + 1 }}
-    http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ repo_dir }}/ppc/ -P {{ dest_dir }}
+    http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/ppc/ -P {{ redhat_linux_install_dest_dir }}
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
-  # noqa command-instead-of-module
+  # noqa: command-instead-of-module wget
 
 - name: Create netboot directory in PXE server under tftp path
   run_once: true
-  ansible.builtin.shell: grub2-mknetdir --net-directory={{ base_dir }} --subdir={{ mac_address }}/boot/grub/
+  ansible.builtin.command: >
+    grub2-mknetdir
+    --net-directory={{ redhat_linux_install_base_dir }}
+    --subdir={{ mac_address }}/boot/grub/
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
-  # noqa command-instead-of-shell
 
 - name: Create grub.cfg and copy to boot directory in PXE server
   run_once: true
   ansible.builtin.template:
       src: templates/grub_conf.j2
-      dest: "{{ dest_dir }}/boot/grub/grub.cfg"
+      dest: "{{ redhat_linux_install_dest_dir }}/boot/grub/grub.cfg"
       mode: "0777"
   delegate_to: "{{ groups['pxe'][0] }}"
 
-- name: Copy to grub.cfg to boot directory in PXE server
+- name: Copy grub.cfg to PXE server boot directory
   run_once: true
-  ansible.builtin.command: cp "{{ dest_dir }}/boot/grub/grub.cfg" "{{ dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
+  ansible.builtin.command: >
+    cp "{{ redhat_linux_install_dest_dir }}/boot/grub/grub.cfg"
+       "{{ redhat_linux_install_dest_dir }}/boot/grub/powerpc-ieee1275/grub.cfg-01-{{ address }}"
   changed_when: false
   delegate_to: "{{ groups['pxe'][0] }}"
 
@@ -320,14 +303,14 @@
       - ibm.power_hmc
   powervm_lpar_instance:
       hmc_host: "{{ hostvars['hmc_server'].ansible_host }}"
-      hmc_auth: "{{ curr_hmc_auth }}"
-      system_name: "{{ managed_system }}"
-      vm_name: "{{ lpar_name }}"
+      hmc_auth: "{{ redhat_linux_install_curr_hmc_auth }}"
+      system_name: "{{ redhat_linux_install_managed_system }}"
+      vm_name: "{{ redhat_linux_install_lpar_name }}"
       install_settings:
-          vm_ip: "{{ host_ip }}"
+          vm_ip: "{{ redhat_linux_install_host_ip }}"
           nim_ip: "{{ hostvars['pxe_server'].ansible_host }}"
-          nim_gateway: "{{ host_gw }}"
-          nim_subnetmask: "{{ host_netmask }}"
+          nim_gateway: "{{ redhat_linux_install_host_gw }}"
+          nim_subnetmask: "{{ redhat_linux_install_host_netmask }}"
           vm_mac: "{{ mac_address }}"
           timeout: 11
       action: install_os
@@ -363,7 +346,7 @@
       sleep: 5
   vars:
       ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-      ansible_host: "{{ host_ip }}"
+      ansible_host: "{{ redhat_linux_install_host_ip }}"
 
 - name: Ensure system facts are gathered from the VM
   run_once: true
