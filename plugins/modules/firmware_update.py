@@ -58,14 +58,13 @@ options:
                 description:
                     - The hostname or IP address of the remote server where the
                       firmware image is located.
-                required: true
+                      This value is required when using a remote FTP or SFTP server.
                 type: str
             userid:
                 description:
                     - The user ID to use to log in to the remote FTP or SFTP server.
                       This option is required when the firmware image is located on a remote FTP or SFTP server
                       Otherwise, this option is not valid.
-                required: true
                 type: str
             passwd:
                 description:
@@ -81,7 +80,7 @@ options:
             directory:
                 description:
                     - Location where the images are stored.
-                required: true
+                    - Required when a remote location is used.
                 type: str
     level:
         description:
@@ -95,6 +94,7 @@ options:
             -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC updates, even if disruptive.
                The level specified in each entry indicates the desired level
                for all components which are running the release specified in the entry.
+            -  The level value must be enclosed in double quotes.
         type: str
         default: latest
     state:
@@ -187,7 +187,7 @@ def create_hmc_conn(module, params):
 def extract_updlic_options(params):
     system_name = params['system_name']
     repo = params['repository']
-    level = params['level']
+    level = params.get("level") or "latest"
     remote_repo = params['remote_repo']
 
     return system_name, repo, level, remote_repo
@@ -241,7 +241,8 @@ def is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_
         elif level == current_level:
             return True
     else:
-        ecnumber = initial_level.get('ecnumber', '').lower()
+        ec_raw = initial_level.get('ecnumber', '')
+        ecnumber = ec_raw.lower() if isinstance(ec_raw, str) else ''
         if isinstance(level, str) and ecnumber and ecnumber in level.lower():
             return True
 
@@ -342,6 +343,7 @@ def validate_parameters(params):
     if params.get('action') is None and params.get('state') is None:
         raise ParameterError("Required parameter missing: either 'state' or 'action' must be provided.")
     remote_repo = params['remote_repo']
+    required_fields = ["hostname", "userid", "directory"]
     if remote_repo:
         passwd = remote_repo['passwd']
         sshkey = remote_repo['sshkey_file']
@@ -352,6 +354,9 @@ def validate_parameters(params):
             raise ParameterError("'repository:ftp' and 'sshkey_file' are  incompatible")
         if repository == 'ibmwebsite':
             raise ParameterError("Value 'ibmwebsite' is incompatible with any 'remote_repo' arguments")
+        missing_fields = [f for f in required_fields if not remote_repo.get(f)]
+        if missing_fields:
+            raise ParameterError(f"Missing required fields in remote_repo: {', '.join(missing_fields)}")
 
 
 def run_module():
@@ -371,11 +376,11 @@ def run_module():
         level=dict(type='str', default='latest'),
         repository=dict(type='str', default='ibmwebsite', choices=['ibmwebsite', 'ftp', 'sftp']),
         remote_repo=dict(type='dict', options=dict(
-                              hostname=dict(type='str', required=True),
-                              userid=dict(type='str', required=True),
+                              hostname=dict(type='str'),
+                              userid=dict(type='str'),
                               passwd=dict(type='str', no_log=True),
                               sshkey_file=dict(type='str'),
-                              directory=dict(type='str', required=True), )
+                              directory=dict(type='str'), )
                          )
     )
 
