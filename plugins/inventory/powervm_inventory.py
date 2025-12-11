@@ -282,7 +282,6 @@ import xml.etree.ElementTree as ET
 import json
 import sys
 from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable
-from ansible.module_utils.six import string_types, viewitems, reraise
 from ansible.errors import AnsibleParserError
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import HmcError
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import parse_error_response
@@ -520,7 +519,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                     error_msg = parse_error_response(del_error)
                     logger.debug(error_msg)
                     traceback = sys.exc_info()[2]
-                    reraise(HmcError, "Error logging off HMC REST Service: %s" % error_msg, traceback)
+                    raise HmcError(f"Error logging off HMC REST Service: {error_msg}. {traceback}")
             except Exception as error:
                 error_msg = parse_error_response(error)
                 msg = ("Unable to connect to HMC host %s: %s" % (hmc_host['hmc'], error_msg))
@@ -579,7 +578,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             if args[arg]["type"] == 'str':
                 type_checked_arg = ensure_type(
                     args[arg].get("value"), 'string')
-                if type_checked_arg is not None and not isinstance(type_checked_arg, string_types):
+                if type_checked_arg is not None and not isinstance(type_checked_arg, str):
                     raise AnsibleParserError("%s is expected to be a string, but got %s instead" % (
                         arg, type(type_checked_arg)))
                 # Check for choices
@@ -649,11 +648,11 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def matches_filters(self, itm):
         # Our filter should be a subset of our LPAR if the LPAR matches the filter items
-        return viewitems(self.filters) <= viewitems(itm)
+        return self.filters.items() <= itm.items()
 
     def matches_ms_filters(self, itm):
         # Our filter should be a subset of our managed_system if the managed_system matches the filter items
-        return viewitems(self.system_filters) <= viewitems(itm)
+        return self.system_filters.items() <= itm.items()
 
     def lpar_should_be_included(self, lpar):
         if self.matches_filters(lpar) and not self.is_lpar_excluded(lpar):

@@ -4,6 +4,6 @@ menuentry 'Install OS' {
     insmod tftp
     set root=tftp,{{ hostvars[groups['pxe'][0]].ansible_host }}
     echo 'Loading OS Install kernel ...'
-    linux {{ mac_address }}/ppc/ppc64/vmlinuz ifname=net0:{{ hardware_ethernet }} ip={{ host_ip }}::{{ redhat_linux_install_host_gw }}:{{ redhat_linux_install_host_netmask }}:{{ redhat_linux_install_hostname }}:net0:none nameserver={{ redhat_linux_install_dns_ip }} inst.repo=http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ redhat_linux_install_repo_dir }}/ inst.ks=http://{{ hostvars[groups['repo'][0]].ansible_host }}/{{ ks_file }}
-    initrd {{ mac_address }}/ppc/ppc64/initrd.img
+    linux {{ redhat_linux_install_mac_address }}/ppc/ppc64/vmlinuz ifname=net0:{{ redhat_linux_install_hardware_ethernet }} ip={{ host_ip }}::{{ redhat_linux_install_host_gw }}:{{ redhat_linux_install_host_netmask }}:{{ redhat_linux_install_hostname }}:net0:none nameserver={{ redhat_linux_install_dns_ip }} inst.repo=http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_repo_dir }}/ inst.ks=http://{{ hostvars[groups['repo'][0]].ansible_host }}:{{ redhat_linux_install_repo_port }}/{{ redhat_linux_install_ks_file }}
+    initrd {{ redhat_linux_install_mac_address }}/ppc/ppc64/initrd.img
 }

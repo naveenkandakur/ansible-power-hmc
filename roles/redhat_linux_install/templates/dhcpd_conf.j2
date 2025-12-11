@@ -6,7 +6,7 @@ subnet {{ redhat_linux_install_host_subnet }} netmask {{ redhat_linux_install_ho
         next-server {{ hostvars[groups['pxe'][0]].ansible_host }};
         filename "{{ redhat_linux_install_core_file_path }}";
         host {{ redhat_linux_install_hostname }} {
-            hardware ethernet {{ hardware_ethernet }};
+            hardware ethernet {{ redhat_linux_install_hardware_ethernet }};
             fixed-address {{ host_ip }};
             option host-name {{ redhat_linux_install_lpar_name }};
             option tftp-server-name "{{ hostvars[groups['pxe'][0]].ansible_host }}";
