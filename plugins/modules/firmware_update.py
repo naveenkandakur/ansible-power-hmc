@@ -12,7 +12,7 @@ module: firmware_update
 short_description: Change firmware level on Managed Systems
 notes:
     - All operations support passwordless authentication.
-    - The module is idempotent. If tasked with updating or upgrading the HMC to a level equal to the current level,
+    - The module is idempotent. If tasked with updating or upgrading a managed system to a level equal to the current level,
       it will skip the operation and report the state as unchanged. If a lower level is requested (downgrade), the module
       will fail with an appropriate message.
 description:
@@ -87,11 +87,10 @@ options:
             -  Specify sss to retrieve a specific level of Managed System or Power LIC updates, even if disruptive.
                sss is the three character identifier of the specific level to retrieve.
                This is only valid when the LIC type is either Managed System only or Power only.
-            -  Specify ccc,ppp to retrieve a specific level of Managed System and Power LIC updates, even if disruptive.
+            -  Specify ccc to retrieve a specific level of Managed System LIC updates, even if disruptive.
                ccc is the three character identifier of the specific level of Managed System LIC updates to retrieve.
-               ppp is the three character identifier of the specific level of Power LIC updates to retrieve.
-               This is only valid when the LIC type is both Managed System and Power.
-            -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC updates, even if disruptive.
+               This is only valid when the LIC type is Managed System.
+            -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC upgrades, even if disruptive.
                The level specified in each entry indicates the desired level
                for all components which are running the release specified in the entry.
             -  The level value must be enclosed in double quotes.
@@ -111,6 +110,7 @@ options:
 
 author:
     - Mario Maldonado (@Mariomds)
+    - Chiranthan M V (@chiranthanmv)
 '''
 
 EXAMPLES = r'''
@@ -130,10 +130,10 @@ EXAMPLES = r'''
       system_name: <System name/mtms>
       repository: sftp
       remote_repo:
-      hostname: <hostname/ip>
-      userid: <user>
-      passwd: <password>
-      directory: /repo/images/
+          hostname: <hostname/ip>
+          userid: <user>
+          passwd: <password>
+          directory: /repo/images/
       level: 01VL941_047
       state: upgraded
 '''
