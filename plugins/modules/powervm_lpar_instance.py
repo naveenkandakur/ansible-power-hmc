@@ -307,7 +307,7 @@ options:
             - Option to display advanced information of the logical partition.
             - Applicable only for C(facts) state.
             - Default is false.
-            - Currently it is showing only NPIV storage details.
+            - Currently it is showing only NPIV storage, SCSI adapters and Virtual Network adapter details.
         type: bool
     install_settings:
         description:
@@ -464,7 +464,7 @@ options:
             - C(poweron) poweron a partition of the specified I(vm_name) with specified I(prof_name), I(keylock), I(iIPLsource) on specified I(system_name).
             - C(restart) restart a partition of the specified I(vm_name) on specified I(system_name).
             - C(install_os) install Aix/Linux OS through NIM Server on specified I(vm_name).
-            - C(modify_vm) rename a logical partition.
+            - C(modify_vm) rename a logical partition with I(new_vm_name).
         type: str
         choices: ['poweron', 'shutdown', 'restart', 'install_os', 'modify_vm']
 '''
