@@ -162,7 +162,7 @@ EXAMPLES = '''
     hmc_auth: "{{ curr_hmc_auth }}"
     system_name: <system name>
     description: Test Description
-    types: vios
+    types: lpm
     attributes:
       title: test
       severity: 4
@@ -174,7 +174,7 @@ EXAMPLES = '''
       target_mtms: < target-sys >
       service_file:
         - pedbgq4
-        - vios
+        - lpmffdc
     state: created
 '''
 
