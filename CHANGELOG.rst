@@ -331,9 +331,9 @@ Version 1.14.0
 -------------
 Notes
   * powervm_lpar_instance: Support for vm name change
-  * powervm_lpar_instance: Support for custom profile name during vm creation
+  * powervm_lpar_instance: Support for user prefered profile name during vm creation
   * powervm_lpar_instance: Fix for VFC adapters not showing up in the facts when there are unmapped adapters
-  * powervm_lpar_instance: Support for showing virtual network details as part vm facts
+  * powervm_lpar_instance: Support for showing virtual network details as part of vm facts
   * powervm_lpar_instance: Fix vm creation with physical IO adapters failure in latest HMC
   * firmware_update: Support for idempotency
   * Support for SSH_PRIVATE_KEY_FILE env variable to use the custom private key file location during passwordless authentication
