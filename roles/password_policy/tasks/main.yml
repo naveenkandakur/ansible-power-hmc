@@ -16,7 +16,7 @@
           password: "{{ password_policy_hmc_password }}"
       state: facts
       policy_type: policies
-  register: policy_check
+  register: password_policy_check
 
 - name: Create a new password policy in power HMC if the policy name doesn't exist
   ibm.power_hmc.hmc_pwdpolicy:
@@ -27,7 +27,9 @@
       policy_name: '{{ password_policy_name }}'
       policy_config: '{{ password_policy_configs }}'
       state: present
-  when: policy_check.policy_info | rejectattr('NAME', 'equalto', password_policy_name) | list | count == policy_check.policy_info | length
+  when: >
+    password_policy_check.policy_info | rejectattr('NAME', 'equalto', password_policy_name) | list | count ==
+    password_policy_check.policy_info | length
 
 - name: Modify an existing password policy in power HMC if the policy name already exists
   ibm.power_hmc.hmc_pwdpolicy:
@@ -38,7 +40,7 @@
       policy_name: '{{ password_policy_name }}'
       policy_config: '{{ password_policy_configs }}'
       state: modified
-  when: policy_check.policy_info | selectattr('NAME', 'equalto', password_policy_name) | list | count > 0
+  when: password_policy_check.policy_info | selectattr('NAME', 'equalto', password_policy_name) | list | count > 0
 
 - name: Activate the provided created/modified password policy in power HMC
   ibm.power_hmc.hmc_pwdpolicy:
@@ -57,7 +59,7 @@
           password: "{{ password_policy_hmc_password }}"
       cmd: lshmcusr -F name | grep -Ev "(root|hscpe|VALUE_SPECIFIED_IN_NO_LOG_PARAMETER\s*)$"
   when: password_policy_password_change is true
-  register: userslist
+  register: password_policy_userslist
 
 - name: Change password for all the remaining users in power HMC
   ibm.power_hmc.hmc_user:
@@ -68,5 +70,5 @@
           username: "{{ password_policy_hmc_username }}"
           password: "{{ password_policy_hmc_password }}"
       attributes: "{{ password_policy_user_password }}"
-  loop: "{{ userslist.command_output }}"
+  loop: "{{ password_policy_userslist.command_output }}"
   when: password_policy_password_change is true

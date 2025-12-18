@@ -106,3 +106,4 @@ unit-test: prep-collection
 .PHONY: ansible-lint
 ansible-lint: 
 	cd playbooks && ansible-lint --exclude=hmc_users_input.yaml,partitions.power_hmc.yml,source.power_hmc.yml .
+	python -m ansiblelint --profile production --exclude tests/integration/ --exclude tests/unit/

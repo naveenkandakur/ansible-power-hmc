@@ -325,3 +325,25 @@ Notes
 
 .. _GitHub v1.13.0:
    https://github.com/IBM/ansible-power-hmc/releases/download/v1.13.0/ibm-power_hmc-1.13.0.tar.gz
+
+
+Version 1.14.0
+-------------
+Notes
+  * powervm_lpar_instance: Support for vm name change
+  * powervm_lpar_instance: Support for user preferred profile name during vm creation
+  * powervm_lpar_instance: Fix for VFC adapters not showing up in the facts when there are unmapped adapters
+  * powervm_lpar_instance: Support for showing virtual network details as part of vm facts
+  * powervm_lpar_instance: Fix vm creation with physical IO adapters failure in latest HMC
+  * firmware_update: Support for idempotency
+  * Support for SSH_PRIVATE_KEY_FILE env variable to use the custom private key file location during passwordless authentication
+
+  Availability
+    * `Galaxy v1.14.0`_
+    * `GitHub v1.14.0`_
+
+.. _Galaxy v1.14.0:
+   https://galaxy.ansible.com/download/ibm-power_hmc-1.14.0.tar.gz
+
+.. _GitHub v1.14.0:
+   https://github.com/IBM/ansible-power-hmc/releases/download/v1.14.0/ibm-power_hmc-1.14.0.tar.gz

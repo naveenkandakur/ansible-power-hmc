@@ -1,24 +1,22 @@
 ---
 - name: Install linux
   hosts: vm
-  collections:
-    - ibm.power_hmc
   gather_facts: false
   roles:
-    - role: redhat_linux_install
+    - role: ibm.power_hmc.redhat_linux_install
       vars:
-        distro: Rhel9.1le
-        repo_dir: /rc-2.0/
-        host_ip: 1.2.3.4
-        host_gw: 1.2.3.1
-        host_subnet: 1.2.3.0
-        host_netmask: 255.255.255.0
-        dns_ip: 1.0.0.1
-        hostname: abc.hmc.com
-        lpar_name: abc-02
-        managed_system: abc-24
-        network_name: test
-        mem: 6144
-        proc: 4
-        disk_size: 28590
-        host_password: "{{ hostvars[groups['vm'][0]].ansible_password }}"
+        redhat_linux_install_distro: Rhel9.1le
+        redhat_linux_install_repo_dir: /rc-2.0/
+        redhat_linux_install_host_ip: 1.2.3.4
+        redhat_linux_install_host_gw: 1.2.3.1
+        redhat_linux_install_host_subnet: 1.2.3.0
+        redhat_linux_install_host_netmask: 255.255.255.0
+        redhat_linux_install_dns_ip: 1.0.0.1
+        redhat_linux_install_hostname: abc.hmc.com
+        redhat_linux_install_lpar_name: abc-02
+        redhat_linux_install_managed_system: abc-24
+        redhat_linux_install_network_name: test
+        redhat_linux_install_mem: 6144
+        redhat_linux_install_proc: 4
+        redhat_linux_install_disk_size: 28590
+        redhat_linux_install_host_password: "{{ hostvars[groups['vm'][0]].ansible_password }}"

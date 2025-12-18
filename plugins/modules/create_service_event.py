@@ -145,15 +145,15 @@ EXAMPLES = '''
     description: Test Description
     types: vios
     attributes:
-        title: test
-        severity: 4
-        contact_name: Test
-        contact_phone: < phone-num >
-        contact_email: test@abc.com
-        lpar_name: < partition >
-        service_file:
-            - pedbgq4
-            - vios
+      title: test
+      severity: 4
+      contact_name: Test
+      contact_phone: < phone-num >
+      contact_email: test@abc.com
+      lpar_name: < partition >
+      service_file:
+        - pedbgq4
+        - vios
     state: created
 
 - name: Create a serviceable event for collection of lpm logs
@@ -162,19 +162,19 @@ EXAMPLES = '''
     hmc_auth: "{{ curr_hmc_auth }}"
     system_name: <system name>
     description: Test Description
-    types: vios
+    types: lpm
     attributes:
-        title: test
-        severity: 4
-        contact_name: Test
-        contact_phone: < phone-num >
-        contact_email: test@abc.com
-        lpar_name: < partition1 >
-        target_lpar_name: <partition2 >
-        target_mtms: < target-sys >
-        service_file:
-            - pedbgq4
-            - vios
+      title: test
+      severity: 4
+      contact_name: Test
+      contact_phone: < phone-num >
+      contact_email: test@abc.com
+      lpar_name: < partition1 >
+      target_lpar_name: <partition2 >
+      target_mtms: < target-sys >
+      service_file:
+        - pedbgq4
+        - lpmffdc
     state: created
 '''
 
@@ -203,7 +203,7 @@ def validate_parameters(params):
     madatory_attribures = ['title', 'severity', 'contact_name', 'contact_phone', 'contact_email']
     for each in madatory_attribures:
         if attributes[each] is None:
-            raise ParameterError(f"{each} is mandatory in 'attributes' parameter")
+            raise ParameterError("{} is mandatory in 'attributes' parameter".format(each))
     if params['types'] in ['lpm', 'vios']:
         if attributes['lpar_name'] is None:
             raise ParameterError("'lpar_name' is mandatory for types: vios, lpm")

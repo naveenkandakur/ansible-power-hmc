@@ -12,7 +12,9 @@ module: firmware_update
 short_description: Change firmware level on Managed Systems
 notes:
     - All operations support passwordless authentication.
-version_added: "1.1.0"
+    - The module is idempotent. If tasked with updating or upgrading a managed system to a level equal to the current level,
+      it will skip the operation and report the state as unchanged. If a lower level is requested (downgrade), the module
+      will fail with an appropriate message.
 description:
     - Update/Upgrade a managed system.
 options:
@@ -56,43 +58,42 @@ options:
                 description:
                     - The hostname or IP address of the remote server where the
                       firmware image is located.
-                required: true
+                      This value is required when using a remote FTP or SFTP server.
                 type: str
             userid:
                 description:
                     - The user ID to use to log in to the remote FTP or SFTP server.
                       This option is required when the firmware image is located on a remote FTP or SFTP server
                       Otherwise, this option is not valid.
-                required: true
                 type: str
             passwd:
                 description:
                     - The password to use to log in to the remote FTP or SFTP server.
-                      The I(passwd) and I(sshkey) options are mutually exclusive in case if I(location_type=sftp).
+                      The I(passwd) and I(sshkey) options are mutually exclusive in case if I(repository=sftp).
                       This option is only valid when the firmware image is located on a remote FTP or SFTP server.
                 type: str
             sshkey_file:
                 description:
                     - The name of the file that contains the SSH private key.
-                      This option is only valid if I(location_type=sftp).
+                      This option is only valid if I(repository=sftp).
                 type: str
             directory:
                 description:
                     - Location where the images are stored.
-                required: true
+                    - This option is required if I(repository=sftp) or I(repository=ftp).
                 type: str
     level:
         description:
             -  Specify sss to retrieve a specific level of Managed System or Power LIC updates, even if disruptive.
                sss is the three character identifier of the specific level to retrieve.
                This is only valid when the LIC type is either Managed System only or Power only.
-            -  Specify ccc,ppp to retrieve a specific level of Managed System and Power LIC updates, even if disruptive.
+            -  Specify ccc to retrieve a specific level of Managed System LIC updates, even if disruptive.
                ccc is the three character identifier of the specific level of Managed System LIC updates to retrieve.
-               ppp is the three character identifier of the specific level of Power LIC updates to retrieve.
-               This is only valid when the LIC type is both Managed System and Power.
-            -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC updates, even if disruptive.
+               This is only valid when the LIC type is Managed System.
+            -  Specify release1_level1,release2_level2,... to retrieve specific levels of LIC upgrades, even if disruptive.
                The level specified in each entry indicates the desired level
                for all components which are running the release specified in the entry.
+            -  The level value must be enclosed in double quotes.
         type: str
         default: latest
     state:
@@ -109,6 +110,7 @@ options:
 
 author:
     - Mario Maldonado (@Mariomds)
+    - Chiranthan M V (@chiranthanmv)
 '''
 
 EXAMPLES = r'''
@@ -128,10 +130,10 @@ EXAMPLES = r'''
       system_name: <System name/mtms>
       repository: sftp
       remote_repo:
-      hostname: <hostname/ip>
-      userid: <user>
-      passwd: <password>
-      directory: /repo/images/
+          hostname: <hostname/ip>
+          userid: <user>
+          passwd: <password>
+          directory: /repo/images/
       level: 01VL941_047
       state: upgraded
 '''
@@ -185,10 +187,66 @@ def create_hmc_conn(module, params):
 def extract_updlic_options(params):
     system_name = params['system_name']
     repo = params['repository']
-    level = params['level']
+    level = params.get("level") or "latest"
     remote_repo = params['remote_repo']
 
     return system_name, repo, level, remote_repo
+
+
+def is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module, is_upgrade=True):
+    current_level = initial_level.get('level')
+
+    def normalize(val):
+        if isinstance(val, str) and val.isdigit():
+            return int(val)
+        return val
+
+    current_level = normalize(current_level)
+
+    level_is_numeric = isinstance(level, str) and level.isdigit()
+    if level_is_numeric:
+        level = int(level)
+
+    if not is_upgrade:
+        if level in ('latest', 'latestconcurrent'):
+            repo_latest_level = hmc.get_latest_firmware_level(
+                system_name,
+                upgrade=is_upgrade,
+                repo=repo,
+                level=level,
+                remote_repo=remote_repo
+            )
+            if isinstance(repo_latest_level, str):
+                module.fail_json(msg=repo_latest_level)
+
+            latest_level = repo_latest_level.get('level') if repo_latest_level else None
+            latest_level = normalize(latest_level)
+            if isinstance(latest_level, int) and isinstance(current_level, int):
+                if latest_level < current_level:
+                    module.fail_json(
+                        msg=f"Downgrade not supported: current level is {current_level}, latest level available is {latest_level}"
+                    )
+
+            if latest_level == current_level:
+                return True
+
+        elif isinstance(level, int) and isinstance(current_level, int):
+            if level < current_level:
+                module.fail_json(
+                    msg=f"Downgrade not supported: current level is {current_level}, requested level is {level}"
+                )
+            if level == current_level:
+                return True
+
+        elif level == current_level:
+            return True
+    else:
+        ec_raw = initial_level.get('ecnumber', '')
+        ecnumber = ec_raw.lower() if isinstance(ec_raw, str) else ''
+        if isinstance(level, str) and ecnumber and ecnumber in level.lower():
+            return True
+
+    return False
 
 
 def update_system(module, params):
@@ -197,6 +255,9 @@ def update_system(module, params):
     ret_dict = {}
     try:
         initial_level = hmc.get_firmware_level(system_name)
+        if is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module, is_upgrade=False):
+            ret_dict['msg'] = f"{system_name} is already at the latest firmware level."
+            return False, ret_dict, None
         hmc.update_managed_system(system_name, False, repo, level, remote_repo)
         ret_dict = {'msg': 'system update finished'}
         new_level = hmc.get_firmware_level(system_name)
@@ -221,6 +282,9 @@ def upgrade_system(module, params):
     ret_dict = {}
     try:
         initial_level = hmc.get_firmware_level(system_name)
+        if is_firmware_up_to_date(level, system_name, initial_level, hmc, repo, remote_repo, module):
+            ret_dict['msg'] = f"{system_name} is already at the latest firmware level."
+            return False, ret_dict, None
         hmc.update_managed_system(system_name, True, repo, level, remote_repo)
         ret_dict = {'msg': 'system upgrade finished'}
         new_level = hmc.get_firmware_level(system_name)
@@ -276,7 +340,10 @@ def perform_task(module):
 
 
 def validate_parameters(params):
+    if params.get('action') is None and params.get('state') is None:
+        raise ParameterError("Required parameter missing: either 'state' or 'action' must be provided.")
     remote_repo = params['remote_repo']
+    required_fields = ["hostname", "userid", "directory"]
     if remote_repo:
         passwd = remote_repo['passwd']
         sshkey = remote_repo['sshkey_file']
@@ -287,6 +354,9 @@ def validate_parameters(params):
             raise ParameterError("'repository:ftp' and 'sshkey_file' are  incompatible")
         if repository == 'ibmwebsite':
             raise ParameterError("Value 'ibmwebsite' is incompatible with any 'remote_repo' arguments")
+        missing_fields = [f for f in required_fields if not remote_repo.get(f)]
+        if missing_fields:
+            raise ParameterError(f"Missing required fields in remote_repo: {', '.join(missing_fields)}")
 
 
 def run_module():
@@ -306,11 +376,11 @@ def run_module():
         level=dict(type='str', default='latest'),
         repository=dict(type='str', default='ibmwebsite', choices=['ibmwebsite', 'ftp', 'sftp']),
         remote_repo=dict(type='dict', options=dict(
-                              hostname=dict(type='str', required=True),
-                              userid=dict(type='str', required=True),
+                              hostname=dict(type='str'),
+                              userid=dict(type='str'),
                               passwd=dict(type='str', no_log=True),
                               sshkey_file=dict(type='str'),
-                              directory=dict(type='str', required=True), )
+                              directory=dict(type='str'), )
                          )
     )
 

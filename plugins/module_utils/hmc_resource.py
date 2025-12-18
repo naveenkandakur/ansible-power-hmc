@@ -314,6 +314,17 @@ class Hmc():
             self.OPT['CHSYSCFG']['-O']['APPLY']
         self.hmcconn.execute(chsyscfgCmd)
 
+    def updateProfileName(self, system_name, lparName, prof_name, next_profile_name):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['PROF'] + \
+            self.OPT['CHSYSCFG']['-M'] + system_name + \
+            self.OPT['CHSYSCFG']['--FORCE'] + \
+            "-i '" + self.OPT['CHSYSCFG']['-I']['NAME'] + f"={next_profile_name}," + \
+            self.OPT['CHSYSCFG']['-I']['LPAR_NAME'] + "=" + lparName + "," + \
+            self.OPT['CHSYSCFG']['-I']['NEW_NAME'] + "=" + prof_name + "'"
+
+        self.hmcconn.execute(chsyscfgCmd)
+
     def managedSystemShutdown(self, cecName):
         chsysstateCmd = self.CMD['CHSYSSTATE'] + \
             self.OPT['CHSYSSTATE']['-R']['SYS'] + \
@@ -774,6 +785,42 @@ class Hmc():
 
         return self.hmcconn.execute(updlic_cmd)
 
+    def get_latest_firmware_level(self, system_name, upgrade=False, repo='ibmwebsite', level='latest', remote_repo=None):
+        if upgrade:
+            update_upgrade_flags = 'upgrade'
+        else:
+            update_upgrade_flags = 'update'
+
+        lslic_cmd = self.CMD['LSLIC'] +\
+            self.OPT['LSLIC']['-M'] + system_name +\
+            self.OPT['LSLIC']['-T']['SYS'] +\
+            self.OPT['LSLIC']['-R'] + repo +\
+            self.OPT['LSLIC']['-L'] + update_upgrade_flags +\
+            self.OPT["LSLIC"]['-F']['AVAILABLE_LEVEL_FIELDS']
+        if remote_repo:
+            lslic_cmd += self.OPT['LSLIC']['-H'] + remote_repo['hostname']
+            lslic_cmd += self.OPT['LSLIC']['-U'] + remote_repo['userid']
+            lslic_cmd += self.OPT['LSLIC']['-D'] + remote_repo['directory']
+            passwd = remote_repo['passwd']
+            if passwd:
+                lslic_cmd += self.OPT['LSLIC']['--PASSWD'] + passwd
+            ssh_key = remote_repo['sshkey_file']
+            if ssh_key:
+                lslic_cmd += self.OPT['LSLIC']['-K'] + ssh_key
+
+        raw_result = self.hmcconn.execute(lslic_cmd)
+        if 'No results were found.' in raw_result:
+            return f"No {update_upgrade_flags} files available in '{repo}' repository"
+        headers = "level,spname,concurrency"
+        res_dict = self.cmdClass.parseMultiLineCSV(raw_result, userConfig={'-F': headers})
+        filtered = res_dict
+        if level == 'latestconcurrent':
+            filtered = [r for r in res_dict if r['concurrency'].lower() == 'concurrent']
+            if not filtered:
+                return f"No Concurrent {update_upgrade_flags} files available for '{repo}' repository"
+        latest_level = max(filtered, key=lambda x: int(x['level']))
+        return latest_level
+
     def update_managed_system(self, system_name, upgrade=False, repo='ibmwebsite', level='latest', remote_repo=None):
         if upgrade:
             update_upgrade_flags = self.OPT['UPDLIC']['-O']['UPGRADE']
@@ -902,7 +949,7 @@ class Hmc():
             files = ','.join(files)
 
         if options:
-            options = f'"ver={options}"'
+            options = '"ver={}"'.format(options)
 
         if media == 'sftp':
             sftp_user = params['sftp_auth']['sftp_username']
@@ -1039,3 +1086,10 @@ class Hmc():
             if str(params['ip_version']).lower() == 'ipv6':
                 viosecure_cmd += self.OPT['VIOSECURE']['-IPV6']
         return viosecure_cmd
+
+    def update_lpar(self, cecName, lparConfig):
+        chsyscfgCmd = self.CMD['CHSYSCFG'] + \
+            self.OPT['CHSYSCFG']['-R']['LPAR'] + \
+            self.OPT['CHSYSCFG']['-M'] + cecName
+        chsyscfgCmd += self.cmdClass.i_a_ConfigBuilder('CHSYSCFG', '-I', lparConfig)
+        self.hmcconn.execute(chsyscfgCmd)

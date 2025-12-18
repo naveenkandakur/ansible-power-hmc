@@ -1,14 +1,14 @@
-subnet {{ host_subnet }} netmask {{ host_netmask }} {
+subnet {{ redhat_linux_install_host_subnet }} netmask {{ redhat_linux_install_host_netmask }} {
     allow bootp;
-    option routers {{ host_gw }};
-    option domain-name-servers {{ dns_ip }};
+    option routers {{ redhat_linux_install_host_gw }};
+    option domain-name-servers {{ redhat_linux_install_dns_ip }};
     group {
         next-server {{ hostvars[groups['pxe'][0]].ansible_host }};
-        filename "{{ core_file_path }}";
-        host {{ hostname }} {
-            hardware ethernet {{ hardware_ethernet }};
+        filename "{{ redhat_linux_install_core_file_path }}";
+        host {{ redhat_linux_install_hostname }} {
+            hardware ethernet {{ redhat_linux_install_hardware_ethernet }};
             fixed-address {{ host_ip }};
-            option host-name {{ lpar_name }};
+            option host-name {{ redhat_linux_install_lpar_name }};
             option tftp-server-name "{{ hostvars[groups['pxe'][0]].ansible_host }}";
         }
     }
