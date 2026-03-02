@@ -186,7 +186,7 @@ options:
             expansion_factor:
                 description:
                     - Active Memory Expansion (AME) expansion factor.
-                    - Valid values are from C(0.0) to C(10.0).
+                    - Valid values are from C(1.0) to C(10.0).
                 type: float
             hardware_page_tableratio:
                 description:
@@ -227,6 +227,13 @@ EXAMPLES = '''
     system_name: <system_name/mtms>
     vm_name: <vm_name>
     name: dedicated_profile
+    memory_settings:
+      desired_huge_pagecount: 2
+      maximum_huge_pagecount: 2
+      minimum_huge_pagecount: 2
+      desired_memory: 1024
+      maximum_memory: 1024
+      minimum_memory: 1024
     processor_settings:
       processor_mode: dedicated
       desired_processors: 1
@@ -302,6 +309,7 @@ EXAMPLES = '''
       desired_memory: 1024
       maximum_memory: 1024
       minimum_memory: 1024
+      active_memory_expansion: true
       expansion_factor: 10
     state: updated
 '''
@@ -391,8 +399,8 @@ def validate_sub_dict(sub_key, sub_params):
     elif sub_key == 'memory_settings':
         expansion_factor = sub_params.get('expansion_factor')
         if expansion_factor is not None:
-            if not (0.0 <= expansion_factor <= 10.0):
-                raise ParameterError("expansion_factor must be between 0.0 and 10.0")
+            if not (1.0 <= expansion_factor <= 10.0):
+                raise ParameterError("expansion_factor must be between 1.0 and 10.0")
         hw_page_ratio = sub_params.get('hardware_page_tableratio')
         if hw_page_ratio is not None:
             if not (5 <= hw_page_ratio <= 9):
@@ -505,6 +513,33 @@ def build_config_dict(params):
     return config
 
 
+def apply_ame_config(config, user_ame, user_exp_factor):
+    if config.get('active_memory_expansion') is None:
+        config['active_memory_expansion'] = False
+    if config.get('expansion_factor') is None:
+        config['expansion_factor'] = 0.0
+    if user_ame is False:
+        config['active_memory_expansion'] = False
+        config['expansion_factor'] = 0.0
+    elif user_ame is True:
+        config['active_memory_expansion'] = True
+        if user_exp_factor is not None:
+            config['expansion_factor'] = user_exp_factor
+        elif config['expansion_factor'] < 1:
+            config['expansion_factor'] = 1.0
+    elif user_exp_factor is not None:
+        config['active_memory_expansion'] = True
+        config['expansion_factor'] = user_exp_factor
+    elif config['active_memory_expansion'] is False:
+        config['expansion_factor'] = 0.0
+    elif config['active_memory_expansion'] is True and config['expansion_factor'] < 1:
+        config['expansion_factor'] = 1.0
+    if config.get('hardware_page_tableratio') is None:
+        config['hardware_page_tableratio'] = 7
+    if config.get('desired_physical_page_tableratio') is None:
+        config['desired_physical_page_tableratio'] = 6
+
+
 def copy_partition_profile(module, params):
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
@@ -597,6 +632,8 @@ def create_partition_profile(module, params):
             if eachLpar['PartitionName'] == vm_name:
                 lpar_uuid = eachLpar['UUID']
                 break
+        if lpar_uuid is None:
+            module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
     else:
         module.fail_json(msg="There are no Logical Partitions present on the system")
 
@@ -629,17 +666,10 @@ def create_partition_profile(module, params):
                     config['allow_processor_sharing'] = allow_sharing_mode
                 else:
                     config['allow_processor_sharing'] = allow_processor_sharing_MAP['never']
-            if config.get('active_memory_expansion') is None:
-                config['active_memory_expansion'] = False
-            expansion_factor = config.get('expansion_factor')
-            if expansion_factor is not None and expansion_factor >= 1:
-                config['active_memory_expansion'] = True
-            else:
-                config['expansion_factor'] = 0.0
-            if config.get('hardware_page_tableratio') is None:
-                config['hardware_page_tableratio'] = 7
-            if config.get('desired_physical_page_tableratio') is None:
-                config['desired_physical_page_tableratio'] = 6
+            mem_settings = params.get('memory_settings', {})
+            user_ame = mem_settings.get('active_memory_expansion')
+            user_exp_factor = mem_settings.get('expansion_factor')
+            apply_ame_config(config, user_ame, user_exp_factor)
             code, result = rest_conn.createPartitionProfile(lpar_uuid, config)
         if code != 200:
             return False, result, None
@@ -718,8 +748,10 @@ def update_partition_profile(module, params):
             if eachLpar['PartitionName'] == vm_name:
                 lpar_uuid = eachLpar['UUID']
                 break
+        if lpar_uuid is None:
+            module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
     else:
-        module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
+        module.fail_json(msg="There are no Logical Partitions present on the system")
 
     try:
         result = rest_conn.getAllPartitionProfiles(lpar_uuid)
@@ -830,17 +862,9 @@ def update_partition_profile(module, params):
                     config['allow_processor_sharing'] = allow_sharing_mode
                 else:
                     config['allow_processor_sharing'] = allow_processor_sharing_MAP['never']
-            if config.get('active_memory_expansion') is None:
-                config['active_memory_expansion'] = False
-            expansion_factor = config.get('expansion_factor')
-            if expansion_factor is not None and expansion_factor >= 1:
-                config['active_memory_expansion'] = True
-            else:
-                config['expansion_factor'] = 0.0
-            if config.get('hardware_page_tableratio') is None:
-                config['hardware_page_tableratio'] = 7
-            if config.get('desired_physical_page_tableratio') is None:
-                config['desired_physical_page_tableratio'] = 6
+            user_ame = user_input.get('memory_settings', {}).get('active_memory_expansion')
+            user_exp_factor = user_input.get('memory_settings', {}).get('expansion_factor')
+            apply_ame_config(config, user_ame, user_exp_factor)
             code, result = rest_conn.updatePartitionProfile(lpar_uuid, profile_uuid, config)
         if code != 200:
             return False, result, None
