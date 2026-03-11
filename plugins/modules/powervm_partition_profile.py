@@ -309,7 +309,6 @@ EXAMPLES = '''
       desired_memory: 1024
       maximum_memory: 1024
       minimum_memory: 1024
-      active_memory_expansion: true
       expansion_factor: 10
     state: updated
 '''
@@ -343,6 +342,7 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions impor
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import ParameterError
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import Error
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import HmcRestClient
+from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_rest_client import parse_error_response
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_constants import HmcConstants
 try:
     from lxml import etree
@@ -559,25 +559,26 @@ def copy_partition_profile(module, params):
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
             return changed, repr(on_system_error), None
+    rest_conn = None
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-    if system_name:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
-    lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-    if lpar_response is not None:
-        lpar_quick_list = json.loads(lpar_response)
-        for eachLpar in lpar_quick_list:
-            if eachLpar['PartitionName'] == vm_name:
-                lpar_uuid = eachLpar['UUID']
-                break
-    else:
-        module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
     try:
+        if system_name:
+            system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+        if not system_uuid:
+            module.fail_json(msg="Given system is not present")
+        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+        if lpar_response is not None:
+            lpar_quick_list = json.loads(lpar_response)
+            for eachLpar in lpar_quick_list:
+                if eachLpar['PartitionName'] == vm_name:
+                    lpar_uuid = eachLpar['UUID']
+                    break
+        else:
+            module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
         result = rest_conn.getAllPartitionProfiles(lpar_uuid)
         root = etree.fromstring(result)
         response = root.xpath("//*[local-name()='ProfileName']/text()")
@@ -596,6 +597,13 @@ def copy_partition_profile(module, params):
                 return False, final_result, None
     except Exception as e:
         return False, repr(e), None
+    finally:
+        if rest_conn:
+            try:
+                rest_conn.logoff()
+            except Exception as logoff_error:
+                error_msg = parse_error_response(logoff_error)
+                logger.debug(error_msg)
 
 
 def create_partition_profile(module, params):
@@ -609,6 +617,7 @@ def create_partition_profile(module, params):
     name = params['name']
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
+    operating_system = None
     final_result = {}
     validate_parameters(params)
     if system_name is not None and re.match(HmcConstants.MTMS_pattern, system_name):
@@ -616,28 +625,29 @@ def create_partition_profile(module, params):
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as on_system_error:
             return changed, repr(on_system_error), None
+    rest_conn = None
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-    if system_name:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
-    lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-    if lpar_response is not None:
-        lpar_quick_list = json.loads(lpar_response)
-        for eachLpar in lpar_quick_list:
-            if eachLpar['PartitionName'] == vm_name:
-                lpar_uuid = eachLpar['UUID']
-                break
-        if lpar_uuid is None:
-            module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
-    else:
-        module.fail_json(msg="There are no Logical Partitions present on the system")
-
     try:
+        if system_name:
+            system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+        if not system_uuid:
+            module.fail_json(msg="Given system is not present")
+        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+        if lpar_response is not None:
+            lpar_quick_list = json.loads(lpar_response)
+            for eachLpar in lpar_quick_list:
+                if eachLpar['PartitionName'] == vm_name:
+                    lpar_uuid = eachLpar['UUID']
+                    operating_system = eachLpar['OperatingSystemType']
+                    break
+            if lpar_uuid is None:
+                module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
+        else:
+            module.fail_json(msg="There are no Logical Partitions present on the system")
         result = rest_conn.getAllPartitionProfiles(lpar_uuid)
         root = etree.fromstring(result)
         response = root.xpath("//*[local-name()='ProfileName']/text()")
@@ -648,6 +658,7 @@ def create_partition_profile(module, params):
             config = build_config_dict(params)
             proc_settings = params.get('processor_settings', {})
             processor_mode = proc_settings.get('processor_mode', '').lower()
+            config['operating_system'] = operating_system
             if processor_mode == 'shared':
                 config['processor_mode'] = 'false'
                 if not config.get('sharing_mode'):
@@ -679,6 +690,13 @@ def create_partition_profile(module, params):
             return changed, final_result, None
     except Exception as e:
         return False, repr(e), None
+    finally:
+        if rest_conn:
+            try:
+                rest_conn.logoff()
+            except Exception as logoff_error:
+                error_msg = parse_error_response(logoff_error)
+                logger.debug(error_msg)
 
 
 def update_partition_profile(module, params):
@@ -689,6 +707,7 @@ def update_partition_profile(module, params):
     vm_name = params['vm_name']
     changed = False
     lpar_uuid = None
+    operating_system = None
     name = params['name']
     validate_parameters(params)
     PROFILE_FIELD_MAP = {
@@ -732,28 +751,29 @@ def update_partition_profile(module, params):
             system_name = hmc.getSystemNameFromMTMS(system_name)
         except HmcError as e:
             return changed, repr(e), None
+    rest_conn = None
     try:
         rest_conn = HmcRestClient(hmc_host, hmc_user, password)
     except Exception as e:
         logger.debug(repr(e))
         module.fail_json(msg="Logon to HMC failed")
-    if system_name:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
-    lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-    if lpar_response:
-        lpar_quick_list = json.loads(lpar_response)
-        for eachLpar in lpar_quick_list:
-            if eachLpar['PartitionName'] == vm_name:
-                lpar_uuid = eachLpar['UUID']
-                break
-        if lpar_uuid is None:
-            module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
-    else:
-        module.fail_json(msg="There are no Logical Partitions present on the system")
-
     try:
+        if system_name:
+            system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+        if not system_uuid:
+            module.fail_json(msg="Given system is not present")
+        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+        if lpar_response:
+            lpar_quick_list = json.loads(lpar_response)
+            for eachLpar in lpar_quick_list:
+                if eachLpar['PartitionName'] == vm_name:
+                    lpar_uuid = eachLpar['UUID']
+                    operating_system = eachLpar['OperatingSystemType']
+                    break
+            if lpar_uuid is None:
+                module.fail_json(msg=f"Given partition ({vm_name}) is not present on the system")
+        else:
+            module.fail_json(msg="There are no Logical Partitions present on the system")
         result = rest_conn.getAllPartitionProfiles(lpar_uuid)
         root = etree.fromstring(result)
         profile_list = root.xpath("//*[local-name()='ProfileName']/text()")
@@ -844,6 +864,7 @@ def update_partition_profile(module, params):
             config = build_config_dict(profile_settings)
             proc_settings = profile_settings.get('processor_settings', {})
             processor_mode = proc_settings.get('processor_mode', '').lower()
+            config['operating_system'] = operating_system
             if processor_mode == 'shared':
                 config['processor_mode'] = 'false'
                 if not config.get('sharing_mode'):
@@ -874,6 +895,13 @@ def update_partition_profile(module, params):
             return changed, final_result, None
     except Exception as e:
         return False, repr(e), None
+    finally:
+        if rest_conn:
+            try:
+                rest_conn.logoff()
+            except Exception as logoff_error:
+                error_msg = parse_error_response(logoff_error)
+                logger.debug(error_msg)
 
 
 def perform_task(module):

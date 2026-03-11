@@ -2831,31 +2831,57 @@ class HmcRestClient:
             logger.debug("Error in copyPartitionProfile: %s", str(e))
             return f"Error: {str(e)}"
 
-    def dedicatedProcessorPayload(self, params):
-        payload = '''
-        <AssignAllResources kxe="false" kb="COD">false</AssignAllResources>
-        <ProcessorAttributes kxe="false" kb="CUR" schemaVersion="V1_0">
-            <Metadata>
-                <Atom/>
-            </Metadata>
-            <DedicatedProcessorConfiguration kxe="false" kb="CUD" schemaVersion="V1_0">
+    def dedicatedProcessorAttributesXML(self, params):
+        return '''
+            <ProcessorAttributes kxe="false" kb="CUR" schemaVersion="V1_0">
                 <Metadata>
                     <Atom/>
                 </Metadata>
-                <DesiredProcessors kb="CUD" kxe="false">{0}</DesiredProcessors>
-                <MaximumProcessors kb="CUD" kxe="false">{1}</MaximumProcessors>
-                <MinimumProcessors kxe="false" kb="CUD">{2}</MinimumProcessors>
-            </DedicatedProcessorConfiguration>
-            <HasDedicatedProcessors kxe="false" kb="CUD">{3}</HasDedicatedProcessors>
-            <SharingMode kxe="false" kb="CUD">{4}</SharingMode>
-        </ProcessorAttributes>
-        '''.format(params['desired_processors'], params['maximum_processors'], params['minimum_processors'],
-                   params['processor_mode'], params['allow_processor_sharing'])
+                <DedicatedProcessorConfiguration kxe="false" kb="CUD" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <DesiredProcessors kb="CUD" kxe="false">{0}</DesiredProcessors>
+                    <MaximumProcessors kb="CUD" kxe="false">{1}</MaximumProcessors>
+                    <MinimumProcessors kxe="false" kb="CUD">{2}</MinimumProcessors>
+                </DedicatedProcessorConfiguration>
+                <HasDedicatedProcessors kxe="false" kb="CUD">{3}</HasDedicatedProcessors>
+                <SharingMode kxe="false" kb="CUD">{4}</SharingMode>
+            </ProcessorAttributes>
+            '''.format(params['desired_processors'], params['maximum_processors'], params['minimum_processors'],
+                       params['processor_mode'], params['allow_processor_sharing'])
+
+    def dedicatedProcessorPayload(self, params):
+        processor_attributes = self.dedicatedProcessorAttributesXML(params)
+        if params['operating_system'] == 'IBM i':
+            payload = '''
+            <AssignAllResources kxe="false" kb="COD">false</AssignAllResources>
+            <IOConfigurationInstance kb="CUD" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <MaximumVirtualIOSlots kb="CUD" kxe="false">10</MaximumVirtualIOSlots>
+                <TaggedIO kb="CUD" kxe="false" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <AlternateLoadSource kb="CUD" kxe="false">NONE</AlternateLoadSource>
+                    <Console kxe="false" kb="CUR">HMC</Console>
+                    <LoadSource kb="CUR" kxe="false">NONE</LoadSource>
+                </TaggedIO>
+                <VirtualOpticonnectPool kb="CUD" kxe="false">false</VirtualOpticonnectPool>
+            </IOConfigurationInstance>
+            {0}
+            '''.format(processor_attributes)
+        else:
+            payload = '''
+            <AssignAllResources kxe="false" kb="COD">false</AssignAllResources>
+            {0}
+            '''.format(processor_attributes)
         return payload
 
-    def sharedProcessorPayload(self, params):
-        payload = '''
-        <AssignAllResources kb="COD" kxe="false">false</AssignAllResources>
+    def sharedProcessorAttributesXML(self, params):
+        return '''
         <ProcessorAttributes kxe="false" kb="CUR" schemaVersion="V1_0">
             <Metadata>
                 <Atom/>
@@ -2879,19 +2905,37 @@ class HmcRestClient:
         '''.format(params['processor_mode'], params['desired_processing_units'], params['desired_processors'],
                    params['maximum_processing_units'], params['maximum_processors'], params['minimum_processing_units'],
                    params['minimum_processors'], params['shared_processor_pool'], params['uncapped_weight'], params['sharing_mode'])
+
+    def sharedProcessorPayload(self, params):
+        processor_attributes = self.sharedProcessorAttributesXML(params)
+        if params['operating_system'] == 'IBM i':
+            payload = '''
+            <AssignAllResources kb="COD" kxe="false">false</AssignAllResources>
+            <IOConfigurationInstance kb="CUD" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <MaximumVirtualIOSlots kb="CUD" kxe="false">10</MaximumVirtualIOSlots>
+                <TaggedIO kb="CUD" kxe="false" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <AlternateLoadSource kb="CUD" kxe="false">NONE</AlternateLoadSource>
+                    <Console kxe="false" kb="CUR">HMC</Console>
+                    <LoadSource kb="CUR" kxe="false">NONE</LoadSource>
+                </TaggedIO>
+                <VirtualOpticonnectPool kb="CUD" kxe="false">false</VirtualOpticonnectPool>
+            </IOConfigurationInstance>
+            {0}
+            '''.format(processor_attributes)
+        else:
+            payload = '''
+            <AssignAllResources kb="COD" kxe="false">false</AssignAllResources>
+            {0}
+            '''.format(processor_attributes)
         return payload
 
-    def createPartitionProfile(self, lpar_uuid, params):
-        partiton_profile_xmlstr = ''
-        template_partition_profile = '''<LogicalPartitionProfile:LogicalPartitionProfile
-                                    xmlns:LogicalPartitionProfile="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
-                                    xmlns="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
-                                    xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2" schemaVersion="V1_0">'''
-        partiton_profile_xmlstr += template_partition_profile
-        if params['processor_mode'].lower() == 'false':
-            partiton_profile_xmlstr += self.sharedProcessorPayload(params)
-        else:
-            partiton_profile_xmlstr += self.dedicatedProcessorPayload(params)
+    def buildMemoryPayloadXML(self, params):
         memory_payload = '''<ProfileMemory kb="CUR" kxe="false" schemaVersion="V1_0">
             <Metadata>
                 <Atom/>
@@ -2911,10 +2955,24 @@ class HmcRestClient:
             <ProfileName kb="CUR" kxe="false">{10}</ProfileName>
             </LogicalPartitionProfile:LogicalPartitionProfile>
             '''.format(str(params['active_memory_expansion']).lower(),
-                       params['desired_huge_pagecount'], params['desired_memory'], params['expansion_factor'], params['hardware_page_tableratio'],
-                       params['maximum_huge_pagecount'], params['maximum_memory'], params['minimum_huge_pagecount'],
-                       params['minimum_memory'], params['desired_physical_page_tableratio'], params['name'])
-        partiton_profile_xmlstr += memory_payload
+                       params['desired_huge_pagecount'], params['desired_memory'], params['expansion_factor'],
+                       params['hardware_page_tableratio'], params['maximum_huge_pagecount'], params['maximum_memory'],
+                       params['minimum_huge_pagecount'], params['minimum_memory'],
+                       params['desired_physical_page_tableratio'], params['name'])
+        return memory_payload
+
+    def createPartitionProfile(self, lpar_uuid, params):
+        partiton_profile_xmlstr = ''
+        template_partition_profile = '''<LogicalPartitionProfile:LogicalPartitionProfile
+                                    xmlns:LogicalPartitionProfile="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2" schemaVersion="V1_0">'''
+        partiton_profile_xmlstr += template_partition_profile
+        if params['processor_mode'].lower() == 'false':
+            partiton_profile_xmlstr += self.sharedProcessorPayload(params)
+        else:
+            partiton_profile_xmlstr += self.dedicatedProcessorPayload(params)
+        partiton_profile_xmlstr += self.buildMemoryPayloadXML(params)
         if 'sharing_mode' in params:
             if params['sharing_mode'] == 'capped':
                 xml_tree = etree.fromstring(partiton_profile_xmlstr.encode())
@@ -2960,29 +3018,7 @@ class HmcRestClient:
             partiton_profile_xmlstr += self.sharedProcessorPayload(params)
         else:
             partiton_profile_xmlstr += self.dedicatedProcessorPayload(params)
-        memory_payload = '''<ProfileMemory kb="CUR" kxe="false" schemaVersion="V1_0">
-            <Metadata>
-                <Atom/>
-            </Metadata>
-            <ActiveMemoryExpansionEnabled kb="CUD" kxe="false">{0}</ActiveMemoryExpansionEnabled>
-            <ActiveMemorySharingEnabled kb="CUD" kxe="false">false</ActiveMemorySharingEnabled>
-            <DesiredHugePageCount kb="CUD" kxe="false">{1}</DesiredHugePageCount>
-            <DesiredMemory kxe="false" kb="CUD">{2}</DesiredMemory>
-            <ExpansionFactor kb="CUD" kxe="false">{3}</ExpansionFactor>
-            <HardwarePageTableRatio kb="CUD" kxe="false">{4}</HardwarePageTableRatio>
-            <MaximumHugePageCount kb="CUD" kxe="false">{5}</MaximumHugePageCount>
-            <MaximumMemory kb="CUD" kxe="false">{6}</MaximumMemory>
-            <MinimumHugePageCount kb="CUD" kxe="false">{7}</MinimumHugePageCount>
-            <MinimumMemory kxe="false" kb="CUD">{8}</MinimumMemory>
-            <DesiredPhysicalPageTableRatio ksv="V1_6_0" kb="CUD" kxe="false">{9}</DesiredPhysicalPageTableRatio>
-            </ProfileMemory>
-            <ProfileName kb="CUR" kxe="false">{10}</ProfileName>
-            </LogicalPartitionProfile:LogicalPartitionProfile>
-            '''.format(str(params['active_memory_expansion']).lower(),
-                       params['desired_huge_pagecount'], params['desired_memory'], params['expansion_factor'], params['hardware_page_tableratio'],
-                       params['maximum_huge_pagecount'], params['maximum_memory'], params['minimum_huge_pagecount'],
-                       params['minimum_memory'], params['desired_physical_page_tableratio'], params['name'])
-        partiton_profile_xmlstr += memory_payload
+        partiton_profile_xmlstr += self.buildMemoryPayloadXML(params)
         if 'sharing_mode' in params:
             if params['sharing_mode'] == 'capped':
                 xml_tree = etree.fromstring(partiton_profile_xmlstr.encode())
