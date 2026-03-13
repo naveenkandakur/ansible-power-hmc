@@ -1911,19 +1911,6 @@ class HmcRestClient:
         # build a payload for client adapter id, if user provides
         if pv_setting['server_adapter_id']:
             server_adapter_id_payload = '''
-            <ClientAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
-                <Metadata>
-                    <Atom/>
-                </Metadata>
-                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
-                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
-                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
-            </ClientAdapter>
-            '''.format(lpar_id, str(pv_setting['server_adapter_id']), vios_id)
-
-        # build a payload for server adapter id, if user provides
-        if pv_setting['client_adapter_id']:
-            client_adapter_id_payload = '''
             <ServerAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
                 <Metadata>
                     <Atom/>
@@ -1932,6 +1919,19 @@ class HmcRestClient:
                 <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
                 <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
             </ServerAdapter>
+            '''.format(lpar_id, str(pv_setting['server_adapter_id']), vios_id)
+
+        # build a payload for server adapter id, if user provides
+        if pv_setting['client_adapter_id']:
+            client_adapter_id_payload = '''
+            <ClientAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
+                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
+                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
+            </ClientAdapter>
             '''.format(vios_id, str(pv_setting['client_adapter_id']), lpar_id)
 
         payload = '''
@@ -1947,7 +1947,7 @@ class HmcRestClient:
             </Storage>
             {4}
         </VirtualSCSIMapping>
-        '''.format(lpar_UUID, server_adapter_id_payload, client_adapter_id_payload, (etree.tostring(pv_payload)).decode("utf-8"), target_name_payload)
+        '''.format(lpar_UUID, client_adapter_id_payload, server_adapter_id_payload, (etree.tostring(pv_payload)).decode("utf-8"), target_name_payload)
 
         return payload.replace('\n\n', '').replace('\n', '')
 
