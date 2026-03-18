@@ -113,6 +113,7 @@ options:
         description:
             - Specifies the client partition ID, in decimal, for which to return device
               mapping information.
+            - Use value 0 to display all mappings for the specified component.
             - Not applicable for C(net) and C(ams) components
         type: int
     types:
@@ -145,6 +146,7 @@ options:
         description:
             - C(facts) gathers and returns information about mapping between physical, logical, and virtual devices
         type: str
+        required: true
         choices: ['facts']
 '''
 
@@ -571,6 +573,7 @@ def component_mapping(module, params):
     vios_list = []
     if params['vios_name'] is not None and system_name is None:
         system_name = identify_ManagedSystem_of_lpar(hmc, vios_name, module)
+        params['system_name'] = system_name
     sys_list = (
         hmc_conn.execute("lssyscfg -r sys -F name").splitlines() + hmc_conn.execute("lssyscfg -r sys -F type_model*serial_num").splitlines()
     )
@@ -640,7 +643,7 @@ def run_module():
                             'file', 'file_disk', 'file_opt', 'cl_disk']),
         vtd=dict(type='str'),
         hostname=dict(type='str'),
-        state=dict(type='str', choices=['facts']),
+        state=dict(type='str', choices=['facts'], required=True),
     )
 
     module = AnsibleModule(

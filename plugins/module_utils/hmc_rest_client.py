@@ -1915,11 +1915,9 @@ class HmcRestClient:
                 <Metadata>
                     <Atom/>
                 </Metadata>
-                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
-                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
-                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
+                <VirtualSlotNumber kb="COD" kxe="false">{0}</VirtualSlotNumber>
             </ServerAdapter>
-            '''.format(lpar_id, str(pv_setting['server_adapter_id']), vios_id)
+            '''.format(str(pv_setting['server_adapter_id']))
 
         # build a payload for server adapter id, if user provides
         if pv_setting['client_adapter_id']:
@@ -1928,11 +1926,9 @@ class HmcRestClient:
                 <Metadata>
                     <Atom/>
                 </Metadata>
-                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
-                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
-                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
+                <VirtualSlotNumber kb="COD" kxe="false">{0}</VirtualSlotNumber>
             </ClientAdapter>
-            '''.format(vios_id, str(pv_setting['client_adapter_id']), lpar_id)
+            '''.format(str(pv_setting['client_adapter_id']))
 
         payload = '''
         <VirtualSCSIMapping schemaVersion="V1_0">
