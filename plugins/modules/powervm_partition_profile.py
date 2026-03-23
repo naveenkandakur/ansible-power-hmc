@@ -18,10 +18,10 @@ DOCUMENTATION = '''
 module: powervm_partition_profile
 author:
     - Sreenidhi (@SreenidhiS1)
-short_description: Create, Copy and update PowerVM Partition Profiles
+short_description: Create, Copy and Update PowerVM Partition Profiles
 notes:
-    - This module currently support only processor and memory configuration.
-    - Copy operation is supported for HMC version >= 1110
+    - This module currently support only Processor and Memory configuration.
+    - Copy operation is supported for HMC version >= HMC V11R1
 description:
     - Create new partition profile
     - Copy an existing partition profile
@@ -53,7 +53,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name or mtms (machine type model serial) of the managed system..
+            - The name or mtms (machine type model serial) of the managed system.
             - Required for I(state=present), I(action=copy) and I(state=updated).
         type: str
     vm_name:
@@ -117,13 +117,13 @@ options:
                     - Processor sharing mode for shared processor configuration.
                     - Only valid if the C(processor_mode) is shared.
                     - Valid values are C(capped) and C(uncapped).
-                    - Deafult value is C(capped).
+                    - Default value is C(capped).
                 type: str
             uncapped_weight:
                 description:
                     - Weight value used for uncapped shared processor mode.
                     - Only valid if the C(processor_mode) is shared.
-                    - Default vale is 0.0.
+                    - Default value is 0.0
                 type: int
             allow_processor_sharing:
                 description:
@@ -145,7 +145,7 @@ options:
     memory_settings:
         description:
             - Memory configuration settings for the partition profile.
-            - Valid only for I(state=present)
+            - Valid only for I(state=present) and I(state=updated)
         type: dict
         suboptions:
             desired_memory:
@@ -220,10 +220,10 @@ options:
 EXAMPLES = '''
 - name: Create a new partition profile with dedicated processor
   powervm_partition_profile:
-    hmc_host: '{{ inventory_hostname }}'
+    hmc_host: '<hmc_host>'
     hmc_auth:
-      username: '{{ ansible_user }}'
-      password: '{{ hmc_password }}'
+      username: '<hmc_username>'
+      password: '<hmc_password>'
     system_name: <system_name/mtms>
     vm_name: <vm_name>
     name: dedicated_profile
@@ -244,10 +244,10 @@ EXAMPLES = '''
 
 - name: Create a new partition profile with shared processor and uncapped sharing mode
   powervm_partition_profile:
-    hmc_host: '{{ inventory_hostname }}'
+    hmc_host: '<hmc_host>'
     hmc_auth:
-      username: '{{ ansible_user }}'
-      password: '{{ hmc_password }}'
+      username: '<hmc_username>'
+      password: '<hmc_password>'
     system_name: <system_name/mtms>
     vm_name: <vm_name>
     name: shared_testing
@@ -273,10 +273,10 @@ EXAMPLES = '''
 
 - name: Create a copy of already existing partition profile
   powervm_partition_profile:
-    hmc_host: '{{ inventory_hostname }}'
+    hmc_host: '<hmc_host>'
     hmc_auth:
-      username: '{{ ansible_user }}'
-      password: '{{ hmc_password }}'
+      username: '<hmc_username>'
+      password: '<hmc_password>'
     system_name: <system_name/mtms>
     vm_name: <vm_name>
     name: shared_testing
@@ -285,10 +285,10 @@ EXAMPLES = '''
 
 - name: Modify the processor and memory settings of existing partition profile
   powervm_partition_profile:
-    hmc_host: '{{ inventory_hostname }}'
+    hmc_host: '<hmc_host>'
     hmc_auth:
-      username: '{{ ansible_user }}'
-      password: '{{ hmc_password }}'
+      username: '<hmc_username>'
+      password: '<hmc_password>'
     system_name: <system_name/mtms>
     vm_name: <vm_name>
     name: shared_testing

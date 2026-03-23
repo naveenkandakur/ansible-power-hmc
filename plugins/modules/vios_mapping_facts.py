@@ -16,7 +16,7 @@ DOCUMENTATION = '''
 module: vios_mapping_facts
 author:
     - Sreenidhi S(@SreenidhiS1)
-short_description: Returns the VIOS mapping of physical, logical, and virtual devices as facts
+short_description: Returns the VIOS mapping of physical, logical, and virtual devices as facts.
 notes:
     - This module requires the HMC login user to have specific permissions.
       To achieve this, the user should create a task role based on hmcsuperadmin with additional permissions,
@@ -50,7 +50,7 @@ notes:
       ViewDumps+ViewPowerManagement+ViewSPP)
     - Create a user with the above created task role.
 description:
-    - Returns the VIOS mapping of physical, logical, and virtual devices as facts
+    - Returns the VIOS mapping of physical, logical, and virtual devices as facts.
 requirements:
 - VIOS >= 2.2.5.0
 - Python >= 3.9
@@ -78,7 +78,7 @@ options:
                 type: str
     system_name:
         description:
-            - The name of the managed system
+            - The name or mtms (machine type model serial) of the managed system
         type: str
     vios_name:
         description:
@@ -94,7 +94,7 @@ options:
             - C(vnic) to list server virtual NIC adapters.
             - C(ams) to list paging space devices that are used in active memory sharing.
             - C(suspend) to list suspended virtual adapters.
-            - C(cluster) to list shared storage pool mappings
+            - C(cluster) to list shared storage pool mappings.
             - C(all) to list all devices.
         type: str
         choices: ['vscsi', 'net', 'npiv', 'vnic', 'ams', 'suspend', 'cluster', 'all']
@@ -114,11 +114,11 @@ options:
             - Specifies the client partition ID, in decimal, for which to return device
               mapping information.
             - Use value 0 to display all mappings for the specified component.
-            - Not applicable for C(net) and C(ams) components
+            - Not applicable for C(net) and C(ams) components.
         type: int
     types:
         description:
-            - Specifies the type of devices to display.
+            - Specifies the type of devices to display
             - C(disk) to list physical backing devices.
             - C(lv) to list logical volume backing devices.
             - C(optical) to list optical backing devices.
@@ -152,22 +152,22 @@ options:
 
 EXAMPLES = '''
 - name: Populate the mapping facts with the mapping information for VSCSI
-  mapping_facts:
-    hmc_host: <host>
+  vios_mapping_facts:
+    hmc_host: <hmc_host>
     hmc_auth:
-      username: <hscroot>
-      password: <hmcpass>
+      username: <hmc_username>
+      password: <hmc_password>
     system_name: <system_name>
     vios_name: <vios_name>
     component: vscsi
     state: facts
 
 - name: Populate the mapping facts with the mapping information for NPIV device vfchost0
-  mapping_facts:
-    hmc_host: <host>
+  vios_mapping_facts:
+    hmc_host: <hmc_host>
     hmc_auth:
-      username: <hscroot>
-      password: <hmcpass>
+      username: <hmc_username>
+      password: <hmc_password>
     system_name: <system_name>
     vios_name: <vios_name>
     vadapter: vfchost0
@@ -175,22 +175,22 @@ EXAMPLES = '''
     state: facts
 
 - name: Populate the mapping facts with the mapping information for all devices
-  mapping_facts:
-    hmc_host: <host>
+  vios_mapping_facts:
+    hmc_host: <hmc_host>
     hmc_auth:
-      username: <hscroot>
-      password: <hmcpass>
+      username: <hmc_username>
+      password: <hmc_password>
     system_name: <system_name>
     vios_name: <vios_name>
     component: all
     state: facts
 
 - name: Populate the mapping facts with the mapping information for optical backing devices
-  mapping_facts:
-    hmc_host: <host>
+  vios_mapping_facts:
+    hmc_host: <hmc_host>
     hmc_auth:
-      username: <hscroot>
-      password: <hmcpass>
+      username: <hmc_username>
+      password: <hmc_password>
     system_name: <system_name>
     vios_name: <vios_name>
     types: optical
