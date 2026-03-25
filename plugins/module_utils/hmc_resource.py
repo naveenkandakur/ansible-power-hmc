@@ -1137,4 +1137,3 @@ class Hmc():
         else:
             cmd += self.OPT['LSMAP']['-ALL']
         cmd += ' -fmt' + ' , '
-        
