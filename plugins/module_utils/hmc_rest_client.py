@@ -1911,28 +1911,24 @@ class HmcRestClient:
         # build a payload for client adapter id, if user provides
         if pv_setting['server_adapter_id']:
             server_adapter_id_payload = '''
-            <ClientAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
-                <Metadata>
-                    <Atom/>
-                </Metadata>
-                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
-                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
-                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
-            </ClientAdapter>
-            '''.format(lpar_id, str(pv_setting['server_adapter_id']), vios_id)
-
-        # build a payload for server adapter id, if user provides
-        if pv_setting['client_adapter_id']:
-            client_adapter_id_payload = '''
             <ServerAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
                 <Metadata>
                     <Atom/>
                 </Metadata>
-                <LocalPartitionID kxe="false" kb="CUR">{0}</LocalPartitionID>
-                <VirtualSlotNumber kb="COD" kxe="false">{1}</VirtualSlotNumber>
-                <RemoteLogicalPartitionID kxe="false" kb="CUR">{2}</RemoteLogicalPartitionID>
+                <VirtualSlotNumber kb="COD" kxe="false">{0}</VirtualSlotNumber>
             </ServerAdapter>
-            '''.format(vios_id, str(pv_setting['client_adapter_id']), lpar_id)
+            '''.format(str(pv_setting['server_adapter_id']))
+
+        # build a payload for server adapter id, if user provides
+        if pv_setting['client_adapter_id']:
+            client_adapter_id_payload = '''
+            <ClientAdapter kb="CUR" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <VirtualSlotNumber kb="COD" kxe="false">{0}</VirtualSlotNumber>
+            </ClientAdapter>
+            '''.format(str(pv_setting['client_adapter_id']))
 
         payload = '''
         <VirtualSCSIMapping schemaVersion="V1_0">
@@ -1947,7 +1943,7 @@ class HmcRestClient:
             </Storage>
             {4}
         </VirtualSCSIMapping>
-        '''.format(lpar_UUID, server_adapter_id_payload, client_adapter_id_payload, (etree.tostring(pv_payload)).decode("utf-8"), target_name_payload)
+        '''.format(lpar_UUID, client_adapter_id_payload, server_adapter_id_payload, (etree.tostring(pv_payload)).decode("utf-8"), target_name_payload)
 
         return payload.replace('\n\n', '').replace('\n', '')
 
@@ -2725,3 +2721,330 @@ class HmcRestClient:
         except Exception as e:
             logger.error("Failed to check job status: %s", e)
             return "Error"
+
+    def getAllPartitionProfiles(self, lpar_uuid, profile_name=None):
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/LogicalPartitionProfile".format(self.hmc_ip, lpar_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': '*/*'}
+        resp = open_url(url,
+                        headers=header,
+                        method='GET',
+                        validate_certs=False,
+                        force_basic_auth=True,
+                        timeout=300)
+        if resp.code != 200:
+            logger.debug("Get of partition profile failed. Respsonse code: %d", resp.code)
+            return None
+        response = resp.read()
+        if profile_name is None:
+            return response
+        elif profile_name is not None:
+            post_response = xml_strip_namespace(response)
+            entries = post_response.xpath("//entry")
+            for entry in entries:
+                profile_name_elem = entry.xpath(".//ProfileName")
+                if profile_name_elem and profile_name_elem[0].text == profile_name:
+                    atom_id_elem = entry.xpath(".//AtomID")
+                    if atom_id_elem:
+                        return atom_id_elem[0].text
+            return None
+
+    def getCurrentPartitionProfiles(self, lpar_uuid, profile_uuid):
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/LogicalPartitionProfile/{2}".format(self.hmc_ip, lpar_uuid, profile_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': '*/*'}
+        resp = open_url(url,
+                        headers=header,
+                        method='GET',
+                        validate_certs=False,
+                        force_basic_auth=True,
+                        timeout=300)
+        if resp.code != 200:
+            logger.debug("Get of partition profile failed. Respsonse code: %d", resp.code)
+            return None
+        response = resp.read()
+        return response
+
+    def copyPartitionProfile(self, lpar_uuid, params):
+        payload = {
+            "JobRequest": {
+                "Metadata": {
+                    "Atom": ""
+                },
+                "RequestedOperation": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "OperationName": "CopyProfile",
+                    "GroupName": "LogicalPartition"
+                },
+                "JobParameters": {
+                    "Metadata": {
+                        "Atom": ""
+                    },
+                    "JobParameter": [
+                        {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "existingPartitionProfileName",
+                            "ParameterValue": params['name']
+                        },
+                        {
+                            "Metadata": {
+                                "Atom": ""
+                            },
+                            "ParameterName": "newPartitionProfileName",
+                            "ParameterValue": params['duplicate_prof_name']
+                        }
+                    ]
+                }
+            }
+        }
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/do/CopyProfile".format(self.hmc_ip, lpar_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/vnd.ibm.powervm.web+json; type=JobRequest'}
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            data=json.dumps(payload),
+                            method='PUT',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            resp = json.loads(resp.read())
+            self_link = resp['entry']['selfLink']
+            response = self.fetchJobStatusJSON(self_link)
+            status = response['entry']['content']['JobResponse']['Status']
+            if status == 'FAILED_BEFORE_COMPLETION':
+                response = response['entry']['content']['JobResponse']
+                if response.get('ResponseException'):
+                    return response
+            elif status == 'COMPLETED_OK':
+                return 200
+        except Exception as e:
+            logger.debug("Error in copyPartitionProfile: %s", str(e))
+            return f"Error: {str(e)}"
+
+    def dedicatedProcessorAttributesXML(self, params):
+        return '''
+            <ProcessorAttributes kxe="false" kb="CUR" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <DedicatedProcessorConfiguration kxe="false" kb="CUD" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <DesiredProcessors kb="CUD" kxe="false">{0}</DesiredProcessors>
+                    <MaximumProcessors kb="CUD" kxe="false">{1}</MaximumProcessors>
+                    <MinimumProcessors kxe="false" kb="CUD">{2}</MinimumProcessors>
+                </DedicatedProcessorConfiguration>
+                <HasDedicatedProcessors kxe="false" kb="CUD">{3}</HasDedicatedProcessors>
+                <SharingMode kxe="false" kb="CUD">{4}</SharingMode>
+            </ProcessorAttributes>
+            '''.format(params['desired_processors'], params['maximum_processors'], params['minimum_processors'],
+                       params['processor_mode'], params['allow_processor_sharing'])
+
+    def dedicatedProcessorPayload(self, params):
+        processor_attributes = self.dedicatedProcessorAttributesXML(params)
+        if params['operating_system'] == 'IBM i':
+            payload = '''
+            <AssignAllResources kxe="false" kb="COD">false</AssignAllResources>
+            <IOConfigurationInstance kb="CUD" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <MaximumVirtualIOSlots kb="CUD" kxe="false">10</MaximumVirtualIOSlots>
+                <TaggedIO kb="CUD" kxe="false" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <AlternateLoadSource kb="CUD" kxe="false">NONE</AlternateLoadSource>
+                    <Console kxe="false" kb="CUR">HMC</Console>
+                    <LoadSource kb="CUR" kxe="false">NONE</LoadSource>
+                </TaggedIO>
+                <VirtualOpticonnectPool kb="CUD" kxe="false">false</VirtualOpticonnectPool>
+            </IOConfigurationInstance>
+            {0}
+            '''.format(processor_attributes)
+        else:
+            payload = '''
+            <AssignAllResources kxe="false" kb="COD">false</AssignAllResources>
+            {0}
+            '''.format(processor_attributes)
+        return payload
+
+    def sharedProcessorAttributesXML(self, params):
+        return '''
+        <ProcessorAttributes kxe="false" kb="CUR" schemaVersion="V1_0">
+            <Metadata>
+                <Atom/>
+            </Metadata>
+            <HasDedicatedProcessors kxe="false" kb="CUD">{0}</HasDedicatedProcessors>
+            <SharedProcessorConfiguration kxe="false" kb="CUD" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <DesiredProcessingUnits kb="CUD" kxe="false">{1}</DesiredProcessingUnits>
+                <DesiredVirtualProcessors kxe="false" kb="CUD">{2}</DesiredVirtualProcessors>
+                <MaximumProcessingUnits kb="CUD" kxe="false">{3}</MaximumProcessingUnits>
+                <MaximumVirtualProcessors kxe="false" kb="CUD">{4}</MaximumVirtualProcessors>
+                <MinimumProcessingUnits kxe="false" kb="CUD">{5}</MinimumProcessingUnits>
+                <MinimumVirtualProcessors kb="CUD" kxe="false">{6}</MinimumVirtualProcessors>
+                <SharedProcessorPoolID kb="CUD" kxe="false">{7}</SharedProcessorPoolID>
+                <UncappedWeight kb="CUD" kxe="false">{8}</UncappedWeight>
+            </SharedProcessorConfiguration>
+            <SharingMode kb="CUD" kxe="false">{9}</SharingMode>
+        </ProcessorAttributes>
+        '''.format(params['processor_mode'], params['desired_processing_units'], params['desired_processors'],
+                   params['maximum_processing_units'], params['maximum_processors'], params['minimum_processing_units'],
+                   params['minimum_processors'], params['shared_processor_pool'], params['uncapped_weight'], params['sharing_mode'])
+
+    def sharedProcessorPayload(self, params):
+        processor_attributes = self.sharedProcessorAttributesXML(params)
+        if params['operating_system'] == 'IBM i':
+            payload = '''
+            <AssignAllResources kb="COD" kxe="false">false</AssignAllResources>
+            <IOConfigurationInstance kb="CUD" kxe="false" schemaVersion="V1_0">
+                <Metadata>
+                    <Atom/>
+                </Metadata>
+                <MaximumVirtualIOSlots kb="CUD" kxe="false">10</MaximumVirtualIOSlots>
+                <TaggedIO kb="CUD" kxe="false" schemaVersion="V1_0">
+                    <Metadata>
+                        <Atom/>
+                    </Metadata>
+                    <AlternateLoadSource kb="CUD" kxe="false">NONE</AlternateLoadSource>
+                    <Console kxe="false" kb="CUR">HMC</Console>
+                    <LoadSource kb="CUR" kxe="false">NONE</LoadSource>
+                </TaggedIO>
+                <VirtualOpticonnectPool kb="CUD" kxe="false">false</VirtualOpticonnectPool>
+            </IOConfigurationInstance>
+            {0}
+            '''.format(processor_attributes)
+        else:
+            payload = '''
+            <AssignAllResources kb="COD" kxe="false">false</AssignAllResources>
+            {0}
+            '''.format(processor_attributes)
+        return payload
+
+    def buildMemoryPayloadXML(self, params):
+        memory_payload = '''<ProfileMemory kb="CUR" kxe="false" schemaVersion="V1_0">
+            <Metadata>
+                <Atom/>
+            </Metadata>
+            <ActiveMemoryExpansionEnabled kb="CUD" kxe="false">{0}</ActiveMemoryExpansionEnabled>
+            <ActiveMemorySharingEnabled kb="CUD" kxe="false">false</ActiveMemorySharingEnabled>
+            <DesiredHugePageCount kb="CUD" kxe="false">{1}</DesiredHugePageCount>
+            <DesiredMemory kxe="false" kb="CUD">{2}</DesiredMemory>
+            <ExpansionFactor kb="CUD" kxe="false">{3}</ExpansionFactor>
+            <HardwarePageTableRatio kb="CUD" kxe="false">{4}</HardwarePageTableRatio>
+            <MaximumHugePageCount kb="CUD" kxe="false">{5}</MaximumHugePageCount>
+            <MaximumMemory kb="CUD" kxe="false">{6}</MaximumMemory>
+            <MinimumHugePageCount kb="CUD" kxe="false">{7}</MinimumHugePageCount>
+            <MinimumMemory kxe="false" kb="CUD">{8}</MinimumMemory>
+            <DesiredPhysicalPageTableRatio ksv="V1_6_0" kb="CUD" kxe="false">{9}</DesiredPhysicalPageTableRatio>
+            </ProfileMemory>
+            <ProfileName kb="CUR" kxe="false">{10}</ProfileName>
+            </LogicalPartitionProfile:LogicalPartitionProfile>
+            '''.format(str(params['active_memory_expansion']).lower(),
+                       params['desired_huge_pagecount'], params['desired_memory'], params['expansion_factor'],
+                       params['hardware_page_tableratio'], params['maximum_huge_pagecount'], params['maximum_memory'],
+                       params['minimum_huge_pagecount'], params['minimum_memory'],
+                       params['desired_physical_page_tableratio'], params['name'])
+        return memory_payload
+
+    def createPartitionProfile(self, lpar_uuid, params):
+        partiton_profile_xmlstr = ''
+        template_partition_profile = '''<LogicalPartitionProfile:LogicalPartitionProfile
+                                    xmlns:LogicalPartitionProfile="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2" schemaVersion="V1_0">'''
+        partiton_profile_xmlstr += template_partition_profile
+        if params['processor_mode'].lower() == 'false':
+            partiton_profile_xmlstr += self.sharedProcessorPayload(params)
+        else:
+            partiton_profile_xmlstr += self.dedicatedProcessorPayload(params)
+        partiton_profile_xmlstr += self.buildMemoryPayloadXML(params)
+        if 'sharing_mode' in params:
+            if params['sharing_mode'] == 'capped':
+                xml_tree = etree.fromstring(partiton_profile_xmlstr.encode())
+                for elem in xml_tree.xpath('.//*[local-name()="UncappedWeight"]'):
+                    elem.getparent().remove(elem)
+                    partiton_profile_xmlstr = etree.tostring(xml_tree, encoding='unicode')
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/LogicalPartitionProfile".format(self.hmc_ip, lpar_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': '*/*',
+                  'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=LogicalPartitionProfile'}
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            data=partiton_profile_xmlstr,
+                            method='PUT',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            response = resp.read()
+        except Exception as e:
+            if hasattr(e, 'read'):
+                response = e.read()
+                post_response = xml_strip_namespace(response)
+                error_message_elements = post_response.xpath("//Message")
+                logger.debug(response)
+                return e.code, error_message_elements[0].text.strip()
+            else:
+                return f"Error: {str(e)}"
+        post_response = xml_strip_namespace(response)
+        profile_name_elements = post_response.xpath("//ProfileName")
+        if profile_name_elements:
+            return 200, profile_name_elements[0].text
+        return "Error: Profile creation failed with unknown error"
+
+    def updatePartitionProfile(self, lpar_uuid, partition_uuid, params):
+        partiton_profile_xmlstr = ''
+        template_partition_profile = '''<LogicalPartitionProfile:LogicalPartitionProfile
+                                    xmlns:LogicalPartitionProfile="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns="http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
+                                    xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2" schemaVersion="V1_0">'''
+        partiton_profile_xmlstr += template_partition_profile
+        if params['processor_mode'].lower() == 'false':
+            partiton_profile_xmlstr += self.sharedProcessorPayload(params)
+        else:
+            partiton_profile_xmlstr += self.dedicatedProcessorPayload(params)
+        partiton_profile_xmlstr += self.buildMemoryPayloadXML(params)
+        if 'sharing_mode' in params:
+            if params['sharing_mode'] == 'capped':
+                xml_tree = etree.fromstring(partiton_profile_xmlstr.encode())
+                for elem in xml_tree.xpath('.//*[local-name()="UncappedWeight"]'):
+                    elem.getparent().remove(elem)
+                    partiton_profile_xmlstr = etree.tostring(xml_tree, encoding='unicode')
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/LogicalPartitionProfile/{2}".format(self.hmc_ip, lpar_uuid, partition_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': '*/*',
+                  'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=LogicalPartitionProfile'}
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            data=partiton_profile_xmlstr,
+                            method='POST',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+            response = resp.read()
+        except Exception as e:
+            if hasattr(e, 'read'):
+                response = e.read()
+                post_response = xml_strip_namespace(response)
+                error_message_elements = post_response.xpath("//Message")
+                logger.debug(response)
+                return e.code, error_message_elements[0].text.strip()
+            else:
+                return f"Error: {str(e)}"
+        post_response = xml_strip_namespace(response)
+        profile_name_elements = post_response.xpath("//ProfileName")
+        if profile_name_elements:
+            return 200, profile_name_elements[0].text
+        return "Error: Profile creation failed with unknown error"

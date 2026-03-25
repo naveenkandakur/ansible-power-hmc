@@ -347,3 +347,21 @@ Notes
 
 .. _GitHub v1.14.0:
    https://github.com/IBM/ansible-power-hmc/releases/download/v1.14.0/ibm-power_hmc-1.14.0.tar.gz
+
+
+Version 1.15.0
+-------------
+Notes
+  * powervm_partition_profile: Support for creating, copying, and updating profiles with processor and memory settings.
+  * vios_mapping_facts: Added support for listing VIOS physical, logical, and virtual device mappings as facts.
+  * powervm_dlpar: Fixed SCSI server and client adapter ID configuration issue during DLPAR.
+  
+  Availability
+    * `Galaxy v1.15.0`_
+    * `GitHub v1.15.0`_ 
+  
+.. _Galaxy v1.15.0:
+   https://galaxy.ansible.com/download/ibm-power_hmc-1.15.0.tar.gz
+  
+.. _GitHub v1.15.0:
+   https://github.com/IBM/ansible-power-hmc/releases/download/v1.15.0/ibm-power_hmc-1.15.0.tar.gz

@@ -1093,3 +1093,47 @@ class Hmc():
             self.OPT['CHSYSCFG']['-M'] + cecName
         chsyscfgCmd += self.cmdClass.i_a_ConfigBuilder('CHSYSCFG', '-I', lparConfig)
         self.hmcconn.execute(chsyscfgCmd)
+
+    def get_mappings(self, params):
+        cmd = self.CMD['LSMAP']
+        component = params['component']
+        component_options = {
+            'npiv': '-NPIV',
+            'net': '-NET',
+            'vnic': '-VNIC',
+            'ams': '-AMS',
+            'suspend': '-SUSPEND'
+        }
+        if component in component_options:
+            cmd += self.OPT['LSMAP'][component_options[component]]
+        if component == 'ams':
+            if params.get('vtd') is not None:
+                cmd += self.OPT['LSMAP']['-VTD'] + params['vtd']
+            else:
+                cmd += self.OPT['LSMAP']['-ALL']
+        elif component == 'suspend':
+            if params.get('vadapter') is not None:
+                cmd += self.OPT['LSMAP']['-VADAPTER'] + params['vadapter']
+            else:
+                cmd += self.OPT['LSMAP']['-ALL']
+        else:
+            if params.get('vadapter') is not None:
+                cmd += self.OPT['LSMAP']['-VADAPTER'] + params['vadapter']
+            elif params.get('physloc') is not None:
+                cmd += self.OPT['LSMAP']['-PLC'] + params['physloc']
+            else:
+                cmd += self.OPT['LSMAP']['-ALL']
+        if component in ['vscsi', 'npiv', 'vnic'] and params.get('cpid') is not None:
+            cmd += self.OPT['LSMAP']['-CPID'] + str(params['cpid'])
+        if component in ['vscsi', 'ams', 'suspend'] and params.get('types') is not None:
+            cmd += self.OPT['LSMAP']['-TYPE'] + ' '.join(params['types'])
+        cmd += ' -fmt' + ' , '
+        return cmd
+
+    def get_cluster_mappings(self, params):
+        cmd = self.CMD['LSMAP'] + self.OPT['LSMAP']['-CLUSTERNAME']
+        if params.get('hostname') is not None:
+            cmd += self.OPT['LSMAP']['-HOSTNAME'] + params['physloc']
+        else:
+            cmd += self.OPT['LSMAP']['-ALL']
+        cmd += ' -fmt' + ' , '

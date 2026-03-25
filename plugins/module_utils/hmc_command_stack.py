@@ -62,6 +62,7 @@ class HmcCommandStack():
                'UPGVIOS': 'upgvios',
                'MKSVCEVENT': 'mksvcevent',
                'VIOSECURE': 'viosecure',
+               'LSMAP': 'lsmap',
                }
 
     HMC_CMD_OPT = {'LSHMC': {'-N': ' -n ',
@@ -530,7 +531,26 @@ class HmcCommandStack():
                                  '-INTERFACE': ' -interface ',
                                  '-REMOTE': ' -remote ',
                                  '-ADDRESS': ' -address ',
-                                 '-TIMEOUT': ' -timeout '}
+                                 '-TIMEOUT': ' -timeout '},
+                   'LSMAP': {'-VADAPTER': ' -vadapter ',
+                             '-PLC': ' -plc ',
+                             '-ALL': ' -all ',
+                             '-CPID': ' -cpid ',
+                             '-TYPE': ' -type ',
+                             '-PORT': ' -port ',
+                             '-IPV6': ' -ip6 ',
+                             '-INTERFACE': ' -interface ',
+                             '-REMOTE': ' -remote ',
+                             '-ADDRESS': ' -address ',
+                             '-TIMEOUT': ' -timeout ',
+                             '-NPIV': ' -npiv ',
+                             '-NET': ' -net ',
+                             '-VNIC': ' -vnic ',
+                             '-AMS': ' -ams ',
+                             '-VTD': ' -vtd ',
+                             '-SUSPEND': ' -suspend ',
+                             '-CLUSTERNAME': '-clustername',
+                             '-HOSTNAME': '-hostname'}
                    }
 
     def filterBuilder(self, cmdKey, configOptionsDict):
