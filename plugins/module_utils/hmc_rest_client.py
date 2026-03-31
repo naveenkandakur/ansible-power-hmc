@@ -1388,20 +1388,26 @@ class HmcRestClient:
                         volumeUniqueID = vios_scsi.xpath('//Storage/PhysicalVolume/VolumeUniqueID')[0].text
                         vscsi_dict['VolumeUniqueID'] = volumeUniqueID
                         vios_id = int(vios_scsi.xpath('//ClientAdapter/RemoteLogicalPartitionID')[0].text)
-                        vol_dict = {"vios": vios_dict[vios_id], 'name': vios_scsi.xpath('//Storage/PhysicalVolume/VolumeName')[0].text}
-                        vscsi_dict['Volume'] = [vol_dict]
+                        client_slot = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
+                        server_slot = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
+                        target_device = vios_scsi.xpath('//TargetDevice//TargetName')[0].text
+                        vol_dict = {
+                            "vios": vios_dict[vios_id],
+                            'name': vios_scsi.xpath('//Storage/PhysicalVolume/VolumeName')[0].text,
+                            'ClientVirtualSlotNumber': client_slot,
+                            'ServerVirtualSlotNumber': server_slot,
+                            'TargetDeviceName': target_device
+                        }
                         flag = False
                         for vscsi in vscsis:
                             if 'VolumeUniqueID' in vscsi and vscsi['VolumeUniqueID'] == volumeUniqueID:
                                 vscsi['Volume'].append(vol_dict)
                                 flag = True
+                                break
                         if not flag:
-                            vscsi_dict['ClientVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
-                            vscsi_dict['ServerVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
-                            vscsi_dict['TargetDeviceName'] = vios_scsi.xpath('//TargetDevice//TargetName')[0].text
                             vscsi_dict['VolumeCapacity'] = vios_scsi.xpath('//Storage/PhysicalVolume/VolumeCapacity')[0].text
+                            vscsi_dict['Volume'] = [vol_dict]
                             vscsis.append(vscsi_dict)
-                    # Adds the VOD
                     elif len(vios_scsi.xpath('//TargetDevice/VirtualOpticalTargetDevice')) >= 1:
                         vscsi_dict['ClientVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
                         vscsi_dict['ServerVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
