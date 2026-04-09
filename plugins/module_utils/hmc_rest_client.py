@@ -280,6 +280,20 @@ class HmcRestClient:
                  force_basic_auth=True,
                  timeout=300)
 
+    def __enter__(self):
+        """Context manager entry point - returns the connection object."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point - calls the existing logoff() method."""
+        logger.debug("__exit__ called - cleaning up HMC session")
+        try:
+            self.logoff()
+            logger.debug("HMC session successfully logged off in __exit__")
+        except Exception as e:
+            logger.debug("Error during logoff in __exit__: %s", repr(e))
+        return False
+
     def fetchJobStatus(self, jobId, template=False, timeout_in_min=30):
 
         if template:
@@ -629,10 +643,9 @@ class HmcRestClient:
         return response
 
     def updatePCM(self, system_uuid, metrics, disable):
-        logon_res = self.logon()
         url = "https://{0}/rest/api/pcm/ManagedSystem/{1}/preferences".format(self.hmc_ip, system_uuid)
         header = {'Content-Type': 'application/xml',
-                  'X-API-Session': logon_res}
+                  'X-API-Session': self.session}
         sys_details = self.getPCM(system_uuid, None)
         doc = xml_strip_namespace(sys_details)
         preference_map = {'LTM': 'LongTermMonitorEnabled', 'STM': 'ShortTermMonitorEnabled',
@@ -670,7 +683,6 @@ class HmcRestClient:
             payload_content = payload_content.replace('\n', ' ').replace('\"', '\'')
             payload_content = etree.fromstring(payload_content)
             payload_content = etree.tostring(payload_content, encoding='unicode')
-            logger.debug(payload_content)
             resp = open_url(url,
                             headers=header,
                             method='POST',

@@ -562,81 +562,76 @@ def fetchViosInfo(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
+            ms_state = server_dom.xpath("//DetailedState")[0].text
+            if ms_state != 'None':
+                module.fail_json(msg="Given system is in " + ms_state + " state")
+            vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+            vios_list = []
+            vios_dom = None
+            vios_UUID = None
+            if vios_quick_response is not None:
+                vios_list = json.loads(vios_quick_response)
+            if vios_list:
+                for vios in vios_list:
+                    if vios['PartitionName'] == name:
+                        lpar_config = vios
+                        vios_UUID = vios['UUID']
+                        vios_dom = rest_conn.getVirtualIOServer(vios_UUID)
+                        break
+                else:
+                    module.fail_json("VIOS: {0} not found in the Managed System: {1}".format(name, system_name))
+                lpar_config['MaximumMemory'] = vios_dom.xpath(
+                    '//PartitionMemoryConfiguration//MaximumMemory')[0].text
+                lpar_config['MinimumMemory'] = vios_dom.xpath(
+                    '//PartitionMemoryConfiguration//MinimumMemory')[0].text
+                lpar_config['CurrentHasDedicatedProcessors'] = vios_dom.xpath(
+                    '//PartitionProcessorConfiguration//CurrentHasDedicatedProcessors')[0].text
+
+                if lpar_config['CurrentHasDedicatedProcessors'] == 'false':
+                    lpar_config['MaximumProcessingUnits'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MaximumProcessingUnits')[0].text
+                    lpar_config['MaximumVirtualProcessors'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MaximumVirtualProcessors')[0].text
+                    lpar_config['MinimumProcessingUnits'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MinimumProcessingUnits')[0].text
+                    lpar_config['MinimumVirtualProcessors'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MinimumVirtualProcessors')[0].text
+                else:
+                    lpar_config['MaximumProcessors'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MaximumProcessors')[0].text
+                    lpar_config['MinimumProcessors'] = vios_dom.xpath(
+                        '//PartitionProcessorConfiguration//MinimumProcessors')[0].text
+
+                if virtual_optical_media:
+                    vom_dict = rest_conn.getVIOSVirtualOpticalMediaDetails(vios_dom)
+                    lpar_config['VirtualOpticalMedia'] = vom_dict
+                if free_pvs:
+                    pv_list = []
+                    # Initialize with empty list
+                    lpar_config['FreePhysicalVolumes'] = []
+                    try:
+                        pv_xml_list = rest_conn.getFreePhyVolume(vios_UUID)
+                        for each in pv_xml_list:
+                            pv_dict = {}
+                            pv_dict['VolumeName'] = each.xpath("VolumeName")[0].text
+                            pv_dict['VolumeCapacity'] = each.xpath("VolumeCapacity")[0].text
+                            pv_dict['VolumeState'] = each.xpath("VolumeState")[0].text
+                            pv_dict['VolumeUniqueID'] = each.xpath("VolumeUniqueID")[0].text
+                            pv_dict['ReservePolicy'] = each.xpath("ReservePolicy")[0].text
+                            pv_dict['ReservePolicyAlgorithm'] = each.xpath("ReservePolicyAlgorithm")[0].text
+                            pv_list.append(pv_dict)
+                        lpar_config['FreePhysicalVolumes'] = pv_list
+                    except Exception as error:
+                        logger.debug(error)
     except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-        ms_state = server_dom.xpath("//DetailedState")[0].text
-        if ms_state != 'None':
-            module.fail_json(msg="Given system is in " + ms_state + " state")
-        vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-        vios_list = []
-        vios_dom = None
-        vios_UUID = None
-        if vios_quick_response is not None:
-            vios_list = json.loads(vios_quick_response)
-        if vios_list:
-            for vios in vios_list:
-                if vios['PartitionName'] == name:
-                    lpar_config = vios
-                    vios_UUID = vios['UUID']
-                    vios_dom = rest_conn.getVirtualIOServer(vios_UUID)
-                    break
-            else:
-                module.fail_json("VIOS: {0} not found in the Managed System: {1}".format(name, system_name))
-            lpar_config['MaximumMemory'] = vios_dom.xpath(
-                '//PartitionMemoryConfiguration//MaximumMemory')[0].text
-            lpar_config['MinimumMemory'] = vios_dom.xpath(
-                '//PartitionMemoryConfiguration//MinimumMemory')[0].text
-            lpar_config['CurrentHasDedicatedProcessors'] = vios_dom.xpath(
-                '//PartitionProcessorConfiguration//CurrentHasDedicatedProcessors')[0].text
-
-            if lpar_config['CurrentHasDedicatedProcessors'] == 'false':
-                lpar_config['MaximumProcessingUnits'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MaximumProcessingUnits')[0].text
-                lpar_config['MaximumVirtualProcessors'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MaximumVirtualProcessors')[0].text
-                lpar_config['MinimumProcessingUnits'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MinimumProcessingUnits')[0].text
-                lpar_config['MinimumVirtualProcessors'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MinimumVirtualProcessors')[0].text
-            else:
-                lpar_config['MaximumProcessors'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MaximumProcessors')[0].text
-                lpar_config['MinimumProcessors'] = vios_dom.xpath(
-                    '//PartitionProcessorConfiguration//MinimumProcessors')[0].text
-
-            if virtual_optical_media:
-                vom_dict = rest_conn.getVIOSVirtualOpticalMediaDetails(vios_dom)
-                lpar_config['VirtualOpticalMedia'] = vom_dict
-            if free_pvs:
-                pv_list = []
-                # Initialize with empty list
-                lpar_config['FreePhysicalVolumes'] = []
-                try:
-                    pv_xml_list = rest_conn.getFreePhyVolume(vios_UUID)
-                    for each in pv_xml_list:
-                        pv_dict = {}
-                        pv_dict['VolumeName'] = each.xpath("VolumeName")[0].text
-                        pv_dict['VolumeCapacity'] = each.xpath("VolumeCapacity")[0].text
-                        pv_dict['VolumeState'] = each.xpath("VolumeState")[0].text
-                        pv_dict['VolumeUniqueID'] = each.xpath("VolumeUniqueID")[0].text
-                        pv_dict['ReservePolicy'] = each.xpath("ReservePolicy")[0].text
-                        pv_dict['ReservePolicyAlgorithm'] = each.xpath("ReservePolicyAlgorithm")[0].text
-                        pv_list.append(pv_dict)
-                    lpar_config['FreePhysicalVolumes'] = pv_list
-                except Exception as error:
-                    logger.debug(error)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
         error_msg = parse_error_response(error)
         module.fail_json(msg=error_msg)
 

@@ -1166,244 +1166,226 @@ def create_partition(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
-
-    try:
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-
-    if partition_dom:
-        try:
-            partition_prop = rest_conn.quickGetPartition(partition_uuid)
-            partition_prop['AssociatedManagedSystem'] = system_name
-        except Exception as error:
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
             try:
-                rest_conn.logoff()
-            except Exception:
-                logger.debug("Logoff error")
-            error_msg = parse_error_response(error)
-            module.fail_json(msg=error_msg)
-        return False, partition_prop, None
-
-    if all_resources:
-        try:
-            hmc.createPartitionWithAllResources(system_name, vm_name, os_type)
-            try:
-                hmc.applyProfileToPartition(system_name, vm_name, "default_profile")
-            except HmcError as apply_profile_error:
-                hmc.deletePartition(system_name, vm_name, False, False)
-                return False, repr(apply_profile_error), None
-        except HmcError as crt_lpar_error:
-            return False, repr(crt_lpar_error), None
-
-        return True, None, None
-
-    validate_proc_mem(server_dom, int(proc), int(mem), int(max_proc), int(min_proc), int(max_mem),
-                      int(min_mem), weight, min_proc_unit, max_proc_unit, proc_unit)
-    if shared_proc_pool:
-        shared_proc_pool = rest_conn.validateSharedProcessorPoolNameAndID(system_uuid, shared_proc_pool)
-        if not shared_proc_pool:
-            raise HmcError("Shared Processor Pool ID or Name:{0}, does not exist in the managed system:{1}". format(params['shared_proc_pool'], system_name))
-
-    if proc_compatibility_mode:
-        supp_compat_modes = server_dom.xpath("//SupportedPartitionProcessorCompatibilityModes")
-        supp_compat_modes = [scm.text.replace('Plus', 'plus') if scm.text != 'default' else 'Default' for scm in supp_compat_modes]
-        if proc_compatibility_mode not in supp_compat_modes:
-            raise HmcError("unsupported proc_compat_mode:{0}, Supported proc_compat_modes are {1}".format(proc_compatibility_mode, supp_compat_modes))
-
-    try:
-        if params['npiv_config']:
-            fcports_config = fetch_fc_config(rest_conn, system_uuid, params['npiv_config'])
-
-        if os_type in ['aix', 'linux', 'aix_linux']:
-            reference_template = "QuickStart_lpar_rpa_2"
-        else:
-            reference_template = "QuickStart_lpar_IBMi_2"
-        rest_conn.copyPartitionTemplate(reference_template, temp_template_name)
-        temp_copied = True
-        max_lpars = server_dom.xpath("//MaximumPartitions")[0].text
-        logger.debug("CEC uuid: %s", system_uuid)
-
-        temporary_temp_dom = rest_conn.getPartitionTemplate(name=temp_template_name)
-        temp_uuid = temporary_temp_dom.xpath("//AtomID")[0].text
-
-        # On servers that do not support the IBM i partitions with native I/O capability
-        if os_type == 'ibmi' and \
-                server_dom.xpath("//IBMiNativeIOCapable") and \
-                server_dom.xpath("//IBMiNativeIOCapable")[0].text == 'false':
-            srrTag = temporary_temp_dom.xpath("//SimplifiedRemoteRestartEnable")[0]
-            srrTag.addnext(etree.XML('<isRestrictedIOPartition kb="CUD" kxe="false">true</isRestrictedIOPartition>'))
-        config_dict = {}
-        hmc_version = hmc.listHMCVersion()
-        sp_level = int(hmc_version['SERVICEPACK'])
-        if sp_level < 951:
-            next_lpar_id = hmc.getNextPartitionID(system_name, max_lpars)
-            logger.debug("Next Partiion ID: %s", str(next_lpar_id))
-            config_dict['lpar_id'] = str(next_lpar_id)
-        config_dict['vm_name'] = vm_name
-        config_dict['proc'] = proc
-        config_dict['max_proc'] = max_proc
-        config_dict['min_proc'] = min_proc
-        config_dict['proc_unit'] = str(proc_unit) if proc_unit else None
-        config_dict['max_proc_unit'] = str(max_proc_unit)
-        config_dict['min_proc_unit'] = str(min_proc_unit)
-        config_dict['mem'] = mem
-        config_dict['max_mem'] = max_mem
-        config_dict['min_mem'] = min_mem
-        config_dict['max_virtual_slots'] = max_virtual_slots
-        config_dict['proc_mode'] = proc_mode
-        config_dict['weight'] = str(weight) if proc_mode == 'uncapped' else str(0)
-        config_dict['proc_comp_mode'] = proc_compatibility_mode
-        config_dict['shared_proc_pool'] = shared_proc_pool if shared_proc_pool else str(0)
-        if vm_id:
-            config_dict['lpar_id'] = str(vm_id)
-
-        # Tagged IO
-        if os_type == 'ibmi':
-            add_taggedIO_details(temporary_temp_dom)
-
-        rest_conn.updateLparNameAndIDToDom(temporary_temp_dom, config_dict)
-
-        # Add physical IO adapter
-        if physical_io:
-            add_physical_io(rest_conn, server_dom, temporary_temp_dom, physical_io)
-
-        rest_conn.updateProcMemSettingsToDom(temporary_temp_dom, config_dict)
-
-        # Add Virtual Networks to partition
-        if params['virt_network_config']:
-            virt_nw_list = fetch_virt_networks(rest_conn, system_uuid, params['virt_network_config'], max_virtual_slots)
-            rest_conn.updateVirtualNWSettingsToDom(temporary_temp_dom, virt_nw_list)
-
-        rest_conn.updatePartitionTemplate(temp_uuid, temporary_temp_dom)
-
-        resp = rest_conn.checkPartitionTemplate(temp_template_name, system_uuid)
-        draft_uuid = resp.xpath("//ParameterName[text()='TEMPLATE_UUID']/following-sibling::ParameterValue")[0].text
-
-        draft_template_dom = rest_conn.getPartitionTemplate(uuid=draft_uuid)
-        if not draft_template_dom:
-            module.fail_json(msg="Not able to fetch template for partition deploy")
-
-        # FC configuration should always be above vscsi configuration, otherwise template leads to marshal error
-        if fcports_config:
-            rest_conn.updateFCSettingsToDom(draft_template_dom, fcports_config)
-            rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
-
-        # Volume configuration settings
-        pvid_added = []
-        vscsi_clients_payload = ''
-        if params['volume_config']:
-            for each_vol_config in params['volume_config']:
-                if 'vios_name' in each_vol_config and each_vol_config['vios_name']:
-                    vios_name = each_vol_config['vios_name']
-                    vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-
-                    if vios_response:
-                        vios_list = json.loads(vios_response)
-                        logger.debug(vios_list)
-                        vios = [vios for vios in vios_list if vios['PartitionName'] == vios_name]
-                        if not vios:
-                            raise Error("Requested vios: {0} is not available".format(vios_name))
-                    else:
-                        raise Error("Requested vios: {0} is not available".format(vios_name))
-
-                    vol_tuple_list = identifyFreeVolume(rest_conn, system_uuid, volume_name=each_vol_config['volume_name'],
-                                                        vios_name=each_vol_config['vios_name'], pvid_list=pvid_added)
-                else:
-                    vol_tuple_list = identifyFreeVolume(rest_conn, system_uuid, volume_size=each_vol_config['volume_size'],
-                                                        pvid_list=pvid_added)
-
-                logger.debug(vol_tuple_list)
-                if vol_tuple_list:
-                    pvid_added.append(vol_tuple_list[0][2].xpath('UniqueDeviceID')[0].text)
-                    vscsi_clients_payload += rest_conn.add_vscsi_payload(vol_tuple_list)
-                else:
-                    module.fail_json(msg="Unable to identify free physical volume")
-
-            if vscsi_clients_payload:
-                rest_conn.add_vscsi(draft_template_dom, vscsi_clients_payload)
-                rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
-
-        # Virtual NIC Configurations
-        if params['vnic_config']:
-            vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-            vios_list = json.loads(vios_response)
-            vios_name_list = []
-            for vios in vios_list:
-                if vios['RMCState'] == 'active':
-                    vios_name_list.append(vios['PartitionName'])
-            if not vios_name_list:
-                module.fail_json(msg="There are no RMC Active VIOS available in the managed system")
-            error_msg = rest_conn.check_vnic_condition(params)
-            if error_msg != "":
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
                 module.fail_json(msg=error_msg)
-            sriov_adapters_dom = server_dom.xpath("//SRIOVAdapters//SRIOVAdapter")
-            sriov_dvc_col = rest_conn.create_sriov_collection(sriov_adapters_dom)
-            if not sriov_dvc_col:
-                module.fail_json(msg="There are no SRIOV Physical ports available in the managed system")
-            rest_conn.add_vnic_payload(draft_template_dom, params['vnic_config'], sriov_dvc_col, vios_name_list)
-            rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-        resp_dom = rest_conn.deployPartitionTemplate(draft_uuid, system_uuid)
-        partition_uuid = resp_dom.xpath("//ParameterName[text()='PartitionUuid']/following-sibling::ParameterValue")[0].text
-        partition_prop = rest_conn.quickGetPartition(partition_uuid)
-        partition_prop['AssociatedManagedSystem'] = system_name
-        changed = True
+            try:
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+
+            if partition_dom:
+                try:
+                    partition_prop = rest_conn.quickGetPartition(partition_uuid)
+                    partition_prop['AssociatedManagedSystem'] = system_name
+                except Exception as error:
+                    error_msg = parse_error_response(error)
+                    module.fail_json(msg=error_msg)
+                return False, partition_prop, None
+
+            if all_resources:
+                try:
+                    hmc.createPartitionWithAllResources(system_name, vm_name, os_type)
+                    try:
+                        hmc.applyProfileToPartition(system_name, vm_name, "default_profile")
+                    except HmcError as apply_profile_error:
+                        hmc.deletePartition(system_name, vm_name, False, False)
+                        return False, repr(apply_profile_error), None
+                except HmcError as crt_lpar_error:
+                    return False, repr(crt_lpar_error), None
+
+                return True, None, None
+
+            validate_proc_mem(server_dom, int(proc), int(mem), int(max_proc), int(min_proc), int(max_mem),
+                              int(min_mem), weight, min_proc_unit, max_proc_unit, proc_unit)
+            if shared_proc_pool:
+                shared_proc_pool = rest_conn.validateSharedProcessorPoolNameAndID(system_uuid, shared_proc_pool)
+                if not shared_proc_pool:
+                    raise HmcError("Shared Processor Pool ID or Name:{0}, does not exist in the managed system:{1}".
+                                   format(params['shared_proc_pool'], system_name))
+
+            if proc_compatibility_mode:
+                supp_compat_modes = server_dom.xpath("//SupportedPartitionProcessorCompatibilityModes")
+                supp_compat_modes = [scm.text.replace('Plus', 'plus') if scm.text != 'default' else 'Default' for scm in supp_compat_modes]
+                if proc_compatibility_mode not in supp_compat_modes:
+                    raise HmcError("unsupported proc_compat_mode:{0}, Supported proc_compat_modes are {1}".format(proc_compatibility_mode, supp_compat_modes))
+
+            try:
+                if params['npiv_config']:
+                    fcports_config = fetch_fc_config(rest_conn, system_uuid, params['npiv_config'])
+
+                if os_type in ['aix', 'linux', 'aix_linux']:
+                    reference_template = "QuickStart_lpar_rpa_2"
+                else:
+                    reference_template = "QuickStart_lpar_IBMi_2"
+                rest_conn.copyPartitionTemplate(reference_template, temp_template_name)
+                temp_copied = True
+                max_lpars = server_dom.xpath("//MaximumPartitions")[0].text
+                logger.debug("CEC uuid: %s", system_uuid)
+
+                temporary_temp_dom = rest_conn.getPartitionTemplate(name=temp_template_name)
+                temp_uuid = temporary_temp_dom.xpath("//AtomID")[0].text
+
+                # On servers that do not support the IBM i partitions with native I/O capability
+                if os_type == 'ibmi' and \
+                        server_dom.xpath("//IBMiNativeIOCapable") and \
+                        server_dom.xpath("//IBMiNativeIOCapable")[0].text == 'false':
+                    srrTag = temporary_temp_dom.xpath("//SimplifiedRemoteRestartEnable")[0]
+                    srrTag.addnext(etree.XML('<isRestrictedIOPartition kb="CUD" kxe="false">true</isRestrictedIOPartition>'))
+                config_dict = {}
+                hmc_version = hmc.listHMCVersion()
+                sp_level = int(hmc_version['SERVICEPACK'])
+                if sp_level < 951:
+                    next_lpar_id = hmc.getNextPartitionID(system_name, max_lpars)
+                    logger.debug("Next Partiion ID: %s", str(next_lpar_id))
+                    config_dict['lpar_id'] = str(next_lpar_id)
+                config_dict['vm_name'] = vm_name
+                config_dict['proc'] = proc
+                config_dict['max_proc'] = max_proc
+                config_dict['min_proc'] = min_proc
+                config_dict['proc_unit'] = str(proc_unit) if proc_unit else None
+                config_dict['max_proc_unit'] = str(max_proc_unit)
+                config_dict['min_proc_unit'] = str(min_proc_unit)
+                config_dict['mem'] = mem
+                config_dict['max_mem'] = max_mem
+                config_dict['min_mem'] = min_mem
+                config_dict['max_virtual_slots'] = max_virtual_slots
+                config_dict['proc_mode'] = proc_mode
+                config_dict['weight'] = str(weight) if proc_mode == 'uncapped' else str(0)
+                config_dict['proc_comp_mode'] = proc_compatibility_mode
+                config_dict['shared_proc_pool'] = shared_proc_pool if shared_proc_pool else str(0)
+                if vm_id:
+                    config_dict['lpar_id'] = str(vm_id)
+
+                # Tagged IO
+                if os_type == 'ibmi':
+                    add_taggedIO_details(temporary_temp_dom)
+
+                rest_conn.updateLparNameAndIDToDom(temporary_temp_dom, config_dict)
+
+                # Add physical IO adapter
+                if physical_io:
+                    add_physical_io(rest_conn, server_dom, temporary_temp_dom, physical_io)
+
+                rest_conn.updateProcMemSettingsToDom(temporary_temp_dom, config_dict)
+
+                # Add Virtual Networks to partition
+                if params['virt_network_config']:
+                    virt_nw_list = fetch_virt_networks(rest_conn, system_uuid, params['virt_network_config'], max_virtual_slots)
+                    rest_conn.updateVirtualNWSettingsToDom(temporary_temp_dom, virt_nw_list)
+
+                rest_conn.updatePartitionTemplate(temp_uuid, temporary_temp_dom)
+
+                resp = rest_conn.checkPartitionTemplate(temp_template_name, system_uuid)
+                draft_uuid = resp.xpath("//ParameterName[text()='TEMPLATE_UUID']/following-sibling::ParameterValue")[0].text
+
+                draft_template_dom = rest_conn.getPartitionTemplate(uuid=draft_uuid)
+                if not draft_template_dom:
+                    module.fail_json(msg="Not able to fetch template for partition deploy")
+
+                # FC configuration should always be above vscsi configuration, otherwise template leads to marshal error
+                if fcports_config:
+                    rest_conn.updateFCSettingsToDom(draft_template_dom, fcports_config)
+                    rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
+
+                # Volume configuration settings
+                pvid_added = []
+                vscsi_clients_payload = ''
+                if params['volume_config']:
+                    for each_vol_config in params['volume_config']:
+                        if 'vios_name' in each_vol_config and each_vol_config['vios_name']:
+                            vios_name = each_vol_config['vios_name']
+                            vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+
+                            if vios_response:
+                                vios_list = json.loads(vios_response)
+                                logger.debug(vios_list)
+                                vios = [vios for vios in vios_list if vios['PartitionName'] == vios_name]
+                                if not vios:
+                                    raise Error("Requested vios: {0} is not available".format(vios_name))
+                            else:
+                                raise Error("Requested vios: {0} is not available".format(vios_name))
+
+                            vol_tuple_list = identifyFreeVolume(rest_conn, system_uuid, volume_name=each_vol_config['volume_name'],
+                                                                vios_name=each_vol_config['vios_name'], pvid_list=pvid_added)
+                        else:
+                            vol_tuple_list = identifyFreeVolume(rest_conn, system_uuid, volume_size=each_vol_config['volume_size'],
+                                                                pvid_list=pvid_added)
+
+                        logger.debug(vol_tuple_list)
+                        if vol_tuple_list:
+                            pvid_added.append(vol_tuple_list[0][2].xpath('UniqueDeviceID')[0].text)
+                            vscsi_clients_payload += rest_conn.add_vscsi_payload(vol_tuple_list)
+                        else:
+                            module.fail_json(msg="Unable to identify free physical volume")
+
+                    if vscsi_clients_payload:
+                        rest_conn.add_vscsi(draft_template_dom, vscsi_clients_payload)
+                        rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
+
+                # Virtual NIC Configurations
+                if params['vnic_config']:
+                    vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+                    vios_list = json.loads(vios_response)
+                    vios_name_list = []
+                    for vios in vios_list:
+                        if vios['RMCState'] == 'active':
+                            vios_name_list.append(vios['PartitionName'])
+                    if not vios_name_list:
+                        module.fail_json(msg="There are no RMC Active VIOS available in the managed system")
+                    error_msg = rest_conn.check_vnic_condition(params)
+                    if error_msg != "":
+                        module.fail_json(msg=error_msg)
+                    sriov_adapters_dom = server_dom.xpath("//SRIOVAdapters//SRIOVAdapter")
+                    sriov_dvc_col = rest_conn.create_sriov_collection(sriov_adapters_dom)
+                    if not sriov_dvc_col:
+                        module.fail_json(msg="There are no SRIOV Physical ports available in the managed system")
+                    rest_conn.add_vnic_payload(draft_template_dom, params['vnic_config'], sriov_dvc_col, vios_name_list)
+                    rest_conn.updatePartitionTemplate(draft_uuid, draft_template_dom)
+
+                resp_dom = rest_conn.deployPartitionTemplate(draft_uuid, system_uuid)
+                partition_uuid = resp_dom.xpath("//ParameterName[text()='PartitionUuid']/following-sibling::ParameterValue")[0].text
+                partition_prop = rest_conn.quickGetPartition(partition_uuid)
+                partition_prop['AssociatedManagedSystem'] = system_name
+                changed = True
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+                try:
+                    partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+                    if partition_dom:
+                        hmc.deletePartition(system_name, vm_name, False, False)
+                except Exception:
+                    logger.debug("The lpar is not yet created")
+                module.fail_json(msg=error_msg)
+            finally:
+                if temp_copied:
+                    try:
+                        rest_conn.deletePartitionTemplate(temp_template_name)
+                    except Exception as del_error:
+                        error_msg = parse_error_response(del_error)
+                        logger.debug(error_msg)
+
+        # Update partition profile if given
+        if prof_name:
+            try:
+                next_profile_name = 'default_profile'
+                hmc.updateProfileName(system_name, vm_name, prof_name, next_profile_name)
+            except HmcError as on_system_error:
+                return changed, repr(on_system_error), None
+            partition_prop["PartitionProfileName"] = prof_name
+
+        return changed, partition_prop, warning_msg
     except Exception as error:
         error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        try:
-            partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-            if partition_dom:
-                hmc.deletePartition(system_name, vm_name, False, False)
-        except Exception:
-            logger.debug("The lpar is not yet created")
         module.fail_json(msg=error_msg)
-    finally:
-        if temp_copied:
-            try:
-                rest_conn.deletePartitionTemplate(temp_template_name)
-            except Exception as del_error:
-                error_msg = parse_error_response(del_error)
-                logger.debug(error_msg)
-
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            logger.debug(error_msg)
-
-    # Update partition profile if given
-    if prof_name:
-        try:
-            next_profile_name = 'default_profile'
-            hmc.updateProfileName(system_name, vm_name, prof_name, next_profile_name)
-        except HmcError as on_system_error:
-            return changed, repr(on_system_error), None
-        partition_prop["PartitionProfileName"] = prof_name
-
-    return changed, partition_prop, warning_msg
 
 
 def rename_partition(module, params):
@@ -1427,42 +1409,41 @@ def rename_partition(module, params):
         except HmcError as on_system_error:
             return changed, repr(on_system_error), None
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            if system_name:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
+
+            lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+            if lpar_response is not None:
+                lpar_quick_list = json.loads(lpar_response)
+                for eachLpar in lpar_quick_list:
+                    if eachLpar['PartitionName'] == vm_name:
+                        lpar_uuid = eachLpar['UUID']
+                        break
+                    if eachLpar['PartitionName'] == new_name:
+                        lpar_uuid_new = eachLpar['UUID']
+                        break
+            else:
+                module.fail_json(msg="There are no Logical Partitions present on the system")
+            if not lpar_uuid:
+                if lpar_uuid_new:
+                    return changed, None, None
+                else:
+                    module.fail_json(msg="Given Logical Partition is not present on the system")
+            if vm_name == new_name:
+                return changed, None, None
+            lparConfig.update({'NAME': vm_name, 'NEW_NAME': new_name})
+            try:
+                result = hmc.update_lpar(system_name, lparConfig)
+                changed = True
+                return changed, result, None
+            except Exception as e:
+                return False, repr(e), None
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-
-    if system_name:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
-
-    lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-    if lpar_response is not None:
-        lpar_quick_list = json.loads(lpar_response)
-        for eachLpar in lpar_quick_list:
-            if eachLpar['PartitionName'] == vm_name:
-                lpar_uuid = eachLpar['UUID']
-                break
-            if eachLpar['PartitionName'] == new_name:
-                lpar_uuid_new = eachLpar['UUID']
-                break
-    else:
-        module.fail_json(msg="There are no Logical Partitions present on the system")
-    if not lpar_uuid:
-        if lpar_uuid_new:
-            return changed, None, None
-        else:
-            module.fail_json(msg="Given Logical Partition is not present on the system")
-    if vm_name == new_name:
-        return changed, None, None
-    lparConfig.update({'NAME': vm_name, 'NEW_NAME': new_name})
-    try:
-        result = hmc.update_lpar(system_name, lparConfig)
-        changed = True
-        return changed, result, None
-    except Exception as e:
-        return False, repr(e), None
 
 
 def remove_partition(module, params):
@@ -1490,63 +1471,62 @@ def remove_partition(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+            hmc = Hmc(hmc_conn)
+
+            # As this feature is supported only from 930 release
+            hmc_version = hmc.listHMCVersion()
+            sp_level = int(hmc_version['SERVICEPACK'])
+            if sp_level < 930:
+                if retainViosCfg or deleteVdisks:
+                    warn_msg = "retain_vios_cfg and delete_vdisks options are not supported on HMC release level below V9 R1 M930"
+                    module.warn(warn_msg)
+                retainViosCfg = False
+                deleteVdisks = False
+            else:
+                retainViosCfg = not (retainViosCfg)
+            try:
+                if system_name:
+                    system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+                else:
+                    system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
+                    if system_name == 1:
+                        warn_msg = "Logical Partition Name:'{0}' not found in any of the managed systems".format(vm_name)
+                        return False, None, warn_msg
+                    system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+
+                if not system_uuid:
+                    module.fail_json(msg="Given system is not present")
+                lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+                if lpar_response is not None:
+                    lpar_quick_list = json.loads(lpar_response)
+                    for eachLpar in lpar_quick_list:
+                        if eachLpar['PartitionName'] == vm_name:
+                            if eachLpar['PartitionState'] != 'not activated' and force is False:
+                                module.fail_json(msg="The partition is not in a valid state to perform the disaster recovery cleanup operation.")
+                            if force is True:
+                                poweroff_partition(module, params)
+                            hmc.deletePartition(system_name, vm_name, retainViosCfg, deleteVdisks)
+                            flag = True
+                            break
+                    if flag is False:
+                        warn_msg = "Logical Partition Name:'{0}' not found in the managed systems".format(vm_name)
+                        return False, None, warn_msg
+                else:
+                    module.fail_json(msg="There are no Logical Partitions present on the system")
+                    return False, None, None
+
+            except HmcError as del_lpar_error:
+                error_msg = parse_error_response(del_lpar_error)
+                if 'HSCL8012' in error_msg:
+                    return False, None, None
+                else:
+                    return False, repr(del_lpar_error), None
+            return True, None, None
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-
-    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
-    hmc = Hmc(hmc_conn)
-
-    # As this feature is supported only from 930 release
-    hmc_version = hmc.listHMCVersion()
-    sp_level = int(hmc_version['SERVICEPACK'])
-    if sp_level < 930:
-        if retainViosCfg or deleteVdisks:
-            warn_msg = "retain_vios_cfg and delete_vdisks options are not supported on HMC release level below V9 R1 M930"
-            module.warn(warn_msg)
-        retainViosCfg = False
-        deleteVdisks = False
-    else:
-        retainViosCfg = not (retainViosCfg)
-    try:
-        if system_name:
-            system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-        else:
-            system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
-            if system_name == 1:
-                warn_msg = "Logical Partition Name:'{0}' not found in any of the managed systems".format(vm_name)
-                return False, None, warn_msg
-            system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-        if lpar_response is not None:
-            lpar_quick_list = json.loads(lpar_response)
-            for eachLpar in lpar_quick_list:
-                if eachLpar['PartitionName'] == vm_name:
-                    if eachLpar['PartitionState'] != 'not activated' and force is False:
-                        module.fail_json(msg="The partition is not in a valid state to perform the disaster recovery cleanup operation.")
-                    if force is True:
-                        poweroff_partition(module, params)
-                    hmc.deletePartition(system_name, vm_name, retainViosCfg, deleteVdisks)
-                    flag = True
-                    break
-            if flag is False:
-                warn_msg = "Logical Partition Name:'{0}' not found in the managed systems".format(vm_name)
-                return False, None, warn_msg
-        else:
-            module.fail_json(msg="There are no Logical Partitions present on the system")
-            return False, None, None
-
-    except HmcError as del_lpar_error:
-        error_msg = parse_error_response(del_lpar_error)
-        if 'HSCL8012' in error_msg:
-            return False, None, None
-        else:
-            return False, repr(del_lpar_error), None
-    return True, None, None
 
 
 def poweroff_partition(module, params):
@@ -1575,65 +1555,58 @@ def poweroff_partition(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                if not system_name:
+                    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+                    hmc = Hmc(hmc_conn)
+                    system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
+                    if system_name == 1:
+                        return False, None, None
+
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+                if not system_uuid:
+                    module.fail_json(msg="Given system is not present")
+                ms_state = server_dom.xpath("//DetailedState")[0].text
+                if ms_state != 'None':
+                    module.fail_json(msg="Given system is in " + ms_state + " state")
+
+                lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+                if lpar_response is not None:
+                    lpar_quick_list = json.loads(lpar_response)
+                    for eachLpar in lpar_quick_list:
+                        if eachLpar['PartitionName'] == vm_name:
+                            partition_dict = eachLpar
+                            lpar_uuid = eachLpar['UUID']
+                            break
+                else:
+                    module.fail_json(msg="There are no Logical Partitions present on the system")
+
+                if not lpar_uuid:
+                    module.fail_json(msg="Given Logical Partition is not present on the system")
+
+                partition_state = partition_dict["PartitionState"]
+
+                if partition_state == 'not activated':
+                    logger.debug("Given partition already in not activated state")
+                    return False, None, None
+                else:
+                    if operation == 'restart':
+                        rest_conn.poweroffPartition(lpar_uuid, 'true', restart_option)
+                        changed = True
+                    elif operation == 'shutdown' or params['force'] is True:
+                        rest_conn.poweroffPartition(lpar_uuid, 'false', shutdown_option)
+                        changed = True
+
+            except (Exception, HmcError) as error:
+                error_msg = parse_error_response(error)
+                logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+                module.fail_json(msg=error_msg)
+
+        return changed, None, None
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-
-    try:
-        if not system_name:
-            hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
-            hmc = Hmc(hmc_conn)
-            system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
-            if system_name == 1:
-                return False, None, None
-
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-        ms_state = server_dom.xpath("//DetailedState")[0].text
-        if ms_state != 'None':
-            module.fail_json(msg="Given system is in " + ms_state + " state")
-
-        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-        if lpar_response is not None:
-            lpar_quick_list = json.loads(lpar_response)
-            for eachLpar in lpar_quick_list:
-                if eachLpar['PartitionName'] == vm_name:
-                    partition_dict = eachLpar
-                    lpar_uuid = eachLpar['UUID']
-                    break
-        else:
-            module.fail_json(msg="There are no Logical Partitions present on the system")
-
-        if not lpar_uuid:
-            module.fail_json(msg="Given Logical Partition is not present on the system")
-
-        partition_state = partition_dict["PartitionState"]
-
-        if partition_state == 'not activated':
-            logger.debug("Given partition already in not activated state")
-            return False, None, None
-        else:
-            if operation == 'restart':
-                rest_conn.poweroffPartition(lpar_uuid, 'true', restart_option)
-                changed = True
-            elif operation == 'shutdown' or params['force'] is True:
-                rest_conn.poweroffPartition(lpar_uuid, 'false', shutdown_option)
-                changed = True
-
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
-
-    return changed, None, None
 
 
 def poweron_partition(module, params):
@@ -1663,90 +1636,83 @@ def poweron_partition(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                if not system_name:
+                    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+                    hmc = Hmc(hmc_conn)
+                    system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
+                    if system_name == 1:
+                        return False, None, None
+
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+                if not system_uuid:
+                    module.fail_json(msg="Given system is not present")
+                ms_state = server_dom.xpath("//DetailedState")[0].text
+                if ms_state != 'None':
+                    module.fail_json(msg="Given system is in " + ms_state + " state")
+
+                lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+                if lpar_response is not None:
+                    lpar_quick_list = json.loads(rest_conn.getLogicalPartitionsQuick(system_uuid))
+                    for eachLpar in lpar_quick_list:
+                        if eachLpar['PartitionName'] == vm_name:
+                            partition_dict = eachLpar
+                            lpar_uuid = eachLpar['UUID']
+                            break
+                else:
+                    module.fail_json(msg="There are no Logical Partitions present on the system")
+
+                if not lpar_uuid:
+                    module.fail_json(msg="Provided Logical Partition is not present on the system")
+
+                if prof_name:
+                    profs = rest_conn.getPartitionProfiles(lpar_uuid)
+                    for prof in profs:
+                        prof1 = etree.ElementTree(prof)
+                        pro_nam = prof1.xpath('//ProfileName/text()')[0]
+                        if prof_name == pro_nam:
+                            prof_uuid = prof1.xpath('//AtomID/text()')[0]
+                            logger.debug(prof_uuid)
+                            break
+
+                if prof_name and not prof_uuid:
+                    module.fail_json(msg="Provided Logical Partition Profile is not present on the logical Partition")
+
+                partition_state = partition_dict["PartitionState"]
+                partition_type = partition_dict["PartitionType"]
+
+                if partition_state == 'not activated':
+                    warn_msg = 'unsupported parameter iIPLsource provided to a partition type: '
+                    if partition_type != 'OS400' and iIPLsource:
+                        module.warn(warn_msg + partition_type)
+                    try:
+                        rest_conn.poweronPartition(lpar_uuid, prof_uuid, keylock, iIPLsource, partition_type)
+                        changed = True
+                    except HmcError as hmcerr:
+                        err_msg = parse_error_response(hmcerr)
+                        resp_dict = json.loads(rest_conn.getLogicalPartitionQuick(lpar_uuid))
+                        partition_state2 = resp_dict["PartitionState"]
+                        if partition_state2 == 'error':
+                            module.warn(err_msg)
+                            changed = True
+                        else:
+                            logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(hmcerr))
+                            module.fail_json(msg=err_msg)
+
+                else:
+                    logger.debug("Given partition already in not activated state")
+                    return False, None, None
+
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+                module.fail_json(msg=error_msg)
+
+        return changed, None, None
     except Exception as error:
         logger.debug(repr(error))
         module.fail_json(msg="Logon to HMC failed")
-
-    try:
-        if not system_name:
-            hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
-            hmc = Hmc(hmc_conn)
-            system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
-            if system_name == 1:
-                return False, None, None
-
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-        ms_state = server_dom.xpath("//DetailedState")[0].text
-        if ms_state != 'None':
-            module.fail_json(msg="Given system is in " + ms_state + " state")
-
-        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-        if lpar_response is not None:
-            lpar_quick_list = json.loads(rest_conn.getLogicalPartitionsQuick(system_uuid))
-            for eachLpar in lpar_quick_list:
-                if eachLpar['PartitionName'] == vm_name:
-                    partition_dict = eachLpar
-                    lpar_uuid = eachLpar['UUID']
-                    break
-        else:
-            module.fail_json(msg="There are no Logical Partitions present on the system")
-
-        if not lpar_uuid:
-            module.fail_json(msg="Provided Logical Partition is not present on the system")
-
-        if prof_name:
-            profs = rest_conn.getPartitionProfiles(lpar_uuid)
-            for prof in profs:
-                prof1 = etree.ElementTree(prof)
-                pro_nam = prof1.xpath('//ProfileName/text()')[0]
-                if prof_name == pro_nam:
-                    prof_uuid = prof1.xpath('//AtomID/text()')[0]
-                    logger.debug(prof_uuid)
-                    break
-
-        if prof_name and not prof_uuid:
-            module.fail_json(msg="Provided Logical Partition Profile is not present on the logical Partition")
-
-        partition_state = partition_dict["PartitionState"]
-        partition_type = partition_dict["PartitionType"]
-
-        if partition_state == 'not activated':
-            warn_msg = 'unsupported parameter iIPLsource provided to a partition type: '
-            if partition_type != 'OS400' and iIPLsource:
-                module.warn(warn_msg + partition_type)
-            try:
-                rest_conn.poweronPartition(lpar_uuid, prof_uuid, keylock, iIPLsource, partition_type)
-                changed = True
-            except HmcError as hmcerr:
-                err_msg = parse_error_response(hmcerr)
-                resp_dict = json.loads(rest_conn.getLogicalPartitionQuick(lpar_uuid))
-                partition_state2 = resp_dict["PartitionState"]
-                if partition_state2 == 'error':
-                    module.warn(err_msg)
-                    changed = True
-                else:
-                    logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(hmcerr))
-                    module.fail_json(msg=err_msg)
-
-        else:
-            logger.debug("Given partition already in not activated state")
-            return False, None, None
-
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
-
-    return changed, None, None
 
 
 def install_aix_os(module, params):
@@ -1841,90 +1807,83 @@ def partition_details(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                if not system_name:
+                    hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
+                    hmc = Hmc(hmc_conn)
+                    system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
+                    if system_name == 1:
+                        return False, None, None
+
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+                if not system_uuid:
+                    module.fail_json(msg="Given system is not present")
+                ms_state = server_dom.xpath("//DetailedState")[0].text
+                if ms_state != 'None':
+                    module.fail_json(msg="Given system is in " + ms_state + " state")
+                lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
+                if lpar_response is not None:
+                    lpar_quick_list = json.loads(lpar_response)
+                    for eachLpar in lpar_quick_list:
+                        if eachLpar['PartitionName'] == vm_name:
+                            partition_prop = eachLpar
+                            partition_prop['AssociatedManagedSystem'] = system_name
+                            lpar_uuid = eachLpar['UUID']
+                            break
+                else:
+                    module.fail_json(msg="There are no Logical Partitions present on the system")
+
+                if lpar_uuid and advanced_info:
+                    vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+                    vios_list = []
+                    if vios_response is not None:
+                        vios_list = json.loads(vios_response)
+                    partition_prop['VirtualFiberChannelAdapters'] = rest_conn.fetchFCDetailsFromVIOS(system_uuid, partition_prop['PartitionID'], vios_list)
+                    partition_prop['VirtualSCSIClientAdapters'] = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, partition_prop['PartitionID'], vios_list)
+                    partition_prop['DedicatedVirtualNICs'] = rest_conn.fetchDedicatedVirtualNICs(system_uuid, lpar_uuid, vm_name, vios_list)
+
+                    lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_uuid=lpar_uuid)
+                    network_info = rest_conn.partition_fetch_virtualnetwrok_info(system_uuid, partition_uuid=lpar_uuid)
+                    partition_prop['VirtualNetworkAdapters'] = network_info['VirtualNetworkAdapters']
+                    partition_prop['MinimumMemory'] = partition_dom.xpath("//MinimumMemory")[0].text
+                    partition_prop['MaximumMemory'] = partition_dom.xpath("//MaximumMemory")[0].text
+                    isDedicatedProc = rest_conn.isDedicatedProcConfig(partition_dom)
+                    if isDedicatedProc:
+                        partition_prop['MinimumProcessors'] = partition_dom.xpath("//MinimumProcessors")[0].text
+                        partition_prop['MaximumProcessors'] = partition_dom.xpath("//MaximumProcessors")[0].text
+                    else:
+                        partition_prop['MinimumProcessingUnits'] = partition_dom.xpath("//MinimumProcessingUnits")[0].text
+                        partition_prop['MaximumProcessingUnits'] = partition_dom.xpath("//MaximumProcessingUnits")[0].text
+                        partition_prop['MinimumVirtualProcessors'] = partition_dom.xpath("//MinimumVirtualProcessors")[0].text
+                        partition_prop['MaximumVirtualProcessors'] = partition_dom.xpath("//MaximumVirtualProcessors")[0].text
+                        partition_prop['CurrentSharedProcessorPoolID'] = rest_conn.getProcPool(partition_dom)
+
+                    modeMapping = {
+                        'keep idle procs': 'keep_idle_procs',
+                        'sre idle proces': 'share_idle_procs',
+                        'sre idle procs active': 'share_idle_procs_active',
+                        'sre idle procs always': 'share_idle_procs_always',
+                        'uncapped': 'uncapped',
+                        'capped': 'capped'
+                    }
+
+                    partition_prop['SharingMode'] = modeMapping[partition_dom.xpath("//SharingMode")[0].text]
+                    if partition_prop['SharingMode'] == 'uncapped':
+                        partition_prop['UncappedWeight'] = rest_conn.getProcUncappedWeight(partition_dom)
+
+                if not lpar_uuid:
+                    module.warn("Logical Partition Name:'{0}' not found in the managed systems".format(vm_name))
+
+            except (Exception, HmcError) as error:
+                error_msg = parse_error_response(error)
+                logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
+                module.fail_json(msg=error_msg)
+
+        return False, partition_prop, None
     except Exception as error:
         error_msg = parse_error_response(error)
         module.fail_json(msg=error_msg)
-
-    try:
-        if not system_name:
-            hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
-            hmc = Hmc(hmc_conn)
-            system_name = identify_ManagedSystem_of_lpar(hmc, vm_name, module)
-            if system_name == 1:
-                return False, None, None
-
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-        ms_state = server_dom.xpath("//DetailedState")[0].text
-        if ms_state != 'None':
-            module.fail_json(msg="Given system is in " + ms_state + " state")
-        lpar_response = rest_conn.getLogicalPartitionsQuick(system_uuid)
-        if lpar_response is not None:
-            lpar_quick_list = json.loads(lpar_response)
-            for eachLpar in lpar_quick_list:
-                if eachLpar['PartitionName'] == vm_name:
-                    partition_prop = eachLpar
-                    partition_prop['AssociatedManagedSystem'] = system_name
-                    lpar_uuid = eachLpar['UUID']
-                    break
-        else:
-            module.fail_json(msg="There are no Logical Partitions present on the system")
-
-        if lpar_uuid and advanced_info:
-            vios_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-            vios_list = []
-            if vios_response is not None:
-                vios_list = json.loads(vios_response)
-            partition_prop['VirtualFiberChannelAdapters'] = rest_conn.fetchFCDetailsFromVIOS(system_uuid, partition_prop['PartitionID'], vios_list)
-            partition_prop['VirtualSCSIClientAdapters'] = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, partition_prop['PartitionID'], vios_list)
-            partition_prop['DedicatedVirtualNICs'] = rest_conn.fetchDedicatedVirtualNICs(system_uuid, lpar_uuid, vm_name, vios_list)
-
-            lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_uuid=lpar_uuid)
-            network_info = rest_conn.partition_fetch_virtualnetwrok_info(system_uuid, partition_uuid=lpar_uuid)
-            partition_prop['VirtualNetworkAdapters'] = network_info['VirtualNetworkAdapters']
-            partition_prop['MinimumMemory'] = partition_dom.xpath("//MinimumMemory")[0].text
-            partition_prop['MaximumMemory'] = partition_dom.xpath("//MaximumMemory")[0].text
-            isDedicatedProc = rest_conn.isDedicatedProcConfig(partition_dom)
-            if isDedicatedProc:
-                partition_prop['MinimumProcessors'] = partition_dom.xpath("//MinimumProcessors")[0].text
-                partition_prop['MaximumProcessors'] = partition_dom.xpath("//MaximumProcessors")[0].text
-            else:
-                partition_prop['MinimumProcessingUnits'] = partition_dom.xpath("//MinimumProcessingUnits")[0].text
-                partition_prop['MaximumProcessingUnits'] = partition_dom.xpath("//MaximumProcessingUnits")[0].text
-                partition_prop['MinimumVirtualProcessors'] = partition_dom.xpath("//MinimumVirtualProcessors")[0].text
-                partition_prop['MaximumVirtualProcessors'] = partition_dom.xpath("//MaximumVirtualProcessors")[0].text
-                partition_prop['CurrentSharedProcessorPoolID'] = rest_conn.getProcPool(partition_dom)
-
-            modeMapping = {
-                'keep idle procs': 'keep_idle_procs',
-                'sre idle proces': 'share_idle_procs',
-                'sre idle procs active': 'share_idle_procs_active',
-                'sre idle procs always': 'share_idle_procs_always',
-                'uncapped': 'uncapped',
-                'capped': 'capped'
-            }
-
-            partition_prop['SharingMode'] = modeMapping[partition_dom.xpath("//SharingMode")[0].text]
-            if partition_prop['SharingMode'] == 'uncapped':
-                partition_prop['UncappedWeight'] = rest_conn.getProcUncappedWeight(partition_dom)
-
-        if not lpar_uuid:
-            module.warn("Logical Partition Name:'{0}' not found in the managed systems".format(vm_name))
-
-    except (Exception, HmcError) as error:
-        error_msg = parse_error_response(error)
-        logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
-        module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
-
-    return False, partition_prop, None
 
 
 def perform_task(module):
