@@ -1137,7 +1137,7 @@ class HmcRestClient:
         lparProfiles = lparProfiles_root.xpath('//LogicalPartitionProfile')
         return lparProfiles
 
-    def add_vscsi_payload(self, pv_tup):
+    def add_vscsi_payload(self, pv_tup, vtd_name=''):
         payload = ''
         pv_tup_list_slice = pv_tup[:2]
         for pv_name, vios_name, pv_obj in pv_tup_list_slice:
@@ -1146,7 +1146,7 @@ class HmcRestClient:
                     <Metadata>
                             <Atom/>
                     </Metadata>
-                    <name kb="CUD" kxe="false"></name>
+                    <PhyscalVolumeVTDName kb="CUD" kxe="false">{2}</PhyscalVolumeVTDName>
                     <associatedLogicalUnits kb="CUD" kxe="false" schemaVersion="V1_0">
                             <Metadata>
                                     <Atom/>
@@ -1174,7 +1174,7 @@ class HmcRestClient:
                                     <Atom/>
                             </Metadata>
                     </associatedVirtualOpticalMedia>
-            </VirtualSCSIClientAdapter>'''.format(pv_name, vios_name)
+            </VirtualSCSIClientAdapter>'''.format(pv_name, vios_name, vtd_name)
         return payload
 
     def add_vscsi(self, lpar_template_dom, vscsi_clients):

@@ -220,6 +220,11 @@ options:
                 description:
                     - Physical volume size in MB.
                 type: int
+            vtd_name:
+                description:
+                    - Physical volume VTD (Virtual Target Device) name.
+                    - This is an optional parameter that can be used to specify a custom VTD name for the physical volume.
+                type: str
     virt_network_config:
         description:
             - Virtual Network configuration of the partition.
@@ -1322,7 +1327,8 @@ def create_partition(module, params):
                         logger.debug(vol_tuple_list)
                         if vol_tuple_list:
                             pvid_added.append(vol_tuple_list[0][2].xpath('UniqueDeviceID')[0].text)
-                            vscsi_clients_payload += rest_conn.add_vscsi_payload(vol_tuple_list)
+                            vtd_name = each_vol_config.get('vtd_name', '')
+                            vscsi_clients_payload += rest_conn.add_vscsi_payload(vol_tuple_list, vtd_name)
                         else:
                             module.fail_json(msg="Unable to identify free physical volume")
 
@@ -1922,7 +1928,8 @@ def run_module():
                              )
     pv_args = dict(volume_name=dict(type='str'),
                    vios_name=dict(type='str'),
-                   volume_size=dict(type='int')
+                   volume_size=dict(type='int'),
+                   vtd_name=dict(type='str')
                    )
     install_os_args = dict(vm_ip=dict(type='str', required=True),
                            nim_ip=dict(type='str', required=True),
