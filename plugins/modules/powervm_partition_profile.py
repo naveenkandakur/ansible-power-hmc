@@ -202,6 +202,14 @@ options:
             - Name of the new profile to be created by copying an existing profile.
             - Required when I(action=copy)
         type: str
+    force:
+        description:
+            - Forces update of the partition profile when set to C(true).
+            - Valid only for I(state=updated).
+            - When the Sync Partition with Profile option is enabled, using this option forcefully updates the profile.
+              These changes will take effect the next time the partition profile is activated.
+        type: bool
+        default: false
     state:
         description:
             - Desired state of the logical partition profile.
@@ -309,6 +317,7 @@ EXAMPLES = '''
       maximum_memory: 1024
       minimum_memory: 1024
       expansion_factor: 10
+      force: true
     state: updated
 '''
 
@@ -422,7 +431,9 @@ def validate_parameters(params):
     if opr == 'present' or opr == 'updated':
         if opr == 'present':
             mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'name']
-        unsupportedList = ['duplicate_prof_name']
+            unsupportedList = ['duplicate_prof_name', 'force']
+        else:
+            unsupportedList = ['duplicate_prof_name']
         if params.get('processor_settings'):
             proc_settings = params['processor_settings']
             validate_sub_dict('processor_settings', proc_settings)
@@ -478,7 +489,7 @@ def validate_parameters(params):
                     raise ParameterError("memory_settings is required for state=present")
     elif opr == 'copy':
         mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'vm_name', 'name', 'duplicate_prof_name']
-        unsupportedList = ['processor_settings', 'memory_settings']
+        unsupportedList = ['processor_settings', 'memory_settings', 'force']
     collate = []
     for eachMandatory in mandatoryList:
         if not params.get(eachMandatory):
@@ -743,6 +754,7 @@ def update_partition_profile(module, params):
         'processor_settings': params.get('processor_settings') or {},
         'memory_settings': params.get('memory_settings') or {}
     }
+    force = params.get('force', False)
     hmc_conn = HmcCliConnection(module, hmc_host, hmc_user, password)
     hmc = Hmc(hmc_conn)
     if system_name and re.match(HmcConstants.MTMS_pattern, system_name):
@@ -885,7 +897,7 @@ def update_partition_profile(module, params):
             user_ame = user_input.get('memory_settings', {}).get('active_memory_expansion')
             user_exp_factor = user_input.get('memory_settings', {}).get('expansion_factor')
             apply_ame_config(config, user_ame, user_exp_factor)
-            code, result = rest_conn.updatePartitionProfile(lpar_uuid, profile_uuid, config)
+            code, result = rest_conn.updatePartitionProfile(lpar_uuid, profile_uuid, config, force=force)
         if code != 200:
             return False, result, None
         else:
@@ -962,6 +974,7 @@ def run_module():
         processor_settings=dict(type='dict', options=processor_args),
         memory_settings=dict(type='dict', options=memory_args),
         duplicate_prof_name=dict(type='str'),
+        force=dict(type='bool', default=False),
         state=dict(type='str', choices=['present', 'updated']),
         action=dict(type='str', choices=['copy']),
     )
