@@ -33,6 +33,9 @@ systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/
 VSWITCH_NS = 'VirtualSwitch xmlns:VirtualSwitch="http://www.ibm.com/xmlns/\
 systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/power\
 /firmware/uom/mc/2012_10/" xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2"'
+VNETWORK_NS = 'VirtualNetwork xmlns:VirtualNetwork="http://www.ibm.com/xmlns/\
+systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/power\
+/firmware/uom/mc/2012_10/" xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2"'
 
 
 def xml_strip_namespace(xml_str):
@@ -3182,6 +3185,111 @@ class HmcRestClient:
 
     def deleteVirtualSwitch(self, system_uuid, switch_uuid):
         url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualSwitch/{2}".format(self.hmc_ip, system_uuid, switch_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/atom+xml'}
+        try:
+            open_url(url,
+                     headers=header,
+                     method='DELETE',
+                     validate_certs=False,
+                     force_basic_auth=True,
+                     timeout=300)
+
+            return True
+        except Exception:
+            raise
+
+    def getVirtualNetworks(self, system_uuid):
+        url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork".format(self.hmc_ip, system_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/vnd.ibm.powervm.uom+xml; type=VirtualNetwork'}
+
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            if resp.code == 204:
+                return None
+
+            response = resp.read()
+            if not response:
+                return None
+
+            virtual_networks_root = xml_strip_namespace(response)
+            return virtual_networks_root
+        except Exception as error:
+            logger.debug("Get of Virtual Networks failed: %s", repr(error))
+            raise
+
+    def createVirtualNetwork(self, system_uuid, network_name, network_vlan_id, switch_href, switch_id, switch_name, tagged_network):
+        url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork".format(self.hmc_ip, system_uuid)
+        header = {'X-API-Session': self.session,
+                  'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=VirtualNetwork',
+                  'Accept': 'application/atom+xml'}
+
+        tagged_str = 'true' if tagged_network else 'false'
+        payload = '''<VirtualNetwork schemaVersion="V1_0">
+                <AssociatedSwitch kxe="false" kb="COD" href="{0}" rel="related"/>
+                <NetworkName kxe="false" kb="CUR">{1}</NetworkName>
+                <NetworkVLANID kxe="false" kb="COD">{2}</NetworkVLANID>
+                <VswitchID kb="ROR" kxe="false">{3}</VswitchID>
+                <VirtualSwitchName ksv="V1_12_0" kb="ROR" kxe="false">{4}</VirtualSwitchName>
+                <TaggedNetwork kxe="false" kb="COD">{5}</TaggedNetwork>
+            </VirtualNetwork>'''.format(switch_href, network_name, network_vlan_id, switch_id, switch_name, tagged_str)
+        payload = payload.replace("VirtualNetwork", VNETWORK_NS, 1)
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            data=payload,
+                            method='PUT',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            response = resp.read()
+            if not response:
+                return None
+            virtual_network_dom = xml_strip_namespace(response)
+            if virtual_network_dom is None:
+                return None
+            return virtual_network_dom
+        except Exception:
+            raise
+
+    def updateVirtualNetwork(self, system_uuid, network_uuid, new_network_name):
+        url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork/{2}".format(self.hmc_ip, system_uuid, network_uuid)
+        header = {'X-API-Session': self.session,
+                  'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=VirtualNetwork',
+                  'Accept': 'application/atom+xml'}
+        payload = '''<VirtualNetwork schemaVersion="V1_0">
+            <NetworkName kxe="false" kb="CUR">{0}</NetworkName>
+        </VirtualNetwork>'''.format(new_network_name)
+        payload = payload.replace("VirtualNetwork", VNETWORK_NS, 1)
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            data=payload,
+                            method='POST',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            response = resp.read()
+            if not response:
+                return None
+            virtual_network_dom = xml_strip_namespace(response)
+            if virtual_network_dom is None:
+                return None
+            return virtual_network_dom
+        except Exception:
+            raise
+
+    def deleteVirtualNetwork(self, system_uuid, network_uuid):
+        url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork/{2}".format(self.hmc_ip, system_uuid, network_uuid)
         header = {'X-API-Session': self.session,
                   'Accept': 'application/atom+xml'}
         try:
