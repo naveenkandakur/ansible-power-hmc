@@ -115,6 +115,7 @@
             echo "dhcp_range_end=$end_ip"
         register: redhat_linux_install_dhcp_range_output
         changed_when: false
+        delegate_to: "{{ groups['pxe'][0] }}"
 
       - name: Set DHCP range facts
         ansible.builtin.set_fact:
@@ -129,6 +130,7 @@
                 | select('search', '^dhcp_range_end=')
                 | first
                 | regex_replace('^dhcp_range_end=', '') }}
+        delegate_to: "{{ groups['pxe'][0] }}"
 
       - name: Add block for dhcp configuration
         run_once: true
