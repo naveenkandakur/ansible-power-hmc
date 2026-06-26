@@ -443,139 +443,130 @@ def update_proc_mem(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
+            try:
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if partition_uuid is None:
+                module.fail_json(msg="Given powervm instance is not present")
 
-    try:
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if partition_uuid is None:
-        module.fail_json(msg="Given powervm instance is not present")
+            isDedicated = rest_conn.isDedicatedProcConfig(partition_dom)
+            if isDedicated and proc_unit is not None:
+                raise ParameterError("Given parition is in dedicated configuration.\
+ Setting proc units is not supported")
 
-    isDedicated = rest_conn.isDedicatedProcConfig(partition_dom)
-    if isDedicated and proc_unit is not None:
-        raise ParameterError("Given parition is in dedicated configuration.\
-Setting proc units is not supported")
-
-    prevProcValue = rest_conn.getProcs(isDedicated, partition_dom)
-    if not isDedicated:
-        prevProcUnitValue = rest_conn.getProcUnits(partition_dom)
-    if (proc is not None and prevProcValue != str(proc)):
-        logger.debug("prevProcValue: %s", prevProcValue)
-        partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc=str(proc))
-        difference = True
-    if (proc_unit is not None and prevProcUnitValue != str(proc_unit)):
-        logger.debug("prevProcUnitValue: %s", prevProcUnitValue)
-        partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc_unit=str(proc_unit))
-        difference = True
-
-    if pool_id is not None and pool_id >= 0:
-        if isDedicated:
-            module.fail_json(msg="Shared processor pool only works with shared processor configuration partition")
-        else:
-            prevPoolID = rest_conn.getProcPool(partition_dom)
-            logger.debug("prevPoolID: %s", prevPoolID)
-            if prevPoolID != str(pool_id):
-                partition_dom = rest_conn.updateProcPool(partition_dom, str(pool_id))
+            prevProcValue = rest_conn.getProcs(isDedicated, partition_dom)
+            if not isDedicated:
+                prevProcUnitValue = rest_conn.getProcUnits(partition_dom)
+            if (proc is not None and prevProcValue != str(proc)):
+                logger.debug("prevProcValue: %s", prevProcValue)
+                partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc=str(proc))
+                difference = True
+            if (proc_unit is not None and prevProcUnitValue != str(proc_unit)):
+                logger.debug("prevProcUnitValue: %s", prevProcUnitValue)
+                partition_dom = rest_conn.updateProc(partition_dom, isDedicated, proc_unit=str(proc_unit))
                 difference = True
 
-    if mem:
-        prevMem = rest_conn.getMem(partition_dom)
-        logger.debug("prevMem: %s", prevMem)
-        if prevMem != str(mem):
-            partition_dom = rest_conn.updateMem(partition_dom, str(mem))
-            difference = True
+            if pool_id is not None and pool_id >= 0:
+                if isDedicated:
+                    module.fail_json(msg="Shared processor pool only works with shared processor configuration partition")
+                else:
+                    prevPoolID = rest_conn.getProcPool(partition_dom)
+                    logger.debug("prevPoolID: %s", prevPoolID)
+                    if prevPoolID != str(pool_id):
+                        partition_dom = rest_conn.updateProcPool(partition_dom, str(pool_id))
+                        difference = True
 
-    if sharing_mode:
-        prevSharingMode = rest_conn.getProcSharingMode(partition_dom)
-        logger.debug("prevSharingMode: %s", prevSharingMode)
-        if isDedicated:
-            if sharing_mode in ['capped', 'uncapped']:
-                module.fail_json(msg="Given sharing mode is not supported with dedicated processor configuration")
-        else:
-            if sharing_mode not in ['capped', 'uncapped']:
-                module.fail_json(msg="Given sharing mode is not supported with shared processor configuration")
-        if prevSharingMode != str(sharing_mode):
-            logger.debug("sharing_mode: %s", sharing_mode)
-            partition_dom = rest_conn.updateProcSharingMode(partition_dom, sharing_mode)
-            difference = True
+            if mem:
+                prevMem = rest_conn.getMem(partition_dom)
+                logger.debug("prevMem: %s", prevMem)
+                if prevMem != str(mem):
+                    partition_dom = rest_conn.updateMem(partition_dom, str(mem))
+                    difference = True
 
-    if uncapped_weight:
-        prevUncappedWeight = rest_conn.getProcUncappedWeight(partition_dom)
-        if isDedicated:
-            module.fail_json(msg="Uncapped weight is not supported with dedicated processor configuration")
-        else:
-            if rest_conn.getProcSharingMode(partition_dom) == 'capped' and \
-                    (sharing_mode is None or sharing_mode == 'capped'):
-                module.fail_json(msg="Uncapped weight is not supported in case sharing mode is not uncapped")
-        if prevUncappedWeight != str(uncapped_weight):
-            partition_dom = rest_conn.updateProcUncappedWeight(partition_dom, str(uncapped_weight))
-            difference = True
+            if sharing_mode:
+                prevSharingMode = rest_conn.getProcSharingMode(partition_dom)
+                logger.debug("prevSharingMode: %s", prevSharingMode)
+                if isDedicated:
+                    if sharing_mode in ['capped', 'uncapped']:
+                        module.fail_json(msg="Given sharing mode is not supported with dedicated processor configuration")
+                else:
+                    if sharing_mode not in ['capped', 'uncapped']:
+                        module.fail_json(msg="Given sharing mode is not supported with shared processor configuration")
+                if prevSharingMode != str(sharing_mode):
+                    logger.debug("sharing_mode: %s", sharing_mode)
+                    partition_dom = rest_conn.updateProcSharingMode(partition_dom, sharing_mode)
+                    difference = True
 
-    if difference:
-        try:
-            rest_conn.updateLogicalPartition(partition_dom, timeout)
-        except Exception as error:
-            error_msg = parse_error_response(error)
-            module.fail_json(msg="HmcError: " + error_msg)
+            if uncapped_weight:
+                prevUncappedWeight = rest_conn.getProcUncappedWeight(partition_dom)
+                if isDedicated:
+                    module.fail_json(msg="Uncapped weight is not supported with dedicated processor configuration")
+                else:
+                    if rest_conn.getProcSharingMode(partition_dom) == 'capped' and \
+                            (sharing_mode is None or sharing_mode == 'capped'):
+                        module.fail_json(msg="Uncapped weight is not supported in case sharing mode is not uncapped")
+                if prevUncappedWeight != str(uncapped_weight):
+                    partition_dom = rest_conn.updateProcUncappedWeight(partition_dom, str(uncapped_weight))
+                    difference = True
 
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid,
-                                                                      partition_name=vm_name,
-                                                                      partition_uuid=partition_uuid)
-        if proc or proc_unit:
-            newProcValue = rest_conn.getProcs(isDedicated, partition_dom)
-            if not isDedicated:
-                newProcUnitValue = rest_conn.getProcUnits(partition_dom)
+            if difference:
+                try:
+                    rest_conn.updateLogicalPartition(partition_dom, timeout)
+                except Exception as error:
+                    error_msg = parse_error_response(error)
+                    module.fail_json(msg="HmcError: " + error_msg)
 
-        if mem:
-            newMem = rest_conn.getMem(partition_dom)
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid,
+                                                                              partition_name=vm_name,
+                                                                              partition_uuid=partition_uuid)
+                if proc or proc_unit:
+                    newProcValue = rest_conn.getProcs(isDedicated, partition_dom)
+                    if not isDedicated:
+                        newProcUnitValue = rest_conn.getProcUnits(partition_dom)
 
-        if sharing_mode:
-            newSharingMode = rest_conn.getProcSharingMode(partition_dom)
+                if mem:
+                    newMem = rest_conn.getMem(partition_dom)
 
-        if uncapped_weight:
-            newUncappedWeight = rest_conn.getProcUncappedWeight(partition_dom)
+                if sharing_mode:
+                    newSharingMode = rest_conn.getProcSharingMode(partition_dom)
 
-        if pool_id:
-            newPoolID = rest_conn.getProcPool(partition_dom)
+                if uncapped_weight:
+                    newUncappedWeight = rest_conn.getProcUncappedWeight(partition_dom)
 
-        logger.debug("newProcValue: %s", newProcValue)
-        logger.debug("newProcUnitValue: %s", newProcUnitValue)
-        logger.debug("newSharingMode: %s", newSharingMode)
-        logger.debug("newPoolID: %s", newPoolID)
-        logger.debug("newMem: %s", newMem)
-    if difference and \
-        (newProcValue != prevProcValue
-         or newProcUnitValue != prevProcUnitValue
-         or newMem != prevMem
-         or newSharingMode != prevSharingMode
-         or newUncappedWeight != prevUncappedWeight
-         or newPoolID != prevPoolID):
-        changed = True
+                if pool_id:
+                    newPoolID = rest_conn.getProcPool(partition_dom)
 
-    vm_facts = fetch_facts(rest_conn, partition_dom)
+                logger.debug("newProcValue: %s", newProcValue)
+                logger.debug("newProcUnitValue: %s", newProcUnitValue)
+                logger.debug("newSharingMode: %s", newSharingMode)
+                logger.debug("newPoolID: %s", newPoolID)
+                logger.debug("newMem: %s", newMem)
+            if difference and \
+                (newProcValue != prevProcValue
+                 or newProcUnitValue != prevProcUnitValue
+                 or newMem != prevMem
+                 or newSharingMode != prevSharingMode
+                 or newUncappedWeight != prevUncappedWeight
+                 or newPoolID != prevPoolID):
+                changed = True
 
-    return changed, vm_facts, None
+            vm_facts = fetch_facts(rest_conn, partition_dom)
+
+            return changed, vm_facts, None
+    except Exception as error:
+        error_msg = parse_error_response(error)
+        module.fail_json(msg=error_msg)
 
 
 def update_lpar(module, params):
@@ -625,75 +616,60 @@ def update_pv(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
+            try:
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if partition_uuid is None:
+                module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
 
-    try:
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if partition_uuid is None:
-        module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
+            try:
+                # Group pv_settings based on the vios name
+                pv_sett_group = build_group_by_key(pv_settings, 'vios_name')
 
-    try:
-        # Group pv_settings based on the vios name
-        pv_sett_group = build_group_by_key(pv_settings, 'vios_name')
-
-        # Get all vios names and their UUID of the Managed System
-        vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-        vios_list = []
-        vios_dict = {}
-        lpar_id = partition_dom.xpath("//PartitionID")[0].text
-        if vios_quick_response is not None:
-            vios_list = json.loads(vios_quick_response)
-        if vios_list:
-            vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
-            for vios_name, pv_sett_list in pv_sett_group.items():
-                if vios_name in vios_dict.keys():
-                    try:
-                        status_flag = rest_conn.updateVIOSwithSCSIMappings(vios_dict[vios_name], pv_sett_list, partition_uuid,
-                                                                           vios_name, partition_dom, timeout)
-                        if status_flag:
-                            counter = counter + 1
-                    except (Exception) as error:
-                        msg = "Failed to update PV Settings of VIOS: {0} =>".format(vios_name)
-                        update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error)
+                # Get all vios names and their UUID of the Managed System
+                vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+                vios_list = []
+                vios_dict = {}
+                lpar_id = partition_dom.xpath("//PartitionID")[0].text
+                if vios_quick_response is not None:
+                    vios_list = json.loads(vios_quick_response)
+                if vios_list:
+                    vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
+                    for vios_name, pv_sett_list in pv_sett_group.items():
+                        if vios_name in vios_dict.keys():
+                            try:
+                                status_flag = rest_conn.updateVIOSwithSCSIMappings(vios_dict[vios_name], pv_sett_list, partition_uuid,
+                                                                                   vios_name, partition_dom, timeout)
+                                if status_flag:
+                                    counter = counter + 1
+                            except (Exception) as error:
+                                msg = "Failed to update PV Settings of VIOS: {0} =>".format(vios_name)
+                                update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error)
+                        else:
+                            update_status_msg = update_status_msg + ". " + \
+                                "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
+                                    vios_name, system_name)
                 else:
-                    update_status_msg = update_status_msg + ". " + \
-                        "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
-                            vios_name, system_name)
-        else:
-            module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
+                    module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
 
-        pv_facts = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, lpar_id, vios_list)
-    except (Exception) as error:
+                pv_facts = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, lpar_id, vios_list)
+            except (Exception) as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+    except Exception as error:
         error_msg = parse_error_response(error)
         module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
     if counter >= 1:
         changed = True
         if update_status_msg:
@@ -729,75 +705,60 @@ def update_npiv(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
+            try:
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if partition_uuid is None:
+                module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
 
-    try:
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if partition_uuid is None:
-        module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
+            try:
+                # Group npiv_settings based on the vios name
+                npiv_sett_group = build_group_by_key(npiv_settings, 'vios_name')
 
-    try:
-        # Group npiv_settings based on the vios name
-        npiv_sett_group = build_group_by_key(npiv_settings, 'vios_name')
-
-        # Get all vios names and their UUID of the Managed System
-        vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-        vios_list = []
-        vios_dict = {}
-        lpar_id = partition_dom.xpath("//PartitionID")[0].text
-        if vios_quick_response is not None:
-            vios_list = json.loads(vios_quick_response)
-        if vios_list:
-            vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
-            for vios_name, npiv_sett_list in npiv_sett_group.items():
-                if vios_name in vios_dict.keys():
-                    try:
-                        status_flag = rest_conn.updateVIOSwithNPIVMappings(vios_dict[vios_name], npiv_sett_list, partition_uuid,
-                                                                           vios_name, partition_dom, timeout)
-                        if status_flag:
-                            counter = counter + 1
-                    except (Exception) as error:
-                        msg = "Failed to update NPIV Settings of VIOS: {0} =>".format(vios_name)
-                        update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error) + "."
+                # Get all vios names and their UUID of the Managed System
+                vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+                vios_list = []
+                vios_dict = {}
+                lpar_id = partition_dom.xpath("//PartitionID")[0].text
+                if vios_quick_response is not None:
+                    vios_list = json.loads(vios_quick_response)
+                if vios_list:
+                    vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
+                    for vios_name, npiv_sett_list in npiv_sett_group.items():
+                        if vios_name in vios_dict.keys():
+                            try:
+                                status_flag = rest_conn.updateVIOSwithNPIVMappings(vios_dict[vios_name], npiv_sett_list, partition_uuid,
+                                                                                   vios_name, partition_dom, timeout)
+                                if status_flag:
+                                    counter = counter + 1
+                            except (Exception) as error:
+                                msg = "Failed to update NPIV Settings of VIOS: {0} =>".format(vios_name)
+                                update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error) + "."
+                        else:
+                            update_status_msg = update_status_msg + ". " + \
+                                "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
+                                    vios_name, system_name)
                 else:
-                    update_status_msg = update_status_msg + ". " + \
-                        "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
-                            vios_name, system_name)
-        else:
-            module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
+                    module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
 
-        npiv_facts = rest_conn.fetchFCDetailsFromVIOS(system_uuid, lpar_id, vios_list)
-    except (Exception) as error:
+                npiv_facts = rest_conn.fetchFCDetailsFromVIOS(system_uuid, lpar_id, vios_list)
+            except (Exception) as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+    except Exception as error:
         error_msg = parse_error_response(error)
         module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
     if counter >= 1:
         changed = True
         if update_status_msg:
@@ -833,75 +794,60 @@ def update_vod(module, params):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-    try:
-        system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if not system_uuid:
-        module.fail_json(msg="Given system is not present")
+            try:
+                partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+            if partition_uuid is None:
+                module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
 
-    try:
-        partition_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
-    except Exception as error:
-        try:
-            rest_conn.logoff()
-        except Exception:
-            logger.debug("Logoff error")
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-    if partition_uuid is None:
-        module.fail_json(msg="Given partition name: {0} not found in the Managed System: {1}".format(vm_name, system_name))
+            try:
+                # Group vod_settings based on the vios name
+                vod_sett_group = build_group_by_key(vod_settings, 'vios_name')
 
-    try:
-        # Group vod_settings based on the vios name
-        vod_sett_group = build_group_by_key(vod_settings, 'vios_name')
-
-        # Get all vios names and their UUID of the Managed System
-        vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
-        vios_list = []
-        vios_dict = {}
-        lpar_id = partition_dom.xpath("//PartitionID")[0].text
-        if vios_quick_response is not None:
-            vios_list = json.loads(vios_quick_response)
-        if vios_list:
-            vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
-            for vios_name, vod_sett_list in vod_sett_group.items():
-                if vios_name in vios_dict.keys():
-                    try:
-                        status_flag = rest_conn.updateVIOSwithVODMappings(vios_dict[vios_name], vod_sett_list, partition_uuid,
-                                                                          partition_dom, timeout)
-                        if status_flag:
-                            counter = counter + 1
-                    except (Exception) as error:
-                        msg = "Failed to update Virtual Optical Device Settings of VIOS: {0} =>".format(vios_name)
-                        update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error) + "."
+                # Get all vios names and their UUID of the Managed System
+                vios_quick_response = rest_conn.getVirtualIOServersQuick(system_uuid)
+                vios_list = []
+                vios_dict = {}
+                lpar_id = partition_dom.xpath("//PartitionID")[0].text
+                if vios_quick_response is not None:
+                    vios_list = json.loads(vios_quick_response)
+                if vios_list:
+                    vios_dict = {vios['PartitionName']: vios['UUID'] for vios in vios_list if vios['RMCState'] == 'active'}
+                    for vios_name, vod_sett_list in vod_sett_group.items():
+                        if vios_name in vios_dict.keys():
+                            try:
+                                status_flag = rest_conn.updateVIOSwithVODMappings(vios_dict[vios_name], vod_sett_list, partition_uuid,
+                                                                                  partition_dom, timeout)
+                                if status_flag:
+                                    counter = counter + 1
+                            except (Exception) as error:
+                                msg = "Failed to update Virtual Optical Device Settings of VIOS: {0} =>".format(vios_name)
+                                update_status_msg = update_status_msg + " " + msg + " " + parse_error_response(error) + "."
+                        else:
+                            update_status_msg = update_status_msg + ". " + \
+                                "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
+                                    vios_name, system_name)
                 else:
-                    update_status_msg = update_status_msg + ". " + \
-                        "{0} VIOS not found or RMC is not active in the Managed System {1}".format(
-                            vios_name, system_name)
-        else:
-            module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
+                    module.fail_json(msg="There are no VIOS available in the Managed system: {0}".format(system_name))
 
-        npiv_facts = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, lpar_id, vios_list)
-    except (Exception) as error:
+                npiv_facts = rest_conn.fetchSCSIDetailsFromVIOS(system_uuid, lpar_id, vios_list)
+            except (Exception) as error:
+                error_msg = parse_error_response(error)
+                module.fail_json(msg=error_msg)
+    except Exception as error:
         error_msg = parse_error_response(error)
         module.fail_json(msg=error_msg)
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(error_msg)
     if counter >= 1:
         changed = True
         if update_status_msg:

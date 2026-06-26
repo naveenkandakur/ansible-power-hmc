@@ -12,10 +12,10 @@ redhat_linux_install_repo_port:
 redhat_linux_install_base_dir: /var/lib/tftpboot/
 
 # Append base directory path with a new directory named by mac address
-redhat_linux_install_dest_dir: "{{ redhat_linux_install_base_dir }}{{ mac_address }}"
+redhat_linux_install_dest_dir: "{{ redhat_linux_install_base_dir }}{{ redhat_linux_install_mac_address }}"
 
 # Set core elf file path in PXE server
-redhat_linux_install_core_file_path: "{{ mac_address }}/boot/grub/powerpc-ieee1275/core.elf"
+redhat_linux_install_core_file_path: "{{ redhat_linux_install_mac_address }}/boot/grub/powerpc-ieee1275/core.elf"
 
 # HMC credentials
 redhat_linux_install_curr_hmc_auth:

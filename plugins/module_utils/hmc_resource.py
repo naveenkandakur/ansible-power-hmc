@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 import time
 import re
-import subprocess
 import multiprocessing
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_command_stack import HmcCommandStack
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_cli_client import HmcCliConnection
@@ -54,17 +53,14 @@ class Hmc():
         cmd = "ping -c 2 " + i_host.strip()
 
         result = 'No response'
-        with subprocess.Popen(cmd, shell=True, executable="/bin/bash",
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as proc:
+        rc, stdout_value, stderr_value = self.hmcconn.module.run_command(cmd, use_unsafe_shell=True)
 
-            stdout_value, stderr_value = proc.communicate()
-            if isinstance(stdout_value, bytes):
-                stdout_value = stdout_value.decode('ascii')
+        if isinstance(stdout_value, bytes):
+            stdout_value = stdout_value.decode('ascii')
 
-            igot = re.findall(pattern, stdout_value)
-            if igot:
-                result = report[int(igot[0][0])]
+        igot = re.findall(pattern, stdout_value)
+        if igot:
+            result = report[int(igot[0][0])]
 
         return result
 
@@ -74,17 +70,14 @@ class Hmc():
         cmd = "ssh -o ConnectTimeout=5 -o Batchmode=yes " + u_host.strip() + "@" + i_host.strip() + " echo 'Alive'"
 
         result = report[0]
-        with subprocess.Popen(cmd, shell=True, executable="/bin/bash",
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as proc:
+        rc, stdout_value, stderr_value = self.hmcconn.module.run_command(cmd, use_unsafe_shell=True)
 
-            stdout_value, stderr_value = proc.communicate()
-            if isinstance(stdout_value, bytes):
-                stdout_value = stdout_value.decode('ascii')
+        if isinstance(stdout_value, bytes):
+            stdout_value = stdout_value.decode('ascii')
 
-            igot = re.findall(pattern, stdout_value)
-            if igot:
-                result = report[1]
+        igot = re.findall(pattern, stdout_value)
+        if igot:
+            result = report[1]
 
         return result
 
@@ -421,7 +414,7 @@ class Hmc():
         if wait:
             migrlparCmd += self.OPT['MIGRLPAR']['-W'] + str(wait)
         if pool and opr == 'M':
-            if len(pool) == 1:
+            if '/' not in str(pool):
                 if pool.isdigit():
                     migrlparCmd += " " + self.OPT['MIGRLPAR']['-I'] + '"shared_proc_pool_id=' + str(pool) + '"'
                 else:
@@ -429,7 +422,7 @@ class Hmc():
             else:
                 if '//' in str(pool):
                     migrlparCmd += " " + self.OPT['MIGRLPAR']['-I'] + '\\' + '"multiple_shared_proc_pool_names=' + str(pool) + '\\' + '"'
-                elif '/' in str(pool):
+                else:
                     migrlparCmd += " " + self.OPT['MIGRLPAR']['-I'] + '\\' + '"multiple_shared_proc_pool_ids=' + str(pool) + '\\' + '"'
         self.hmcconn.execute(migrlparCmd)
 

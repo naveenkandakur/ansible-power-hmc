@@ -870,218 +870,211 @@ def platform_update(module):
             return changed, repr(on_system_error), None
 
     try:
-        rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-    except Exception as error:
-        error_msg = parse_error_response(error)
-        module.fail_json(msg=error_msg)
-
-    try:
-        system_uuid, _unused = rest_conn.getManagedSystem(system_name)
-        if not system_uuid:
-            module.fail_json(msg="Given system is not present")
-
-        # Partition Migration Checks
-        if attributes.get('partition_migration'):
-            partition_migration = attributes.get('partition_migration')
-            destination_system = partition_migration.get('destination_managed_system')
-            if destination_system not in [v for d in sys_list for v in d.values()]:
-                module.fail_json(msg=f"The managed system {destination_system} is not available in HMC")
-            attributes['partition_migration'] = [partition_migration]
-
-        # System Readiness Check
-        sysfirm_update = attributes.get("system_firmware_update", {})
-        if sysfirm_update:
-            status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
-            check_response_exception(result, module, 'LicReadinessCheck')
-            if status == 'COMPLETED_OK':
-                logger.info("System readiness check Passed")
-            else:
-                msg = "No message error provided"
-                for param in result:
-                    if param.get("ParameterName") == 'JOBRESULT_KEY_ERRORMSG':
-                        msg = param.get('ParameterValue')
-                        break
-                error_msg = f'system {system_name} is not in ready state, therefore the system firmware cannot be updated, Msg: {msg}'
+        with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+            try:
+                system_uuid, _unused = rest_conn.getManagedSystem(system_name)
+            except Exception as error:
+                error_msg = parse_error_response(error)
                 module.fail_json(msg=error_msg)
+            if not system_uuid:
+                module.fail_json(msg="Given system is not present")
 
-        # SRIOV Adapters Avaiability Check
-        sysfirm_update = attributes.get("system_firmware_update", {})
-        if sysfirm_update:
-            output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
-            check_response_exception(output, module, 'LicQueryLevel')
-            if output.get('ParameterName'):
-                error_msg = output.get('ParameterValue')
-                module.fail_json(msg=error_msg)
-            sriov_update = sysfirm_update.get('sriov_adapter_update')
-            if sriov_update:
-                if 'No results' in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
-                    error_msg = f'No SRIOV Adapters are available for {system_name}'
-                    module.fail_json(msg=error_msg)
+            # Partition Migration Checks
+            if attributes.get('partition_migration'):
+                partition_migration = attributes.get('partition_migration')
+                destination_system = partition_migration.get('destination_managed_system')
+                if destination_system not in [v for d in sys_list for v in d.values()]:
+                    module.fail_json(msg=f"The managed system {destination_system} is not available in HMC")
+                attributes['partition_migration'] = [partition_migration]
 
-                for adapter in sriov_update:
-                    if adapter.get('all') is False:
-                        adapter['all'] = None
-                    if adapter.get('all'):
-                        available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
-                    else:
-                        adapter_id = adapter.get("adapter_id")
-                        if adapter_id not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
-                            error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
-                            module.fail_json(msg=error_msg)
-                        adapter['adapter_id'] = str(adapter_id)
-
-        # IO Adapter Avaiabillty check
-        if all_io_updates:
-            output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
-            check_response_exception(output, module, 'LicQueryLevel')
-            if output.get('ParameterName'):
-                error_msg = output.get('ParameterValue')
-                module.fail_json(msg=error_msg)
-
-            for io_update in all_io_updates:
-                if 'No results' in output.get("IOAdapterUpdate"):
-                    error_msg = f"No IO Adapters are available for VIOS '{io_update.get('vios_name')}'"
-                    module.fail_json(msg=error_msg)
-                if io_update.get('all'):
-                    vios_id = io_update.get('vios_id')
-                    if output.get('IOAdapterUpdate', {}).get(vios_id, []):
-                        available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
-                    else:
-                        error_msg = f"No available I/O adapters found for VIOS {io_update.get('vios_name')}"
-                        module.fail_json(msg=error_msg)
+            # System Readiness Check
+            sysfirm_update = attributes.get("system_firmware_update", {})
+            if sysfirm_update:
+                status, result = rest_conn.LicReadinessCheck(system_uuid, system_name)
+                check_response_exception(result, module, 'LicReadinessCheck')
+                if status == 'COMPLETED_OK':
+                    logger.info("System readiness check Passed")
                 else:
-                    io_id = str(io_update.get('vios_id')).zfill(3)
-                    devices = io_update.get('device')
-                    valid_devices = output.get('IOAdapterUpdate', {}).get(io_id, [])
-                    if valid_devices:
-                        for device in devices:
-                            if device not in valid_devices:
-                                error_msg = (
-                                    f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('vios_id')}' "
-                                    f"for VIOS '{io_update.get('vios_name')}'."
-                                )
-                                module.fail_json(msg=error_msg)
-                    else:
-                        error_msg = f"VIOS '{io_update.get('vios_name')}' does not contain IO Adapter with ID '{io_update.get('vios_id')}'."
+                    msg = "No message error provided"
+                    for param in result:
+                        if param.get("ParameterName") == 'JOBRESULT_KEY_ERRORMSG':
+                            msg = param.get('ParameterValue')
+                            break
+                    error_msg = f'system {system_name} is not in ready state, therefore the system firmware cannot be updated, Msg: {msg}'
+                    module.fail_json(msg=error_msg)
+
+            # SRIOV Adapters Avaiability Check
+            sysfirm_update = attributes.get("system_firmware_update", {})
+            if sysfirm_update:
+                output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
+                check_response_exception(output, module, 'LicQueryLevel')
+                if output.get('ParameterName'):
+                    error_msg = output.get('ParameterValue')
+                    module.fail_json(msg=error_msg)
+                sriov_update = sysfirm_update.get('sriov_adapter_update')
+                if sriov_update:
+                    if 'No results' in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
+                        error_msg = f'No SRIOV Adapters are available for {system_name}'
                         module.fail_json(msg=error_msg)
 
-        # Vios Update Check
-        needs_update = None
-        if vios_updates:
-            needs_update = any('update' == vios.get('update_type', '').lower() for vios in attributes.get("vios_update", []))
-        if needs_update:
-            console_uuid = rest_conn.getManagementConsole()
-            for vios_info in attributes.get("vios_update", []):
-                updateType = vios_info['update_type'].lower()
-                if updateType in 'update':
-                    vios_name = vios_info['vios_name']
-                    source_file = vios_info['resource_type']
-                    vios_level = vios_info['vios_image_name']
-                    output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
-                    check_response_exception(output, module, 'listViosUpdates')
-                    if output.strip() in ("[]", "", "None"):
-                        error_msg = f"Vios Image {vios_level} for {vios_name} not found at the specified source location: {source_file}."
+                    for adapter in sriov_update:
+                        if adapter.get('all') is False:
+                            adapter['all'] = None
+                        if adapter.get('all'):
+                            available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
+                        else:
+                            adapter_id = adapter.get("adapter_id")
+                            if adapter_id not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
+                                error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
+                                module.fail_json(msg=error_msg)
+                            adapter['adapter_id'] = str(adapter_id)
+
+            # IO Adapter Avaiabillty check
+            if all_io_updates:
+                output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
+                check_response_exception(output, module, 'LicQueryLevel')
+                if output.get('ParameterName'):
+                    error_msg = output.get('ParameterValue')
+                    module.fail_json(msg=error_msg)
+
+                for io_update in all_io_updates:
+                    if 'No results' in output.get("IOAdapterUpdate"):
+                        error_msg = f"No IO Adapters are available for VIOS '{io_update.get('vios_name')}'"
                         module.fail_json(msg=error_msg)
-                    elif vios_level not in output:
+                    if io_update.get('all'):
+                        vios_id = io_update.get('vios_id')
+                        if output.get('IOAdapterUpdate', {}).get(vios_id, []):
+                            available_io_updates = {'IOAdapterUpdate': {vios_id: output.get('IOAdapterUpdate', {}).get(vios_id, [])}}
+                        else:
+                            error_msg = f"No available I/O adapters found for VIOS {io_update.get('vios_name')}"
+                            module.fail_json(msg=error_msg)
+                    else:
+                        io_id = str(io_update.get('vios_id')).zfill(3)
+                        devices = io_update.get('device')
+                        valid_devices = output.get('IOAdapterUpdate', {}).get(io_id, [])
+                        if valid_devices:
+                            for device in devices:
+                                if device not in valid_devices:
+                                    error_msg = (
+                                        f"Device '{device}' is not found under IO Adapter with ID '{io_update.get('vios_id')}' "
+                                        f"for VIOS '{io_update.get('vios_name')}'."
+                                    )
+                                    module.fail_json(msg=error_msg)
+                        else:
+                            error_msg = f"VIOS '{io_update.get('vios_name')}' does not contain IO Adapter with ID '{io_update.get('vios_id')}'."
+                            module.fail_json(msg=error_msg)
+
+            # Vios Update Check
+            needs_update = None
+            if vios_updates:
+                needs_update = any('update' == vios.get('update_type', '').lower() for vios in attributes.get("vios_update", []))
+            if needs_update:
+                console_uuid = rest_conn.getManagementConsole()
+                for vios_info in attributes.get("vios_update", []):
+                    updateType = vios_info['update_type'].lower()
+                    if updateType in 'update':
+                        vios_name = vios_info['vios_name']
+                        source_file = vios_info['resource_type']
+                        vios_level = vios_info['vios_image_name']
+                        output = rest_conn.listViosUpdates(console_uuid, system_name, vios_name, source_file)
+                        check_response_exception(output, module, 'listViosUpdates')
+                        if output.strip() in ("[]", "", "None"):
+                            error_msg = f"Vios Image {vios_level} for {vios_name} not found at the specified source location: {source_file}."
+                            module.fail_json(msg=error_msg)
+                        elif vios_level not in output:
+                            error_msg = (
+                                f"Update file {vios_level} for vios {vios_name} "
+                                f"is not found at the specified source location: {source_file}."
+                            )
+                            module.fail_json(msg=error_msg)
+
+            # System Firmware Update Check
+            sysfirm_update = attributes.get('system_firmware_update')
+            if sysfirm_update:
+                updateType = sysfirm_update.get('update_type').lower()
+                if updateType in ['update', 'upgrade']:
+                    firm_level = sysfirm_update.get('level')
+                    source_file = sysfirm_update.get('repository').lower()
+                    if source_file:
+                        sysfirm_update['repository'] = source_file
+                    sysfirm_update['Type'] = 'sys'
+                    output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
+                                                          type="sys", level=updateType)
+                    check_response_exception(output, module, 'LICQueryRepository')
+                    if "No results" in output.get('ParameterValue'):
+                        error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
+                        module.fail_json(msg=error_msg)
+                    if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
                         error_msg = (
-                            f"Update file {vios_level} for vios {vios_name} "
+                            f"No {updateType.upper()} file found at the specified source: {source_file} "
+                            f"for the resource: {system_name} reason: {output.get('ParameterValue')}"
+                        )
+                        module.fail_json(msg=error_msg)
+                    param_val = output.get('ParameterValue', '')
+                    available_levels = []
+                    if param_val:
+                        for line in param_val.splitlines():
+                            parts = line.split(",")
+                            if len(parts) >= 3:
+                                available_levels.append(parts[2].strip())
+                    if firm_level != 'latest' and firm_level not in available_levels:
+                        error_msg = (
+                            f"Update file {firm_level} for the resource {system_name} "
                             f"is not found at the specified source location: {source_file}."
                         )
                         module.fail_json(msg=error_msg)
+                    else:
+                        if output.get('ParameterValue'):
+                            output = output.get('ParameterValue')
+                            lines = output.split("\n")
+                            sysfirm_update['IsDestruptive'] = False
+                            if firm_level != 'latest':
+                                for line in lines:
+                                    parts = line.split(",")
+                                    if firm_level == parts[2]:
+                                        sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
+                                        break
+                            else:
+                                latest_line = max(
+                                    (line for line in lines if line.strip()),
+                                    key=lambda line_data: int(line_data.split(",")[2])
+                                )
+                                parts = latest_line.split(",")
+                                sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
+                    if sysfirm_update.get('level') != "latest":
+                        firm_level = str(sysfirm_update.get('level'))
+                        if firm_level.isdigit():
+                            if len(firm_level) == 1:
+                                firm_level = "00" + firm_level
+                            elif len(firm_level) == 2:
+                                firm_level = "0" + firm_level
 
-        # System Firmware Update Check
-        sysfirm_update = attributes.get('system_firmware_update')
-        if sysfirm_update:
-            updateType = sysfirm_update.get('update_type').lower()
-            if updateType in ['update', 'upgrade']:
-                firm_level = sysfirm_update.get('level')
-                source_file = sysfirm_update.get('repository').lower()
-                if source_file:
-                    sysfirm_update['repository'] = source_file
-                sysfirm_update['Type'] = 'sys'
-                output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
-                                                      type="sys", level=updateType)
-                check_response_exception(output, module, 'LICQueryRepository')
-                if "No results" in output.get('ParameterValue'):
-                    error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
-                    module.fail_json(msg=error_msg)
-                if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                    error_msg = (
-                        f"No {updateType.upper()} file found at the specified source: {source_file} "
-                        f"for the resource: {system_name} reason: {output.get('ParameterValue')}"
-                    )
-                    module.fail_json(msg=error_msg)
-                param_val = output.get('ParameterValue', '')
-                available_levels = []
-                if param_val:
-                    for line in param_val.splitlines():
-                        parts = line.split(",")
-                        if len(parts) >= 3:
-                            available_levels.append(parts[2].strip())
-                if firm_level != 'latest' and firm_level not in available_levels:
-                    error_msg = (
-                        f"Update file {firm_level} for the resource {system_name} "
-                        f"is not found at the specified source location: {source_file}."
-                    )
-                    module.fail_json(msg=error_msg)
-                else:
-                    if output.get('ParameterValue'):
-                        output = output.get('ParameterValue')
-                        lines = output.split("\n")
-                        sysfirm_update['IsDestruptive'] = False
-                        if firm_level != 'latest':
-                            for line in lines:
-                                parts = line.split(",")
-                                if firm_level == parts[2]:
-                                    sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
-                                    break
-                        else:
-                            latest_line = max(
-                                (line for line in lines if line.strip()),
-                                key=lambda line_data: int(line_data.split(",")[2])
-                            )
-                            parts = latest_line.split(",")
-                            sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
-                if sysfirm_update.get('level') != "latest":
-                    firm_level = str(sysfirm_update.get('level'))
-                    if firm_level.isdigit():
-                        if len(firm_level) == 1:
-                            firm_level = "00" + firm_level
-                        elif len(firm_level) == 2:
-                            firm_level = "0" + firm_level
+            # IO Adapter Update check
+            if all_io_updates:
+                for io_update in all_io_updates:
+                    source_file = io_update.get('repository').lower()
+                    vios_id = io_update.get('vios_id')
+                    output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
+                    check_response_exception(output, module, 'LICQueryRepository')
+                    if available_io_updates:
+                        adp_ids = vios_id
+                    else:
+                        adp_ids = {io_update.get('id')}
+                    if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                        f"Import operation failed for IO Adapter ID '{adp_ids}' "
+                        f"on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
+                        module.fail_json(msg=error_msg)
 
-        # IO Adapter Update check
-        if all_io_updates:
-            for io_update in all_io_updates:
-                source_file = io_update.get('repository').lower()
-                vios_id = io_update.get('vios_id')
-                output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file)
-                check_response_exception(output, module, 'LICQueryRepository')
-                if available_io_updates:
-                    adp_ids = vios_id
-                else:
-                    adp_ids = {io_update.get('id')}
-                if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                    error_msg = f"Import operation failed for IO Adapter ID '{adp_ids}' on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
-                    module.fail_json(msg=error_msg)
-
-        cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
-        mapped_data = map_entries(cleaned_data)
-        before_update_level = check_current_level(hmc, mapped_data, system_name)
-        final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
-        check_response_exception(final_output, module, 'PlatformUpdate')
-        after_update_level = check_current_level(hmc, mapped_data, system_name)
+            cleaned_data = cleanup_entries(attributes, sriov=available_adapter_id, io=available_io_updates)
+            mapped_data = map_entries(cleaned_data)
+            before_update_level = check_current_level(hmc, mapped_data, system_name)
+            final_output = rest_conn.PlatformUpdate(system_uuid, mapped_data)
+            check_response_exception(final_output, module, 'PlatformUpdate')
+            after_update_level = check_current_level(hmc, mapped_data, system_name)
     except (Exception, HmcError) as error:
         error_msg = parse_error_response(error)
         logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
         module.fail_json(msg=error_msg)
-
-    finally:
-        try:
-            rest_conn.logoff()
-        except Exception as logoff_error:
-            error_msg = parse_error_response(logoff_error)
-            module.warn(msg=error_msg)
 
     return True, final_output, None
 
@@ -1128,53 +1121,52 @@ def facts(module):
                 return changed, repr(on_system_error), None
 
         try:
-            rest_conn = HmcRestClient(hmc_host, hmc_user, password)
-        except Exception as error:
-            error_msg = parse_error_response(error)
-            module.fail_json(msg=error_msg)
+            with HmcRestClient(hmc_host, hmc_user, password) as rest_conn:
+                try:
+                    system_uuid, _unused = rest_conn.getManagedSystem(system_name)
+                except Exception as error:
+                    error_msg = parse_error_response(error)
+                    module.fail_json(msg=error_msg)
+                if not system_uuid:
+                    module.fail_json(msg="Given system is not present")
 
-        try:
-            system_uuid, _unused = rest_conn.getManagedSystem(system_name)
-            if not system_uuid:
-                module.fail_json(msg="Given system is not present")
+                def extract_adapters(response, key):
+                    if response.get('ParameterName'):
+                        return None
+                    value = response.get(key)
+                    if not value or 'No results' in value:
+                        return None
+                    return value
+
+                sriov_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
+                check_response_exception(sriov_output, module, 'LicQueryLevel')
+                sriov_adapters = extract_adapters(sriov_output, 'SRIOVAdapterUpdate')
+
+                io_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
+                check_response_exception(io_output, module, 'LicQueryLevel')
+                io_adapters = extract_adapters(io_output, 'IOAdapterUpdate')
+
+                vios_info = []
+
+                for vios_name, vios_id in vios_list:
+                    padded_id = vios_id.zfill(3)
+                    adapter_info = io_adapters.get(padded_id) if io_adapters else None
+                    vios_info.append({
+                        'vios_name': vios_name,
+                        'vios_id': vios_id,
+                        'io_devices': adapter_info if adapter_info else 'No adapters available'
+                    })
+
+                adapter_info = {
+                    system_name: {
+                        'sriov_adapters': sriov_adapters if sriov_adapters else 'No sriov_adapters available',
+                        'vios_info': vios_info
+                    }
+                }
         except (Exception, HmcError) as error:
             error_msg = parse_error_response(error)
             logger.debug("Line number: %d exception: %s", sys.exc_info()[2].tb_lineno, repr(error))
             module.fail_json(msg=error_msg)
-
-        def extract_adapters(response, key):
-            if response.get('ParameterName'):
-                return None
-            value = response.get(key)
-            if not value or 'No results' in value:
-                return None
-            return value
-
-        sriov_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='sriov')
-        check_response_exception(sriov_output, module, 'LicQueryLevel')
-        sriov_adapters = extract_adapters(sriov_output, 'SRIOVAdapterUpdate')
-
-        io_output = rest_conn.LicQueryLevel(system_uuid, system_name, type='io')
-        check_response_exception(io_output, module, 'LicQueryLevel')
-        io_adapters = extract_adapters(io_output, 'IOAdapterUpdate')
-
-        vios_info = []
-
-        for vios_name, vios_id in vios_list:
-            padded_id = vios_id.zfill(3)
-            adapter_info = io_adapters.get(padded_id)
-            vios_info.append({
-                'vios_name': vios_name,
-                'vios_id': vios_id,
-                'io_devices': adapter_info if adapter_info else 'No adapters available'
-            })
-
-        adapter_info = {
-            system_name: {
-                'sriov_adapters': sriov_adapters if sriov_adapters else 'No sriov_adapters available',
-                'vios_info': vios_info
-            }
-        }
 
     return changed, adapter_info, None
 

@@ -280,6 +280,20 @@ class HmcRestClient:
                  force_basic_auth=True,
                  timeout=300)
 
+    def __enter__(self):
+        """Context manager entry point - returns the connection object."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point - calls the existing logoff() method."""
+        logger.debug("__exit__ called - cleaning up HMC session")
+        try:
+            self.logoff()
+            logger.debug("HMC session successfully logged off in __exit__")
+        except Exception as e:
+            logger.debug("Error during logoff in __exit__: %s", repr(e))
+        return False
+
     def fetchJobStatus(self, jobId, template=False, timeout_in_min=30):
 
         if template:
@@ -629,10 +643,9 @@ class HmcRestClient:
         return response
 
     def updatePCM(self, system_uuid, metrics, disable):
-        logon_res = self.logon()
         url = "https://{0}/rest/api/pcm/ManagedSystem/{1}/preferences".format(self.hmc_ip, system_uuid)
         header = {'Content-Type': 'application/xml',
-                  'X-API-Session': logon_res}
+                  'X-API-Session': self.session}
         sys_details = self.getPCM(system_uuid, None)
         doc = xml_strip_namespace(sys_details)
         preference_map = {'LTM': 'LongTermMonitorEnabled', 'STM': 'ShortTermMonitorEnabled',
@@ -670,7 +683,6 @@ class HmcRestClient:
             payload_content = payload_content.replace('\n', ' ').replace('\"', '\'')
             payload_content = etree.fromstring(payload_content)
             payload_content = etree.tostring(payload_content, encoding='unicode')
-            logger.debug(payload_content)
             resp = open_url(url,
                             headers=header,
                             method='POST',
@@ -1125,7 +1137,7 @@ class HmcRestClient:
         lparProfiles = lparProfiles_root.xpath('//LogicalPartitionProfile')
         return lparProfiles
 
-    def add_vscsi_payload(self, pv_tup):
+    def add_vscsi_payload(self, pv_tup, vtd_name=''):
         payload = ''
         pv_tup_list_slice = pv_tup[:2]
         for pv_name, vios_name, pv_obj in pv_tup_list_slice:
@@ -1134,7 +1146,7 @@ class HmcRestClient:
                     <Metadata>
                             <Atom/>
                     </Metadata>
-                    <name kb="CUD" kxe="false"></name>
+                    <PhyscalVolumeVTDName kb="CUD" kxe="false">{2}</PhyscalVolumeVTDName>
                     <associatedLogicalUnits kb="CUD" kxe="false" schemaVersion="V1_0">
                             <Metadata>
                                     <Atom/>
@@ -1162,7 +1174,7 @@ class HmcRestClient:
                                     <Atom/>
                             </Metadata>
                     </associatedVirtualOpticalMedia>
-            </VirtualSCSIClientAdapter>'''.format(pv_name, vios_name)
+            </VirtualSCSIClientAdapter>'''.format(pv_name, vios_name, vtd_name)
         return payload
 
     def add_vscsi(self, lpar_template_dom, vscsi_clients):
@@ -1388,20 +1400,26 @@ class HmcRestClient:
                         volumeUniqueID = vios_scsi.xpath('//Storage/PhysicalVolume/VolumeUniqueID')[0].text
                         vscsi_dict['VolumeUniqueID'] = volumeUniqueID
                         vios_id = int(vios_scsi.xpath('//ClientAdapter/RemoteLogicalPartitionID')[0].text)
-                        vol_dict = {"vios": vios_dict[vios_id], 'name': vios_scsi.xpath('//Storage/PhysicalVolume/VolumeName')[0].text}
-                        vscsi_dict['Volume'] = [vol_dict]
+                        client_slot = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
+                        server_slot = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
+                        target_device = vios_scsi.xpath('//TargetDevice//TargetName')[0].text
+                        vol_dict = {
+                            "vios": vios_dict[vios_id],
+                            'name': vios_scsi.xpath('//Storage/PhysicalVolume/VolumeName')[0].text,
+                            'ClientVirtualSlotNumber': client_slot,
+                            'ServerVirtualSlotNumber': server_slot,
+                            'TargetDeviceName': target_device
+                        }
                         flag = False
                         for vscsi in vscsis:
                             if 'VolumeUniqueID' in vscsi and vscsi['VolumeUniqueID'] == volumeUniqueID:
                                 vscsi['Volume'].append(vol_dict)
                                 flag = True
+                                break
                         if not flag:
-                            vscsi_dict['ClientVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
-                            vscsi_dict['ServerVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
-                            vscsi_dict['TargetDeviceName'] = vios_scsi.xpath('//TargetDevice//TargetName')[0].text
                             vscsi_dict['VolumeCapacity'] = vios_scsi.xpath('//Storage/PhysicalVolume/VolumeCapacity')[0].text
+                            vscsi_dict['Volume'] = [vol_dict]
                             vscsis.append(vscsi_dict)
-                    # Adds the VOD
                     elif len(vios_scsi.xpath('//TargetDevice/VirtualOpticalTargetDevice')) >= 1:
                         vscsi_dict['ClientVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/VirtualSlotNumber')[0].text
                         vscsi_dict['ServerVirtualSlotNumber'] = vios_scsi.xpath('//ClientAdapter/RemoteSlotNumber')[0].text
