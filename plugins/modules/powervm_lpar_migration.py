@@ -108,21 +108,29 @@ options:
                 description:
                     - Name of the partition to be migrated.
                     - lpar_name and lpar_id are mutually exclusive.
+                    - Use lpar_name only when I(vm_names) is specified at the top level.
+                    - When using lpar_name, you must use pool_name (pool_id is not supported).
                 type: str
             lpar_id:
                 description:
                     - Id of the partition to be migrated.
                     - lpar_name and lpar_id are mutually exclusive.
+                    - Use lpar_id only when I(vm_ids) is specified at the top level.
+                    - When using lpar_id, you must use pool_id (pool_name is not supported).
                 type: int
             pool_id:
                 description:
                     - IDs of the shared processor pools to use on the destination managed.
                     - pool_id and pool_name are mutually exclusive.
+                    - Use pool_id only when I(vm_ids) is specified at the top level.
+                    - Required when using lpar_id.
                 type: int
             pool_name:
                 description:
                     - Names of the shared processor pools to use on the destination managed.
                     - pool_id and pool_name are mutually exclusive.
+                    - Use pool_name only when I(vm_names) is specified at the top level.
+                    - Required when using lpar_name.
                 type: str
     action:
         description:
@@ -255,11 +263,15 @@ def validate_parameters(params):
                 if params['vm_names'] is not None:
                     if len(params['shared_proc_pool']) != len(params['vm_names']):
                         raise ParameterError("Specify the pool details for each VMs provided")
+                    if item['pool_id'] is not None or item['lpar_id'] is not None:
+                        raise ParameterError("pool_id or lpar_id are not supported for migration with partition name.")
                     if item['pool_name'] is None or item['lpar_name'] is None:
                         raise ParameterError("pool_name and lpar_name are mandatory for migration with partition name.")
                 elif params['vm_ids'] is not None:
                     if len(params['shared_proc_pool']) != len(params['vm_ids']):
                         raise ParameterError("Specify the pool details for each VMs provided")
+                    if item['pool_name'] is not None or item['lpar_name'] is not None:
+                        raise ParameterError("pool_name or lpar_name are not supported for migration with partition id.")
                     if item['pool_id'] is None or item['lpar_id'] is None:
                         raise ParameterError("pool_id and lpar_id are mandatory for migration with partition id.")
 
