@@ -162,16 +162,21 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions impor
 from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions import ParameterError
 
 import logging
+import os
 import sys
-LOG_FILENAME = "/tmp/ansible_power_hmc.log"
+LOG_FILENAME = "/tmp/ansible_power_hmc_{0}.log".format(os.getpid())
 logger = logging.getLogger(__name__)
 
 
 def init_logger():
-    logging.basicConfig(
-        filename=LOG_FILENAME,
-        format='[%(asctime)s] %(levelname)s: [%(funcName)s] %(message)s',
-        level=logging.DEBUG)
+    old_umask = os.umask(0o177)
+    try:
+        logging.basicConfig(
+            filename=LOG_FILENAME,
+            format='[%(asctime)s] %(levelname)s: [%(funcName)s] %(message)s',
+            level=logging.DEBUG)
+    finally:
+        os.umask(old_umask)
 
 
 def create_hmc_conn(module, params):

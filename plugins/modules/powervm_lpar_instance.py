@@ -690,15 +690,20 @@ except ImportError:
 
 # Generic setting for log initializing and log rotation
 import logging
-LOG_FILENAME = "/tmp/ansible_power_hmc.log"
+import os
+LOG_FILENAME = "/tmp/ansible_power_hmc_{0}.log".format(os.getpid())
 logger = logging.getLogger(__name__)
 
 
 def init_logger():
-    logging.basicConfig(
-        filename=LOG_FILENAME,
-        format='[%(asctime)s] %(levelname)s: [%(funcName)s] %(message)s',
-        level=logging.DEBUG)
+    old_umask = os.umask(0o177)
+    try:
+        logging.basicConfig(
+            filename=LOG_FILENAME,
+            format='[%(asctime)s] %(levelname)s: [%(funcName)s] %(message)s',
+            level=logging.DEBUG)
+    finally:
+        os.umask(old_umask)
 
 
 def validate_proc_mem(system_dom, proc, mem, max_proc, min_proc, max_mem, min_mem, weight, min_proc_unit, max_proc_unit, proc_unit=None):
