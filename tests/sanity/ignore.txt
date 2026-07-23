@@ -1,0 +1,2 @@
+devops/bin/gen_doc.sh SC2006: Use $(...) notation instead of legacy backticks
+devops/bin/gen_doc.sh SC2086: Double quote to prevent globbing and word splitting

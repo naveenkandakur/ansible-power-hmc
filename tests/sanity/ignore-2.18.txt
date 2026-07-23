@@ -1,2 +1,0 @@
-devops/bin/gen_doc.sh # ignore Use $(...) notation instead of legacy backticks `...`
-devops/bin/gen_doc.sh # ignore Double quote to prevent globbing and word splitting
