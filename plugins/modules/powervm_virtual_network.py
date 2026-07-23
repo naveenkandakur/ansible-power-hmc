@@ -232,9 +232,9 @@ def validate_parameters(params):
     if state == 'present':
         mandatoryList = ['hmc_host', 'hmc_auth', 'system_name', 'network_name', 'network_vlan_id']
         unsupportedList = ['new_network_name']
-        if not params.get('switch_name') and not params.get('switch_id'):
+        if not params.get('switch_name') and params.get('switch_id') is None:
             raise ParameterError("Either 'switch_name' or 'switch_id' is required for present state")
-        if params.get('switch_name') and params.get('switch_id'):
+        if params.get('switch_name') and params.get('switch_id') is not None:
             raise ParameterError("Parameters 'switch_name' and 'switch_id' are mutually exclusive")
         vlan_id = params.get('network_vlan_id')
         if vlan_id is not None and (vlan_id < 1 or vlan_id > 4094):
