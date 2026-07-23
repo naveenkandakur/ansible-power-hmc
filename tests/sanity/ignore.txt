@@ -1,2 +1,2 @@
 devops/bin/gen_doc.sh shebang
-devops/bin/gen_doc.sh shellcheck
+devops/bin/gen_doc.sh shellcheck:SC1090,SC1091,SC2028
