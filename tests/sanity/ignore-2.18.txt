@@ -1,1 +1,2 @@
-devops/bin/gen_doc.sh # ignore
+devops/bin/gen_doc.sh # ignore SC2006
+devops/bin/gen_doc.sh # ignore SC2086
