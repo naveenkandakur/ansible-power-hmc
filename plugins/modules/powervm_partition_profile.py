@@ -755,6 +755,8 @@ def update_partition_profile(module, params):
         'processor_settings': {k.split('.')[1]: None for k in PROFILE_FIELD_MAP if k.startswith('processor_settings.')},
         'memory_settings': {k.split('.')[1]: None for k in PROFILE_FIELD_MAP if k.startswith('memory_settings.')},
     }
+    profile_settings['processor_settings']['sharing_mode'] = None
+    profile_settings['processor_settings']['allow_processor_sharing'] = None
     user_input = {
         'processor_settings': params.get('processor_settings') or {},
         'memory_settings': params.get('memory_settings') or {}
@@ -799,6 +801,10 @@ def update_partition_profile(module, params):
         current_config = rest_conn.getCurrentPartitionProfiles(lpar_uuid, profile_uuid)
         root = etree.fromstring(current_config)
         ns = {'lpp': 'http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/'}
+        profile_elem = root.xpath(".//lpp:LogicalPartitionProfile", namespaces=ns)
+        if not profile_elem:
+            module.fail_json(msg="Could not locate LogicalPartitionProfile element in GET response")
+        profile_root = profile_elem[0]
         has_dedicated = root.xpath(".//lpp:ProcessorAttributes/lpp:HasDedicatedProcessors/text()", namespaces=ns)
         processor_mode = 'dedicated' if has_dedicated and has_dedicated[0].lower() == 'true' else 'shared'
         profile_settings['processor_settings']['processor_mode'] = processor_mode
@@ -902,7 +908,36 @@ def update_partition_profile(module, params):
             user_ame = user_input.get('memory_settings', {}).get('active_memory_expansion')
             user_exp_factor = user_input.get('memory_settings', {}).get('expansion_factor')
             apply_ame_config(config, user_ame, user_exp_factor)
-            code, result = rest_conn.updatePartitionProfile(lpar_uuid, profile_uuid, config, force=force)
+
+            lpp_ns = ns['lpp']
+            if config['processor_mode'].lower() == 'false':
+                new_proc_xml = rest_conn.sharedProcessorAttributesXML(config)
+            else:
+                new_proc_xml = rest_conn.dedicatedProcessorAttributesXML(config)
+            new_proc_xml = new_proc_xml.strip().replace(
+                '<ProcessorAttributes ', f'<ProcessorAttributes xmlns="{lpp_ns}" ', 1)
+            new_proc_elem = etree.fromstring(new_proc_xml)
+            old_proc = profile_root.xpath(".//lpp:ProcessorAttributes", namespaces=ns)
+            if old_proc:
+                parent = old_proc[0].getparent()
+                idx = list(parent).index(old_proc[0])
+                parent.remove(old_proc[0])
+                parent.insert(idx, new_proc_elem)
+
+            new_mem_xml = rest_conn.buildMemoryPayloadXML(config)
+            mem_fragment = new_mem_xml[:new_mem_xml.index('</ProfileMemory>') + len('</ProfileMemory>')]
+            mem_fragment = mem_fragment.strip().replace(
+                '<ProfileMemory ', f'<ProfileMemory xmlns="{lpp_ns}" ', 1)
+            new_mem_elem = etree.fromstring(mem_fragment)
+            old_mem = profile_root.xpath(".//lpp:ProfileMemory", namespaces=ns)
+            if old_mem:
+                parent = old_mem[0].getparent()
+                idx = list(parent).index(old_mem[0])
+                parent.remove(old_mem[0])
+                parent.insert(idx, new_mem_elem)
+
+            patched_xml = etree.tostring(profile_root, encoding='unicode')
+            code, result = rest_conn.updatePartitionProfile(lpar_uuid, profile_uuid, patched_xml, force=force)
         if code != 200:
             return False, result, None
         else:
