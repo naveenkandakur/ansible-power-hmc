@@ -149,7 +149,6 @@ options:
 
 EXAMPLES = '''
 # The most minimal example, targeting only a single HMC
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -158,7 +157,6 @@ hmc_hosts:
 
 # Create an inventory consisting of only Virtual IO Servers.
 # This may be important if grouping by advanced_fields exclusive to VIOS.
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -168,7 +166,6 @@ filters:
   PartitionType: 'Virtual IO Server'
 
 # Target multiple HMC hosts and only add running partitions to the inventory
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -181,7 +178,6 @@ filters:
   PartitionState: 'running'
 
 # Generate an inventory of all running partitions and create a separate group for AIX 7.2 and IBMi type of partitions
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -199,7 +195,6 @@ groups:
 # Generate an inventory of running partitions and group them by PartitionType with a prefix of type_
 # Groups will be created will resemble "type_Virtual_IO_Server", "type_AIX_Linux", "type_OS400", etc.
 # Additionally, include the following variables as host_vars for a given target host: CurrentMemory, OperatingSystemVersion, PartitionName
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -221,7 +216,6 @@ compose:
   HMCUSERNAME: AssociatedHMCUserName
 
 ## Generate an inventory that excludes partitions by ip, name, or the name of managed system on which they run
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -242,7 +236,6 @@ exclude_system:
 # Generate an inventory of operating Power Servers and group them by SystemType with a prefix of type_
 # Groups will be created will resemble "type_fsp", "type_ebmc", etc.
 # Additionally, include the following variables as host_vars for a given target host: MaximumPartitions, SystemFirmware, SystemName
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
@@ -263,7 +256,6 @@ system_compose:
 # Generate an inventory of all running partitions and operating Power Servers
 # Create a seperate group for partitions tagged with associated group name 'production_lpars'
 # Create a seperate group for Power Servers tagged with associated group name 'Production_systems'
----
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
   - hmc: <hmc_host_name>
