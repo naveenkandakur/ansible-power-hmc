@@ -1,2 +1,3 @@
+dependencies: ansible.posix: ">=1.5.0"
 collections:
   - name: ibm.power_hmc
