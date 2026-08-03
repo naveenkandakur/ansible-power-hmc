@@ -148,6 +148,7 @@ options:
 '''
 
 EXAMPLES = '''
+-
 # The most minimal example, targeting only a single HMC
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
@@ -155,6 +156,7 @@ hmc_hosts:
     user: <HMC_Username>
     password: <HMC_Password>
 
+-
 # Create an inventory consisting of only Virtual IO Servers.
 # This may be important if grouping by advanced_fields exclusive to VIOS.
 plugin: ibm.power_hmc.powervm_inventory
@@ -165,6 +167,7 @@ hmc_hosts:
 filters:
   PartitionType: 'Virtual IO Server'
 
+-
 # Target multiple HMC hosts and only add running partitions to the inventory
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
@@ -177,6 +180,7 @@ hmc_hosts:
 filters:
   PartitionState: 'running'
 
+-
 # Generate an inventory of all running partitions and create a separate group for AIX 7.2 and IBMi type of partitions
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
@@ -192,6 +196,7 @@ groups:
   AIX_72: "'7.2' in OperatingSystemVersion"
   IBMi: "'IBM' in OperatingSystemVersion"
 
+-
 # Generate an inventory of running partitions and group them by PartitionType with a prefix of type_
 # Groups will be created will resemble "type_Virtual_IO_Server", "type_AIX_Linux", "type_OS400", etc.
 # Additionally, include the following variables as host_vars for a given target host: CurrentMemory, OperatingSystemVersion, PartitionName
@@ -215,6 +220,7 @@ compose:
   HMCIP: AssociatedHMC
   HMCUSERNAME: AssociatedHMCUserName
 
+-
 ## Generate an inventory that excludes partitions by ip, name, or the name of managed system on which they run
 plugin: ibm.power_hmc.powervm_inventory
 hmc_hosts:
@@ -233,6 +239,7 @@ exclude_system:
   - Frame1-XXX-WWWWWW
   - Frame2-XXX-WWWWWW
 
+-
 # Generate an inventory of operating Power Servers and group them by SystemType with a prefix of type_
 # Groups will be created will resemble "type_fsp", "type_ebmc", etc.
 # Additionally, include the following variables as host_vars for a given target host: MaximumPartitions, SystemFirmware, SystemName
@@ -253,6 +260,7 @@ system_compose:
   HMCIP: AssociatedHMC
   HMCUSERNAME: AssociatedHMCUserName
 
+-
 # Generate an inventory of all running partitions and operating Power Servers
 # Create a seperate group for partitions tagged with associated group name 'production_lpars'
 # Create a seperate group for Power Servers tagged with associated group name 'Production_systems'
