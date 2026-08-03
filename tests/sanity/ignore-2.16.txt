@@ -1,4 +1,13 @@
-Ignore Python 2.7 compile/import checks (collection is not Python 2 compatible)
 devops/bin/gen_doc.sh shebang
 devops/bin/gen_doc.sh shellcheck:SC2006
 devops/bin/gen_doc.sh shellcheck:SC2086
+plugins/module_utils/hmc_resource.py compile-2.7!skip # Python 2.7 is not supported
+plugins/module_utils/hmc_resource.py import-2.7!skip # Python 2.7 is not supported
+plugins/module_utils/hmc_rest_client.py compile-2.7!skip # Python 2.7 is not supported
+plugins/module_utils/hmc_rest_client.py import-2.7!skip # Python 2.7 is not supported
+plugins/modules/create_service_event.py compile-2.7!skip # Python 2.7 is not supported
+plugins/modules/create_service_event.py import-2.7!skip # Python 2.7 is not supported
+plugins/modules/firmware_update.py compile-2.7!skip # Python 2.7 is not supported
+plugins/modules/firmware_update.py import-2.7!skip # Python 2.7 is not supported
+plugins/modules/hmc_pwdpolicy.py compile-2.7!skip # Python 2.7 is not supported
+plugins/modules/hmc_pwdpolicy.py import-2.7!skip # Python 2.7 is not supported
