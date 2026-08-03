@@ -1,3 +1,4 @@
+Ignore Python 2.7 compile/import checks (collection is not Python 2 compatible)
 devops/bin/gen_doc.sh shebang
 devops/bin/gen_doc.sh shellcheck:SC2006
 devops/bin/gen_doc.sh shellcheck:SC2086
