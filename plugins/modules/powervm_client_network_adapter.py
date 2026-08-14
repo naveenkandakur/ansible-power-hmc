@@ -612,14 +612,14 @@ def create_client_network_adapter(module, params):
                 lpar_uuid = _get_vios_uuid(module, rest_conn, system_uuid, vios_name)
                 partition_label = vios_name
                 partition_type = 'VirtualIOServer'
-                adapters_getter = lambda uuid: rest_conn.getViosClientNetworkAdapters(uuid)
+                adapters_getter = rest_conn.getViosClientNetworkAdapters
             else:
                 lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
                 if not lpar_uuid:
                     module.fail_json(msg="Logical partition not found: {0}".format(vm_name))
                 partition_label = vm_name
                 partition_type = 'LogicalPartition'
-                adapters_getter = lambda uuid: rest_conn.getClientNetworkAdapters(uuid)
+                adapters_getter = rest_conn.getClientNetworkAdapters
 
             # Resolve virtual network UUID
             virtual_networks_dom = rest_conn.getVirtualNetworks(system_uuid)

@@ -3404,7 +3404,7 @@ class HmcRestClient:
         <link href="{6}" rel="related"/>
     </VirtualNetworks>
 </ClientNetworkAdapter>'''.format(vsn_payload, mac_payload, allowed_os_mac_payload,
-                                   vlan_id, tvlan_payload, switch_href, vn_href)
+                                  vlan_id, tvlan_payload, switch_href, vn_href)
         payload = payload.replace("ClientNetworkAdapter", CNA_NS, 1)
 
         header = {'X-API-Session': self.session,
@@ -3431,7 +3431,6 @@ class HmcRestClient:
         except Exception:
             # A non-XML or empty body just means success (e.g. 201 Created with no body)
             return True
-
 
     def updateClientNetworkAdapter(self, lpar_uuid, adapter_uuid,
                                    mac_address=None, allowed_os_mac_addresses=None,
@@ -3683,7 +3682,6 @@ class HmcRestClient:
             return adapter_dom
         except Exception:
             raise
-
 
     def deleteClientNetworkAdapter(self, lpar_uuid, adapter_uuid,
                                    partition_type='LogicalPartition'):

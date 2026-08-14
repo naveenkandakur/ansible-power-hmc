@@ -445,7 +445,7 @@ def test_facts_returns_empty_when_no_adapters(mocker):
     rest_conn.getClientNetworkAdapters.return_value = []
 
     module = DummyModule()
-    changed, info, _ = mod.get_client_network_adapters(module, _facts_params())
+    changed, info, _warning = mod.get_client_network_adapters(module, _facts_params())
     assert info == {'client_network_adapters': []}
 
 
@@ -591,8 +591,8 @@ def test_delete_succeeds_when_adapter_found(mocker):
     assert changed is True
     assert info['status'] == 'deleted'
     assert info['partition_name'] == 'lpar1'
-    rest_conn.deleteClientNetworkAdapter.assert_called_once_with('lpar-uuid', 'cna-uuid-1',
-                                                                  partition_type='LogicalPartition')
+    rest_conn.deleteClientNetworkAdapter.assert_called_once_with(
+        'lpar-uuid', 'cna-uuid-1', partition_type='LogicalPartition')
 
 
 # ---------------------------------------------------------------------------
@@ -686,7 +686,7 @@ def test_update_succeeds_when_values_change(mocker):
         vsi_manager_id=200,
         vsi_type_version=1,
     )
-    changed, info, _ = mod.update_client_network_adapter(module, params)
+    changed, info, _warning = mod.update_client_network_adapter(module, params)
 
     assert changed is True
     assert info['client_network_adapters'][0]['status'] == 'updated'
@@ -921,5 +921,5 @@ def test_update_vios_succeeds_when_shutdown(mocker):
         'qos_priority': None, 'vsi_type_id': None, 'vsi_manager_id': None,
         'vsi_type_version': None,
     }
-    changed, info, _ = mod.update_client_network_adapter(module, params)
+    changed, info, _warning = mod.update_client_network_adapter(module, params)
     assert changed is True
