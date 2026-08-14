@@ -610,14 +610,12 @@ def create_client_network_adapter(module, params):
 
             if vios_name:
                 lpar_uuid = _get_vios_uuid(module, rest_conn, system_uuid, vios_name)
-                partition_label = vios_name
                 partition_type = 'VirtualIOServer'
                 adapters_getter = rest_conn.getViosClientNetworkAdapters
             else:
                 lpar_uuid, partition_dom = rest_conn.getLogicalPartition(system_uuid, partition_name=vm_name)
                 if not lpar_uuid:
                     module.fail_json(msg="Logical partition not found: {0}".format(vm_name))
-                partition_label = vm_name
                 partition_type = 'LogicalPartition'
                 adapters_getter = rest_conn.getClientNetworkAdapters
 
@@ -866,9 +864,9 @@ def update_client_network_adapter(module, params):
             # currently enabled on the adapter, or explicitly enabled in this call.
             if qos_priority is not None:
                 qos_will_be_enabled = (
-                    qos_priority_enabled is True or
-                    (qos_priority_enabled is None and
-                     current_adapter.get('qos_priority_enabled') == 'true')
+                    qos_priority_enabled is True
+                    or (qos_priority_enabled is None
+                        and current_adapter.get('qos_priority_enabled') == 'true')
                 )
                 if not qos_will_be_enabled:
                     module.fail_json(
