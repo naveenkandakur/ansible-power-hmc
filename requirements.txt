@@ -1,3 +1,1 @@
 lxml
-ansible-core==2.16.5
-ansible-lint==6.24.0
