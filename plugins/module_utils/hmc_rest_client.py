@@ -43,8 +43,6 @@ systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/
 
 def xml_strip_namespace(xml_str):
     parser = etree.XMLParser(recover=True, encoding='utf-8')
-    if isinstance(xml_str, str):
-        xml_str = xml_str.encode('utf-8')
     root = etree.fromstring(xml_str, parser)
     for elem in root.getiterator():
         if not hasattr(elem.tag, 'find'):
