@@ -36,10 +36,15 @@ systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/
 VNETWORK_NS = 'VirtualNetwork xmlns:VirtualNetwork="http://www.ibm.com/xmlns/\
 systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/power\
 /firmware/uom/mc/2012_10/" xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2"'
+CNA_NS = 'ClientNetworkAdapter xmlns:ClientNetworkAdapter="http://www.ibm.com/xmlns/\
+systems/power/firmware/uom/mc/2012_10/" xmlns="http://www.ibm.com/xmlns/systems/power\
+/firmware/uom/mc/2012_10/" xmlns:ns2="http://www.w3.org/XML/1998/namespace/k2"'
 
 
 def xml_strip_namespace(xml_str):
     parser = etree.XMLParser(recover=True, encoding='utf-8')
+    if isinstance(xml_str, str):
+        xml_str = xml_str.encode('utf-8')
     root = etree.fromstring(xml_str, parser)
     for elem in root.getiterator():
         if not hasattr(elem.tag, 'find'):
@@ -63,8 +68,6 @@ def parse_error_response(error):
             error_msg_l = dom.xpath("//Message")
             if error_msg_l:
                 error_msg = error_msg_l[0].text
-                if "Failed to unmarshal input payload" in error_msg:
-                    error_msg = "Current HMC version might not support some of input settings or invalid input"
             else:
                 error_msg = "Unknown http error"
     else:
@@ -3273,6 +3276,425 @@ class HmcRestClient:
 
     def deleteVirtualNetwork(self, system_uuid, network_uuid):
         url = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork/{2}".format(self.hmc_ip, system_uuid, network_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/atom+xml'}
+        try:
+            open_url(url,
+                     headers=header,
+                     method='DELETE',
+                     validate_certs=False,
+                     force_basic_auth=True,
+                     timeout=300)
+
+            return True
+        except Exception:
+            raise
+
+    def getViosClientNetworkAdapters(self, vios_uuid):
+        """Return a list of parsed CNA DOM elements for *vios_uuid* (VirtualIOServer), or an empty list."""
+        url = "https://{0}/rest/api/uom/VirtualIOServer/{1}/ClientNetworkAdapter".format(
+            self.hmc_ip, vios_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/vnd.ibm.powervm.uom+xml; type=ClientNetworkAdapter'}
+
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            if resp.code == 204:
+                return []
+
+            response = resp.read()
+            if not response:
+                return []
+
+            root = xml_strip_namespace(response)
+            if root is None:
+                logger.debug("getViosClientNetworkAdapters: xml_strip_namespace returned None")
+                return []
+            return root.xpath("//ClientNetworkAdapter")
+        except Exception as error:
+            logger.debug("Get of VIOS Client Network Adapters failed: %s", repr(error))
+            raise
+
+    def getClientNetworkAdapters(self, lpar_uuid):
+        """Return a list of parsed CNA DOM elements for *lpar_uuid*, or an empty list."""
+        url = "https://{0}/rest/api/uom/LogicalPartition/{1}/ClientNetworkAdapter".format(
+            self.hmc_ip, lpar_uuid)
+        header = {'X-API-Session': self.session,
+                  'Accept': 'application/vnd.ibm.powervm.uom+xml; type=ClientNetworkAdapter'}
+
+        try:
+            resp = open_url(url,
+                            headers=header,
+                            method='GET',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            if resp.code == 204:
+                return []
+
+            response = resp.read()
+            if not response:
+                return []
+
+            root = xml_strip_namespace(response)
+            if root is None:
+                logger.debug("getClientNetworkAdapters: xml_strip_namespace returned None")
+                return []
+            return root.xpath("//ClientNetworkAdapter")
+        except Exception as error:
+            logger.debug("Get of Client Network Adapters failed: %s", repr(error))
+            raise
+
+    def createClientNetworkAdapter(self, lpar_uuid, system_uuid, network_uuid,
+                                   vlan_id, switch_href, virtual_ethernet_adapter_id=None,
+                                   mac_address=None, allowed_os_mac_addresses=None,
+                                   tagged_vlan_ids=None, partition_type='LogicalPartition'):
+        """Create a Client Network Adapter on *lpar_uuid* connected to *network_uuid*.
+
+        PUTs a minimal ClientNetworkAdapter XML to the sub-resource collection URL.
+        vlan_id and switch_href are sourced from the target VirtualNetwork.
+        allowed_os_mac_addresses: string value for AllowedOperatingSystemMACAddresses
+            (e.g. 'ALL', 'NONE', or space-separated MACs). Defaults to 'ALL'.
+        tagged_vlan_ids: space-separated VLAN IDs string for TaggedVLANIDs when the
+            new adapter should have tagged VLAN support enabled from creation.
+        partition_type: 'LogicalPartition' (default) or 'VirtualIOServer'.
+        """
+        url = "https://{0}/rest/api/uom/{1}/{2}/ClientNetworkAdapter".format(
+            self.hmc_ip, partition_type, lpar_uuid)
+
+        # Build the virtual network href exactly as the HMC returns it on GET.
+        vn_href = "https://{0}:443/rest/api/uom/ManagedSystem/{1}/VirtualNetwork/{2}".format(
+            self.hmc_ip, system_uuid, network_uuid)
+
+        vsn_payload = ''
+        if virtual_ethernet_adapter_id is not None:
+            vsn_payload = '\n    <VirtualSlotNumber kb="COD" kxe="false">{0}</VirtualSlotNumber>'.format(
+                virtual_ethernet_adapter_id)
+
+        mac_payload = ''
+        if mac_address is not None:
+            mac_payload = '\n    <MACAddress kxe="false" kb="CUR">{0}</MACAddress>'.format(
+                mac_address.replace(':', '').upper())
+
+        _allowed_os_mac = allowed_os_mac_addresses if allowed_os_mac_addresses is not None else 'ALL'
+        allowed_os_mac_payload = '\n    <AllowedOperatingSystemMACAddresses kb="CUD" kxe="false">{0}</AllowedOperatingSystemMACAddresses>'.format(
+            _allowed_os_mac)
+
+        if tagged_vlan_ids:
+            tvlan_payload = (
+                '\n    <TaggedVLANIDs kxe="false" kb="CUA">{0}</TaggedVLANIDs>'
+                '\n    <TaggedVLANSupported kb="CUA" kxe="false">true</TaggedVLANSupported>'
+            ).format(tagged_vlan_ids)
+        else:
+            tvlan_payload = '\n    <TaggedVLANSupported kb="CUA" kxe="false">false</TaggedVLANSupported>'
+
+        payload = '''<ClientNetworkAdapter schemaVersion="V1_0">
+    <Metadata><Atom/></Metadata>{0}{1}{2}
+    <PortVLANID kxe="false" kb="CUR">{3}</PortVLANID>
+    <QualityOfServicePriorityEnabled kxe="false" kb="CUD">false</QualityOfServicePriorityEnabled>{4}
+    <AssociatedVirtualSwitch kb="CUD" kxe="false">
+        <link href="{5}" rel="related"/>
+    </AssociatedVirtualSwitch>
+    <VirtualNetworks kb="CUR" kxe="false">
+        <link href="{6}" rel="related"/>
+    </VirtualNetworks>
+</ClientNetworkAdapter>'''.format(vsn_payload, mac_payload, allowed_os_mac_payload,
+                                   vlan_id, tvlan_payload, switch_href, vn_href)
+        payload = payload.replace("ClientNetworkAdapter", CNA_NS, 1)
+
+        header = {'X-API-Session': self.session,
+                  'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=ClientNetworkAdapter',
+                  'Accept': 'application/atom+xml'}
+
+        logger.debug("createClientNetworkAdapter URL: %s", url)
+        logger.debug("createClientNetworkAdapter PAYLOAD:\n%s", payload)
+
+        resp = open_url(url,
+                        headers=header,
+                        data=payload,
+                        method='POST' if mac_address is not None else 'PUT',
+                        validate_certs=False,
+                        force_basic_auth=True,
+                        timeout=300)
+
+        logger.debug("createClientNetworkAdapter response code: %s", resp.code)
+        response = resp.read()
+        if not response:
+            return True
+        try:
+            return xml_strip_namespace(response)
+        except Exception:
+            # A non-XML or empty body just means success (e.g. 201 Created with no body)
+            return True
+
+
+    def updateClientNetworkAdapter(self, lpar_uuid, adapter_uuid,
+                                   mac_address=None, allowed_os_mac_addresses=None,
+                                   qos_priority_enabled=None, qos_priority=None,
+                                   vsi_type_id=None, vsi_manager_id=None, vsi_type_version=None,
+                                   virtual_network_href=None, tagged_vlan_id=None,
+                                   detach_vn_href=None, detach_tagged_vlan_id=None,
+                                   partition_type='LogicalPartition'):
+        """Update a Client Network Adapter's settings (MAC, QoS, OS MAC restrictions, 802.1Qbg).
+
+        The HMC requires VirtualSlotNumber and PortVLANID in every POST, so both are
+        fetched via GET first. Only the fields the caller wants to change are included
+        beyond that. MAC addresses in mac_address and allowed_os_mac_addresses are
+        normalised to no-colon uppercase format as expected by the HMC API.
+        tagged_vlan_id: when adding a new VirtualNetwork to an existing slot, pass the
+        VLAN ID of the new network so it is merged into the TaggedVLANIDs field.
+        detach_vn_href: href of a VirtualNetwork link to *remove* from VirtualNetworks.
+        detach_tagged_vlan_id: VLAN ID string to *remove* from TaggedVLANIDs after detach.
+        partition_type: 'LogicalPartition' (default) or 'VirtualIOServer'.
+        """
+        url = "https://{0}/rest/api/uom/{1}/{2}/ClientNetworkAdapter/{3}".format(
+            self.hmc_ip, partition_type, lpar_uuid, adapter_uuid)
+
+        # HMC API expects MAC addresses without colons (e.g. B608907CA607)
+        def _strip_colons(mac):
+            return mac.replace(':', '').upper()
+
+        # Fetch the current CNA XML — needed to replay as POST with changes applied
+        get_header = {'X-API-Session': self.session, 'Accept': 'application/atom+xml'}
+        get_resp = open_url(url, headers=get_header, method='GET',
+                            validate_certs=False, force_basic_auth=True, timeout=300)
+        raw_get = get_resp.read()
+
+        # Parse preserving namespaces so we can re-serialise faithfully
+        from lxml import etree as _et
+        ns_parser = _et.XMLParser(recover=True, encoding='utf-8')
+        ns_root = _et.fromstring(raw_get if isinstance(raw_get, bytes) else raw_get.encode('utf-8'),
+                                 ns_parser)
+
+        # Locate the ClientNetworkAdapter element inside the Atom <content> wrapper
+        _UOM_NS = 'http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/'
+        _cna_tag = '{{{0}}}ClientNetworkAdapter'.format(_UOM_NS)
+        cna_el = ns_root.find('.//' + _cna_tag)
+        if cna_el is None:
+            # Fallback: root may already be the CNA
+            cna_el = ns_root
+
+        def _set_ns_field(el, local_name, value):
+            """Update or insert a UOM namespace child element by local name.
+
+            For existing elements the kb attribute is left exactly as the HMC
+            returned it on GET — the HMC schema dictates which value is valid
+            per field and changing it (e.g. CUR→CUD) causes REST0001.
+            Only newly inserted elements get kb="CUD".
+            """
+            qname = '{{{0}}}{1}'.format(_UOM_NS, local_name)
+            nodes = el.findall('.//' + qname)
+            if nodes:
+                nodes[0].text = value
+            else:
+                new_el = _et.SubElement(el, qname)
+                new_el.set('kb', 'CUD')
+                new_el.set('kxe', 'false')
+                new_el.text = value
+
+        if mac_address is not None:
+            _set_ns_field(cna_el, 'MACAddress', _strip_colons(mac_address))
+        if virtual_network_href is not None:
+            qname = '{{{0}}}VirtualNetworks'.format(_UOM_NS)
+            virtual_networks_el = cna_el.find('.//' + qname)
+            if virtual_networks_el is None:
+                virtual_networks_el = _et.SubElement(cna_el, qname)
+                virtual_networks_el.set('kb', 'CUR')
+                virtual_networks_el.set('kxe', 'false')
+            _LINK_TAG = '{{{0}}}link'.format(_UOM_NS)
+            existing_links = virtual_networks_el.findall('.//' + _LINK_TAG)
+            if not any(link.get('href') == virtual_network_href for link in existing_links):
+                new_link = _et.SubElement(virtual_networks_el, _LINK_TAG)
+                new_link.set('href', virtual_network_href)
+                new_link.set('rel', 'related')
+        _needs_tvlan_fixup = False
+        if tagged_vlan_id is not None:
+            # Merge the new VLAN ID into the space-separated TaggedVLANIDs list and
+            # ensure TaggedVLANSupported is true, as required by the HMC when multiple
+            # virtual networks share a slot.
+            _tvlan_qname = '{{{0}}}TaggedVLANIDs'.format(_UOM_NS)
+            _tvsup_qname = '{{{0}}}TaggedVLANSupported'.format(_UOM_NS)
+            tvlan_nodes = cna_el.findall('.//' + _tvlan_qname)
+            _vlan_str = str(tagged_vlan_id)
+            if tvlan_nodes:
+                existing_ids = tvlan_nodes[0].text.split() if tvlan_nodes[0].text else []
+                if _vlan_str not in existing_ids:
+                    existing_ids.append(_vlan_str)
+                tvlan_nodes[0].text = ' '.join(existing_ids)
+            else:
+                # lxml always serialises a new element with the registered prefix
+                # for the UOM namespace (ClientNetworkAdapter:) rather than the
+                # default namespace, which the HMC rejects. Work around this by
+                # inserting using makeelement (inherits nsmap) and fixing up the
+                # serialised string afterwards.
+                tvsup_nodes = cna_el.findall('.//' + _tvsup_qname)
+                if tvsup_nodes:
+                    new_tvlan = tvsup_nodes[0].makeelement(_tvlan_qname,
+                                                           {'kb': 'CUA', 'kxe': 'false'})
+                    new_tvlan.text = _vlan_str
+                    cna_el.insert(list(cna_el).index(tvsup_nodes[0]), new_tvlan)
+                else:
+                    new_tvlan = cna_el.makeelement(_tvlan_qname,
+                                                   {'kb': 'CUA', 'kxe': 'false'})
+                    new_tvlan.text = _vlan_str
+                    cna_el.append(new_tvlan)
+                _needs_tvlan_fixup = True
+            # Ensure TaggedVLANSupported is set to true
+            tvsup_nodes = cna_el.findall('.//' + _tvsup_qname)
+            if tvsup_nodes:
+                tvsup_nodes[0].text = 'true'
+            else:
+                _set_ns_field(cna_el, 'TaggedVLANSupported', 'true')
+                _needs_tvlan_fixup = True
+        if detach_vn_href is not None:
+            # Remove the specified VirtualNetwork link from the VirtualNetworks element
+            _vn_qname = '{{{0}}}VirtualNetworks'.format(_UOM_NS)
+            _LINK_TAG = '{{{0}}}link'.format(_UOM_NS)
+            vn_el = cna_el.find('.//' + _vn_qname)
+            if vn_el is not None:
+                for link in vn_el.findall('.//' + _LINK_TAG):
+                    if link.get('href') == detach_vn_href:
+                        vn_el.remove(link)
+                        break
+        if detach_tagged_vlan_id is not None:
+            # Remove the specified VLAN ID from the space-separated TaggedVLANIDs list.
+            # If the list becomes empty afterwards, set TaggedVLANSupported to false and
+            # clear the TaggedVLANIDs text rather than leaving an empty element.
+            _tvlan_qname = '{{{0}}}TaggedVLANIDs'.format(_UOM_NS)
+            _tvsup_qname = '{{{0}}}TaggedVLANSupported'.format(_UOM_NS)
+            tvlan_nodes = cna_el.findall('.//' + _tvlan_qname)
+            if tvlan_nodes:
+                existing_ids = tvlan_nodes[0].text.split() if tvlan_nodes[0].text else []
+                updated_ids = [v for v in existing_ids if v != str(detach_tagged_vlan_id)]
+                if updated_ids:
+                    tvlan_nodes[0].text = ' '.join(updated_ids)
+                else:
+                    tvlan_nodes[0].text = ''
+                    # No tagged VLANs remain — disable TaggedVLANSupported
+                    tvsup_nodes = cna_el.findall('.//' + _tvsup_qname)
+                    if tvsup_nodes:
+                        tvsup_nodes[0].text = 'false'
+        if allowed_os_mac_addresses is not None:
+            if allowed_os_mac_addresses in ('ALL', 'NONE'):
+                _oa = allowed_os_mac_addresses
+            else:
+                _oa = ' '.join(_strip_colons(m) for m in allowed_os_mac_addresses.split())
+            _set_ns_field(cna_el, 'AllowedOperatingSystemMACAddresses', _oa)
+        if qos_priority_enabled is not None:
+            _set_ns_field(cna_el, 'QualityOfServicePriorityEnabled',
+                          'true' if qos_priority_enabled else 'false')
+        _needs_qp_fixup = False
+        _qp_qname = '{{{0}}}QualityOfServicePriority'.format(_UOM_NS)
+        _qpe_qname = '{{{0}}}QualityOfServicePriorityEnabled'.format(_UOM_NS)
+        if qos_priority is not None:
+            _qp_nodes = cna_el.findall('.//' + _qp_qname)
+            if _qp_nodes:
+                _qp_nodes[0].text = str(qos_priority)
+            else:
+                # Insert immediately BEFORE QualityOfServicePriorityEnabled —
+                # the HMC schema places QualityOfServicePriority before the
+                # Enabled flag. Use makeelement so the new node inherits the
+                # nsmap and lxml doesn't serialise it with a prefixed tag name.
+                _qpe_nodes = cna_el.findall('.//' + _qpe_qname)
+                new_qp = (_qpe_nodes[0] if _qpe_nodes else cna_el).makeelement(
+                    _qp_qname, {'kb': 'CUD', 'kxe': 'false'})
+                new_qp.text = str(qos_priority)
+                if _qpe_nodes:
+                    cna_el.insert(list(cna_el).index(_qpe_nodes[0]), new_qp)
+                else:
+                    cna_el.append(new_qp)
+                _needs_qp_fixup = True
+        elif qos_priority_enabled:
+            # HMC REST0149: enabling QoS requires QualityOfServicePriority in the
+            # same payload. If the caller did not supply a value, read the current
+            # element value from the GET response and write it back unchanged.
+            # Fall back to '0' if the element was absent (adapter never had QoS).
+            _qp_nodes = cna_el.findall('.//' + _qp_qname)
+            if _qp_nodes:
+                # Element already in GET response — text is fine as-is, nothing to do.
+                pass
+            else:
+                # Element absent — insert BEFORE QualityOfServicePriorityEnabled.
+                _qpe_nodes = cna_el.findall('.//' + _qpe_qname)
+                new_qp = (_qpe_nodes[0] if _qpe_nodes else cna_el).makeelement(
+                    _qp_qname, {'kb': 'CUD', 'kxe': 'false'})
+                new_qp.text = '0'
+                if _qpe_nodes:
+                    cna_el.insert(list(cna_el).index(_qpe_nodes[0]), new_qp)
+                else:
+                    cna_el.append(new_qp)
+                _needs_qp_fixup = True
+        if vsi_type_id is not None:
+            _set_ns_field(cna_el, 'VirtualStationInterfaceTypeID', str(vsi_type_id))
+        if vsi_manager_id is not None:
+            _set_ns_field(cna_el, 'VirtualStationInterfaceManagerID', str(vsi_manager_id))
+        if vsi_type_version is not None:
+            _set_ns_field(cna_el, 'VirtualStationInterfaceTypeVersion', str(vsi_type_version))
+
+        # Re-serialise the modified CNA element preserving its original namespaces
+        payload = _et.tostring(cna_el, encoding='unicode')
+
+        # lxml serialises newly inserted UOM elements with the ClientNetworkAdapter:
+        # prefix instead of the default namespace. Strip that prefix from all
+        # affected leaf elements so the HMC receives well-formed XML.
+        if _needs_tvlan_fixup or _needs_qp_fixup:
+            _uom_prefix = next(
+                (p for p, ns in cna_el.nsmap.items() if ns == _UOM_NS and p is not None),
+                None)
+            if _uom_prefix:
+                _fixup_locals = []
+                if _needs_tvlan_fixup:
+                    _fixup_locals += ['TaggedVLANIDs', 'TaggedVLANSupported']
+                if _needs_qp_fixup:
+                    _fixup_locals += ['QualityOfServicePriority']
+                for _local in _fixup_locals:
+                    payload = payload.replace(
+                        '<%s:%s ' % (_uom_prefix, _local), '<%s ' % _local)
+                    payload = payload.replace(
+                        '</%s:%s>' % (_uom_prefix, _local), '</%s>' % _local)
+
+        logger.debug("updateClientNetworkAdapter POST payload:\n%s", payload)
+
+        post_header = {'X-API-Session': self.session,
+                       'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=ClientNetworkAdapter',
+                       'Accept': 'application/atom+xml'}
+
+        try:
+            resp = open_url(url,
+                            headers=post_header,
+                            data=payload,
+                            method='POST',
+                            validate_certs=False,
+                            force_basic_auth=True,
+                            timeout=300)
+
+            response = resp.read()
+            logger.debug(url)
+            logger.debug(response)
+            if not response:
+                return True
+
+            adapter_dom = xml_strip_namespace(response)
+            return adapter_dom
+        except Exception:
+            raise
+
+
+    def deleteClientNetworkAdapter(self, lpar_uuid, adapter_uuid,
+                                   partition_type='LogicalPartition'):
+        """Delete the Client Network Adapter identified by *adapter_uuid* from *lpar_uuid*.
+
+        partition_type: 'LogicalPartition' (default) or 'VirtualIOServer'.
+        """
+        url = "https://{0}/rest/api/uom/{1}/{2}/ClientNetworkAdapter/{3}".format(
+            self.hmc_ip, partition_type, lpar_uuid, adapter_uuid)
         header = {'X-API-Session': self.session,
                   'Accept': 'application/atom+xml'}
         try:
