@@ -68,6 +68,7 @@ options:
         description:
             - The name of the logical partition to which the CNA belongs.
             - Mutually exclusive with I(vios_name).
+            - One of I(vm_name) or I(vios_name) is required for all states.
         type: str
     vios_name:
         description:
@@ -76,6 +77,7 @@ options:
             - When used with I(state=updated), I(state=absent), or
               I(state=detach_virtual_network), the VIOS must be shut down
               (C(not activated) state). The module fails if the VIOS is running.
+            - One of I(vm_name) or I(vios_name) is required for all states.
         type: str
     virtual_network_name:
         description:
@@ -342,6 +344,9 @@ client_network_adapter_info:
                 adapter_uuid:
                     description: Unique identifier of the Client Network Adapter.
                     type: str
+                mac_address:
+                    description: MAC address of the adapter (no colons, uppercase hex).
+                    type: str
                 virtual_ethernet_adapter_id:
                     description: Virtual slot number of the adapter.
                     type: str
@@ -357,6 +362,10 @@ client_network_adapter_info:
                 virtual_network_uuid:
                     description: UUID of the virtual network the adapter is connected to.
                     type: str
+                virtual_network_uuids:
+                    description: List of all virtual network UUIDs attached to the adapter.
+                    type: list
+                    elements: str
                 virtual_network_name:
                     description: Name of the virtual network the adapter is connected to.
                     type: str
@@ -378,11 +387,26 @@ client_network_adapter_info:
                 tagged_vlan_supported:
                     description: Whether tagged VLAN is supported on the adapter.
                     type: str
+                tagged_vlan_ids:
+                    description: Comma-separated list of tagged VLAN IDs configured on the adapter.
+                    type: str
                 allowed_os_mac_addresses:
                     description: OS MAC address restriction setting (ALL, NONE, or a list of addresses).
                     type: str
                 qos_priority_enabled:
                     description: Whether QoS priority is enabled on the adapter.
+                    type: str
+                qos_priority:
+                    description: QoS priority value for the adapter (0-7). Null when QoS is disabled.
+                    type: str
+                vsi_type_id:
+                    description: VSI Type ID of the adapter. Null when not configured.
+                    type: str
+                vsi_manager_id:
+                    description: VSI Manager ID of the adapter. Null when not configured.
+                    type: str
+                vsi_type_version:
+                    description: VSI Type Version of the adapter. Null when not configured.
                     type: str
                 hcn_id:
                     description: Host Channel Name ID of the adapter.
