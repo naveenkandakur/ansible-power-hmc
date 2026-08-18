@@ -17,21 +17,21 @@ DOCUMENTATION = '''
 module: powervm_client_network_adapter
 author:
     - Navinakumar Kandakur (@nkandak1)
-short_description: Manage Client Network Adapters (CNAs) on PowerVM logical partitions
+short_description: Create, update, delete, and query Client Network Adapters (CNAs) on PowerVM logical partitions and Virtual I/O Servers
 notes:
     - This module uses the HMC REST API and requires a password for authentication.
       Passwordless authentication is not supported.
-    - A Client Network Adapter (CNA) allows logical partitions to communicate with
-      each other without assigning physical hardware to the logical partitions.
+    - A Client Network Adapter (CNA) allows logical partitions and Virtual I/O Servers
+      to communicate with each other without assigning physical hardware to the partitions.
     - When I(vios_name) is used with I(state=updated), I(state=absent), or
       I(state=detach_virtual_network), the target VIOS must be in the
       C(not activated) (shut-down) state. The module will fail if the VIOS is
       running, because the HMC does not allow CNA modifications on a running VIOS.
 description:
-    - Creates a Client Network Adapter on a logical partition and attaches it to a virtual network.
-    - Updates an existing Client Network Adapter by reassigning it to a different virtual network.
-    - Retrieves information about Client Network Adapters attached to a logical partition.
-    - Deletes a Client Network Adapter from a logical partition.
+    - Creates a Client Network Adapter on a logical partition or VIOS and attaches it to a virtual network.
+    - Updates settings of an existing Client Network Adapter such as MAC address, QoS, and 802.1Qbg settings.
+    - Retrieves information about Client Network Adapters attached to a logical partition or VIOS.
+    - Deletes a Client Network Adapter from a logical partition or VIOS.
 version_added: "1.0.0"
 requirements:
     - Python >= 3
@@ -148,8 +148,10 @@ options:
         description:
             - C(present) creates a new Client Network Adapter on the logical partition or VIOS.
             - C(updated) modifies settings of an existing Client Network Adapter identified
-              by I(virtual_ethernet_adapter_id). Supports updating adapter MAC address, MAC address
-              settings, QoS settings, and 802.1Qbg settings.
+              by I(virtual_ethernet_adapter_id). Supports updating the adapter MAC address,
+              OS MAC address restrictions, QoS settings, and 802.1Qbg settings.
+              Virtual network assignment cannot be changed with this state; use
+              C(detach_virtual_network) and C(present) instead.
               When I(vios_name) is specified, the VIOS must be in the C(not activated)
               (shut-down) state, otherwise the module fails with an error.
             - C(absent) deletes an existing Client Network Adapter from the logical partition or VIOS.
@@ -220,7 +222,7 @@ EXAMPLES = '''
     virtual_network_name: '{{ virtual_network_name }}'
     state: facts
 
-- name: Update CNA adapter MAC address, MAC restrictions, QoS and 802.1Qbg settings
+- name: Update CNA MAC address, MAC restrictions, QoS and 802.1Qbg settings on an LPAR
   ibm.power_hmc.powervm_client_network_adapter:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
@@ -228,7 +230,7 @@ EXAMPLES = '''
       password: '{{ hmc_password }}'
     system_name: '{{ system_name }}'
     vm_name: '{{ vm_name }}'
-    virtual_network_name: '{{ virtual_network_name }}'
+    virtual_ethernet_adapter_id: '{{ virtual_ethernet_adapter_id }}'
     mac_address: '{{ mac_address }}'
     os_mac_address_restrictions: '{{ os_mac_address_restrictions }}'
     allowed_os_mac_addresses: '{{ allowed_os_mac_addresses }}'
@@ -258,6 +260,37 @@ EXAMPLES = '''
       password: '{{ hmc_password }}'
     system_name: '{{ system_name }}'
     vm_name: '{{ vm_name }}'
+    virtual_ethernet_adapter_id: '{{ virtual_ethernet_adapter_id }}'
+    virtual_network_name: '{{ virtual_network_name }}'
+    state: detach_virtual_network
+
+- name: Update CNA MAC address, MAC restrictions, QoS and 802.1Qbg settings on a VIOS
+  ibm.power_hmc.powervm_client_network_adapter:
+    hmc_host: "{{ inventory_hostname }}"
+    hmc_auth:
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: '{{ system_name }}'
+    vios_name: '{{ vios_name }}'
+    virtual_ethernet_adapter_id: '{{ virtual_ethernet_adapter_id }}'
+    mac_address: '{{ mac_address }}'
+    os_mac_address_restrictions: '{{ os_mac_address_restrictions }}'
+    allowed_os_mac_addresses: '{{ allowed_os_mac_addresses }}'
+    qos_priority_enabled: '{{ qos_priority_enabled }}'
+    qos_priority: '{{ qos_priority }}'
+    vsi_type_id: '{{ vsi_type_id }}'
+    vsi_manager_id: '{{ vsi_manager_id }}'
+    vsi_type_version: '{{ vsi_type_version }}'
+    state: updated
+
+- name: Detach a virtual network from a VIOS Client Network Adapter
+  ibm.power_hmc.powervm_client_network_adapter:
+    hmc_host: "{{ inventory_hostname }}"
+    hmc_auth:
+      username: '{{ ansible_user }}'
+      password: '{{ hmc_password }}'
+    system_name: '{{ system_name }}'
+    vios_name: '{{ vios_name }}'
     virtual_ethernet_adapter_id: '{{ virtual_ethernet_adapter_id }}'
     virtual_network_name: '{{ virtual_network_name }}'
     state: detach_virtual_network
@@ -297,12 +330,12 @@ EXAMPLES = '''
 
 RETURN = '''
 client_network_adapter_info:
-    description: Information about Client Network Adapters on the logical partition.
+    description: Information about Client Network Adapters on the logical partition or VIOS.
     type: dict
     returned: on success of C(facts), C(present), and C(updated) states
     contains:
         client_network_adapters:
-            description: List of Client Network Adapters found on the logical partition.
+            description: List of Client Network Adapters found on the logical partition or VIOS.
             type: list
             elements: dict
             contains:
@@ -334,7 +367,7 @@ client_network_adapter_info:
                     description: Dynamic reconfiguration connector name of the adapter.
                     type: str
                 local_partition_id:
-                    description: ID of the logical partition that owns the adapter.
+                    description: ID of the logical partition or VIOS that owns the adapter.
                     type: str
                 varied_on:
                     description: Whether the adapter is varied on.
@@ -441,8 +474,7 @@ def validate_parameters(params):
 
     collate = []
     for eachUnsupported in unsupportedList:
-        value = params.get(eachUnsupported)
-        if value is not None and value is not False:
+        if params.get(eachUnsupported) is not None:
             collate.append(eachUnsupported)
     if collate:
         if len(collate) == 1:
