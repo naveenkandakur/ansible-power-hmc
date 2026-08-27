@@ -41,5 +41,7 @@ plugins/modules/vios_mapping_facts.py compile-2.7!skip # Python 2.7 is not suppo
 plugins/modules/vios_mapping_facts.py import-2.7!skip # Python 2.7 is not supported
 plugins/modules/vios_secure.py compile-2.7!skip # Python 2.7 is not supported
 plugins/modules/vios_secure.py import-2.7!skip # Python 2.7 is not supported
+plugins/modules/powervm_client_network_adapter.py compile-2.7!skip # Python 2.7 is not supported
+plugins/modules/powervm_client_network_adapter.py import-2.7!skip # Python 2.7 is not supported
 plugins/modules/vios_update_upgrade.py compile-2.7!skip # Python 2.7 is not supported
 plugins/modules/vios_update_upgrade.py import-2.7!skip # Python 2.7 is not supported
