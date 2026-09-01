@@ -2554,7 +2554,8 @@ class HmcRestClient:
             logger.error("listViosUpdates request failed: %s", str(e))
             return None
 
-    def LICQueryRepository(self, system_uuid, system_name, source_file, type="io", level=None):
+    def LICQueryRepository(self, system_uuid, system_name, source_file, type="io", level=None,
+                           hostname=None, username=None, password=None, directory=None, keyfile=None):
         url = f"https://{self.hmc_ip}/rest/api/uom/ManagedSystem/{system_uuid}/do/LICQueryRepository"
         header = {
             "X-API-Session": self.session,
@@ -2598,6 +2599,21 @@ class HmcRestClient:
                 "ParameterName": "filter",
                 "ParameterValue": "os=vios"
             })
+
+        # Optional SFTP connection parameters
+        for param_name, param_value in [
+            ("hostname", hostname),
+            ("username", username),
+            ("password", password),
+            ("directory", directory),
+            ("keyfile", keyfile),
+        ]:
+            if param_value:
+                job_parameters.append({
+                    "Metadata": {"Atom": ""},
+                    "ParameterName": param_name,
+                    "ParameterValue": param_value
+                })
 
         payload = {
             "JobRequest": {
@@ -2745,7 +2761,7 @@ class HmcRestClient:
             raise HmcError(f"Unexpected job status: {status}")
         except Exception as e:
             logger.error("Failed to check job status: %s", e)
-            return "Error"
+            raise
 
     def getAllPartitionProfiles(self, lpar_uuid, profile_name=None):
         url = "https://{0}/rest/api/uom/LogicalPartition/{1}/LogicalPartitionProfile".format(self.hmc_ip, lpar_uuid)
