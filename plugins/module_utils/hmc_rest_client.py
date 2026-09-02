@@ -3784,7 +3784,6 @@ class HmcRestClient:
         parts.append('</SharedEthernetAdapter>')
         return parts
 
-
     def createNetworkBridge(self, system_uuid, port_vlan_id, virtual_network_id,
                             vios_id, vios2_id, failover_enabled, load_balancing_enabled,
                             vios1_cfg=None, vios2_cfg=None, secondary_pvid=None):
@@ -3827,16 +3826,16 @@ class HmcRestClient:
         # secondary PVID has been supplied by the caller.
         if load_balancing_enabled and secondary_pvid is not None:
             payload_parts += ['<LoadGroup schemaVersion="V1_0">',
-                               '<Metadata><Atom/></Metadata>',
-                               '<PortVLANID kxe="false" kb="CUR">{0}</PortVLANID>'.format(secondary_pvid),
-                               '<TrunkAdapters kb="CUD" kxe="false" schemaVersion="V1_0">',
-                               '<Metadata><Atom/></Metadata>',
-                               '</TrunkAdapters>',
-                               '</LoadGroup>']
+                              '<Metadata><Atom/></Metadata>',
+                              '<PortVLANID kxe="false" kb="CUR">{0}</PortVLANID>'.format(secondary_pvid),
+                              '<TrunkAdapters kb="CUD" kxe="false" schemaVersion="V1_0">',
+                              '<Metadata><Atom/></Metadata>',
+                              '</TrunkAdapters>',
+                              '</LoadGroup>']
         payload_parts += ['</LoadGroups>',
-                         '<PortVLANID kb="COR" kxe="false">{0}</PortVLANID>'.format(port_vlan_id),
-                         '<SharedEthernetAdapters kxe="false" kb="CUD" schemaVersion="V1_0">',
-                         '<Metadata><Atom/></Metadata>']
+                          '<PortVLANID kb="COR" kxe="false">{0}</PortVLANID>'.format(port_vlan_id),
+                          '<SharedEthernetAdapters kxe="false" kb="CUD" schemaVersion="V1_0">',
+                          '<Metadata><Atom/></Metadata>']
         payload_parts += self._sea_xml(vios_href, is_primary=True, cfg=vios1_cfg)
         if vios2_id:
             vios2_href = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualIOServer/{2}".format(
