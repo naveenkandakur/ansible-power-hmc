@@ -80,7 +80,6 @@ options:
                     - Enable load-balancing across VIOSes.
                     - Requires I(secondary_vios) to be configured.
                 type: bool
-                default: false
             secondary_pvid:
                 description:
                     - The Port VLAN ID for the secondary load group, used when
@@ -97,13 +96,11 @@ options:
                     - Enable 9000-byte jumbo frames on the Shared Ethernet Adapter.
                     - Applied via a POST update after bridge creation.
                 type: bool
-                default: false
             large_send:
                 description:
                     - Enable TCP large-send offload on the Shared Ethernet Adapter.
                     - Applied via a POST update after bridge creation.
                 type: bool
-                default: false
             qos_mode:
                 description:
                     - Quality-of-service mode on the Shared Ethernet Adapter.
@@ -115,21 +112,20 @@ options:
             primary_vios:
                 description:
                     - Primary VIOS that hosts the Shared Ethernet Adapter.
-                    - Required when I(state=present).
+                    - Required when I(state=present). Validated in code.
                 type: dict
-                required: true
                 suboptions:
                     name:
                         description:
                             - Name of the primary VIOS partition (e.g. C(VIOS-test-02)).
-                        required: true
+                            - Required when I(state=present).
                         type: str
                     backing_device:
                         description:
                             - Physical Ethernet adapter on the VIOS used as the SEA backing device
                               (e.g. C(ent2)).
                             - Required by the HMC — the SEA cannot be created without a backing device.
-                        required: true
+                            - Required when I(state=present).
                         type: str
                     address_to_ping:
                         description:
@@ -161,14 +157,13 @@ options:
                     name:
                         description:
                             - Name of the secondary VIOS partition (e.g. C(VIOS-test-01)).
-                        required: true
+                            - Required when I(secondary_vios) is configured.
                         type: str
                     backing_device:
                         description:
                             - Physical Ethernet adapter on the VIOS used as the secondary SEA
                               backing device (e.g. C(ent3)).
                             - Required by the HMC when I(secondary_vios) is configured.
-                        required: true
                         type: str
                     address_to_ping:
                         description:
