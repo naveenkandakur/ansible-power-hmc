@@ -4024,8 +4024,8 @@ class HmcRestClient:
             if load_groups:
                 primary_lg = load_groups[0]
                 # Accept either element name used by the HMC
-                vn_container = (primary_lg.xpath('VirtualNetworks') or
-                                primary_lg.xpath('AssociatedInternalNetwork'))
+                vn_container = (primary_lg.xpath('VirtualNetworks')
+                                or primary_lg.xpath('AssociatedInternalNetwork'))
                 if vn_container:
                     vn_read_el = vn_container[0]
                     # Build the set of already-present hrefs for idempotency check.
