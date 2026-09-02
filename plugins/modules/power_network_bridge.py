@@ -919,8 +919,8 @@ def ensure_update(module, params):
                     load_groups = nb_el.xpath('LoadGroups/LoadGroup')
                     if load_groups:
                         # HMC may return VN links under either element name
-                        vn_container = (load_groups[0].xpath('VirtualNetworks') or
-                                        load_groups[0].xpath('AssociatedInternalNetwork'))
+                        vn_container = (load_groups[0].xpath('VirtualNetworks')
+                                        or load_groups[0].xpath('AssociatedInternalNetwork'))
                         if vn_container:
                             existing_hrefs = {
                                 link.get('href', '')
