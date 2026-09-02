@@ -1312,7 +1312,54 @@ def platform_update(module):
                         sysfirm_update['repository'] = source_file
                     sysfirm_update['Type'] = 'sys'
                     if _is_sftp(source_file):
-                        logger.info("Skipping LICQueryRepository for system firmware: sftp repository")
+                        sftp_block = sysfirm_update.get('sftp', {}) or {}
+                        output = rest_conn.LICQueryRepository(
+                            system_uuid, system_name, source_file,
+                            type="sys", level=updateType,
+                            hostname=sftp_block.get('hostname'),
+                            username=sftp_block.get('username'),
+                            password=sftp_block.get('password'),
+                            directory=sftp_block.get('directory'),
+                            keyfile=sftp_block.get('keyfile'),
+                        )
+                        check_response_exception(output, module, 'LICQueryRepository')
+                        if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
+                            error_msg = (
+                                f"No {updateType.upper()} file found at the SFTP source: {sftp_block.get('hostname')} "
+                                f"for the resource: {system_name} reason: {output.get('ParameterValue')}"
+                            )
+                            module.fail_json(msg=error_msg)
+                        param_val = output.get('ParameterValue', '')
+                        available_levels = []
+                        if param_val:
+                            for line in param_val.splitlines():
+                                parts = line.split(",")
+                                if len(parts) >= 3:
+                                    available_levels.append(parts[2].strip())
+                        if firm_level != 'latest' and firm_level not in available_levels:
+                            error_msg = (
+                                f"Update file {firm_level} for the resource {system_name} "
+                                f"is not found at the specified SFTP source location: {sftp_block.get('hostname')}."
+                            )
+                            module.fail_json(msg=error_msg)
+                        else:
+                            if output.get('ParameterValue'):
+                                output = output.get('ParameterValue')
+                                lines = output.split("\n")
+                                sysfirm_update['IsDestruptive'] = False
+                                if firm_level != 'latest':
+                                    for line in lines:
+                                        parts = line.split(",")
+                                        if firm_level == parts[2]:
+                                            sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
+                                            break
+                                else:
+                                    latest_line = max(
+                                        (line for line in lines if line.strip()),
+                                        key=lambda line_data: int(line_data.split(",")[2])
+                                    )
+                                    parts = latest_line.split(",")
+                                    sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
                     else:
                         output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                               type="sys", level=updateType)
@@ -1357,13 +1404,16 @@ def platform_update(module):
                                     )
                                     parts = latest_line.split(",")
                                     sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
-                        if sysfirm_update.get('level') != "latest":
-                            firm_level = str(sysfirm_update.get('level'))
-                            if firm_level.isdigit():
-                                if len(firm_level) == 1:
-                                    firm_level = "00" + firm_level
-                                elif len(firm_level) == 2:
-                                    firm_level = "0" + firm_level
+
+                    # Normalise numeric level to 3-digit zero-padded string for HMC API
+                    if sysfirm_update.get('level') != "latest":
+                        firm_level = str(sysfirm_update.get('level'))
+                        if firm_level.isdigit():
+                            if len(firm_level) == 1:
+                                firm_level = "00" + firm_level
+                            elif len(firm_level) == 2:
+                                firm_level = "0" + firm_level
+                        sysfirm_update['level'] = firm_level
 
             # IO Adapter Update check — skip LICQueryRepository for SFTP
             if all_io_updates:
