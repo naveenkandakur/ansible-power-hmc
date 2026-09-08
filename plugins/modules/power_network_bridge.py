@@ -513,7 +513,7 @@ def validate_parameters(params):
 
     elif state == 'facts':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name']
-        unsupported = ['virtual_network_name', 'network_bridge']
+        unsupported = ['port_vlan_id', 'virtual_network_name', 'network_bridge']
 
     else:
         mandatory = []
@@ -524,6 +524,11 @@ def validate_parameters(params):
         if len(collate) == 1:
             raise ParameterError("mandatory parameter '%s' is missing" % collate[0])
         raise ParameterError("mandatory parameters '%s' are missing" % ', '.join(collate))
+
+    pvid = params.get('port_vlan_id')
+    if pvid is not None and not (1 <= pvid <= 4094):
+        raise ParameterError(
+            "port_vlan_id must be between 1 and 4094; got: %s" % pvid)
 
     # network_bridge sub-field validation
     if state in ('present', 'update'):
@@ -539,6 +544,9 @@ def validate_parameters(params):
                 raise ParameterError(
                     "network_bridge.primary_vios.backing_device is required when state=present")
             s_vios = nb.get('secondary_vios') or None
+            if s_vios and not s_vios.get('name'):
+                raise ParameterError(
+                    "network_bridge.secondary_vios.name is required when secondary_vios is configured")
             if s_vios and not s_vios.get('backing_device'):
                 raise ParameterError(
                     "network_bridge.secondary_vios.backing_device is required when secondary_vios is configured")
@@ -574,7 +582,7 @@ def validate_parameters(params):
             raise ParameterError(
                 "network_bridge.tagged_virtual_networks is only valid when state=update")
         if tagged_vns is not None:
-            if not isinstance(tagged_vns, list) or not all(
+            if not isinstance(tagged_vns, list) or len(tagged_vns) == 0 or not all(
                     isinstance(n, str) and n.strip() for n in tagged_vns):
                 raise ParameterError(
                     "network_bridge.tagged_virtual_networks must be a non-empty list of strings")
