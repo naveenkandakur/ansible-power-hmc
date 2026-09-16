@@ -1659,8 +1659,7 @@ def run_module():
         raise ParameterError("Unsupported Python version {0}, supported python version is 3 and above".format(py_ver))
 
     ok_count = 0
-    failed_count = 0
-    failed = 0
+    failed_messages = []
 
     if module.params.get('state'):
         changed, info, warning = facts(module)
@@ -1673,21 +1672,23 @@ def run_module():
                 if status == "COMPLETED_OK":
                     ok_count += 1
                 elif status == "COMPLETED_WITH_ERROR":
-                    failureMsg = data.get('FailureMessage')
+                    failureMsg = data.get('FailureMessage', '')
                     if failureMsg and "no updates" in failureMsg.lower():
                         ok_count += 1
                     else:
-                        failed_count += 1
+                        failed_messages.append(failureMsg or "Unknown error")
 
-            if failed_count > 0 and ok_count == 0:
-                failed = failed_count
+            if failed_messages and ok_count == 0:
+                result = {'changed': changed, 'command_output': info}
+                if warning:
+                    result['warning'] = warning
+                module.fail_json(msg='; '.join(failed_messages), **result)
 
         if compare_levels(before_update_level, after_update_level):
             changed = False
 
     result = {
         'changed': changed,
-        'failed': failed
     }
 
     if info:
