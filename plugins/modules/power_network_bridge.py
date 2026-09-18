@@ -536,22 +536,29 @@ def validate_parameters(params):
             raise ParameterError(
                 "shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: %s" % secondary_pvid)
 
-        # shared: high_availability_mode choices and applicability
-        # high_availability_mode is only valid when secondary_vios is configured
-        # (i.e. a two-VIOS failover bridge). It has no meaning on a single-VIOS bridge.
-        ha_choices = ('disabled', 'auto', 'standby')
-        has_secondary_vios = bool(nb.get('secondary_vios'))
-        for vios_key in ('primary_vios', 'secondary_vios'):
-            vios_cfg = nb.get(vios_key) or {}
-            ha = vios_cfg.get('high_availability_mode')
-            if ha is not None and not has_secondary_vios:
-                raise ParameterError(
-                    "shared_ethernet_adapter.%s.high_availability_mode is only valid "
-                    "when secondary_vios is configured (two-VIOS bridge)" % vios_key)
-            if ha is not None and ha not in ha_choices:
-                raise ParameterError(
-                    "shared_ethernet_adapter.%s.high_availability_mode must be one of %s; got: %s"
-                    % (vios_key, ', '.join(ha_choices), ha))
+        # high_availability_mode is unsupported for state=present
+        if state == 'present':
+            for vios_key in ('primary_vios', 'secondary_vios'):
+                vios_cfg = nb.get(vios_key) or {}
+                if vios_cfg.get('high_availability_mode') is not None:
+                    raise ParameterError(
+                        "unsupported parameter: shared_ethernet_adapter.%s.high_availability_mode" % vios_key)
+
+        # high_availability_mode is only valid for state=update with secondary_vios
+        if state == 'update':
+            ha_choices = ('disabled', 'auto', 'standby')
+            has_secondary_vios = bool(nb.get('secondary_vios'))
+            for vios_key in ('primary_vios', 'secondary_vios'):
+                vios_cfg = nb.get(vios_key) or {}
+                ha = vios_cfg.get('high_availability_mode')
+                if ha is not None and not has_secondary_vios:
+                    raise ParameterError(
+                        "shared_ethernet_adapter.%s.high_availability_mode is only valid "
+                        "when secondary_vios is configured (two-VIOS bridge)" % vios_key)
+                if ha is not None and ha not in ha_choices:
+                    raise ParameterError(
+                        "shared_ethernet_adapter.%s.high_availability_mode must be one of %s; got: %s"
+                        % (vios_key, ', '.join(ha_choices), ha))
 
         # update-only: tagged_virtual_networks
         tagged_vns = nb.get('tagged_virtual_networks')
@@ -724,9 +731,7 @@ def ensure_present(module, params):
     failover_enabled = secondary_vios_name is not None
     # per-VIOS optional fields
     p_backing = primary_cfg.get('backing_device')
-    p_ha_mode = primary_cfg.get('high_availability_mode')
     s_backing = secondary_cfg.get('backing_device') if secondary_cfg else None
-    s_ha_mode = secondary_cfg.get('high_availability_mode') if secondary_cfg else None
 
     validate_parameters(params)
     system_name = _resolve_system_name(module, params, hmc_host, hmc_user, password)
@@ -741,8 +746,8 @@ def ensure_present(module, params):
             vios1_uuid = _resolve_vios_uuid(module, rest_conn, system_uuid, primary_vios_name)
             vios2_uuid = (_resolve_vios_uuid(module, rest_conn, system_uuid, secondary_vios_name)
                           if secondary_vios_name else None)
-            vios1_cfg = {'backing_device': p_backing, 'ha_mode': p_ha_mode}
-            vios2_cfg = ({'backing_device': s_backing, 'ha_mode': s_ha_mode}
+            vios1_cfg = {'backing_device': p_backing}
+            vios2_cfg = ({'backing_device': s_backing}
                           if vios2_uuid else None)
 
             # Resolve virtual network name to UUID, validate it is untagged,
@@ -767,9 +772,8 @@ def ensure_present(module, params):
                 module.fail_json(msg="Virtual network '{0}' not found on system '{1}'".format(
                     virtual_network_name, system_name))
 
-            # Idempotency: if a bridge already exists on the derived PVID, still apply
-            # any SEA-level settings that can only be set on an existing bridge
-            # (large_send, high_availability_mode) before exiting unchanged.
+            # Idempotency: if a bridge already exists on the derived PVID, still
+            # apply large_send (only post-create field) before exiting unchanged.
             bridge_uuid = None
             bridges_dom = rest_conn.getNetworkBridges(system_uuid)
             if bridges_dom is not None:
@@ -779,17 +783,15 @@ def ensure_present(module, params):
                         atom_id_elem = bridge.xpath('Metadata/Atom/AtomID')
                         if atom_id_elem:
                             bridge_uuid = atom_id_elem[0].text
-                        sea_update_needed = (large_send is not None
-                                             or p_ha_mode is not None
-                                             or s_ha_mode is not None)
+                        sea_update_needed = large_send is not None
                         if sea_update_needed and bridge_uuid:
                             single_bridge_dom = rest_conn.getNetworkBridge(system_uuid, bridge_uuid)
                             if single_bridge_dom is not None:
-                                rest_conn.updateNetworkBridgeSEAs(
+                                rest_conn.updateNetworkBridge(
                                     system_uuid, bridge_uuid, single_bridge_dom,
-                                    large_send, vios1_ha_mode=p_ha_mode, vios2_ha_mode=s_ha_mode)
+                                    large_send=large_send)
                         module.exit_json(
-                            changed=sea_update_needed,
+                            changed=False,
                             msg="Network bridge with port_vlan_id '{0}' already exists".format(port_vlan_id))
 
             # Step 1: create the bridge — jumbo_frames and qos_mode are embedded
@@ -808,17 +810,14 @@ def ensure_present(module, params):
                 bridge_uuid_elem = bridge_dom.xpath("//AtomID")
             bridge_uuid = bridge_uuid_elem[0].text if bridge_uuid_elem else None
 
-            # Step 2: apply SEA-level settings that cannot be set at creation time:
-            #   - large_send (XSD requires IIDPService/ConfigurationState first)
-            #   - high_availability_mode (HMC only accepts it on an existing bridge)
-            #   jumbo_frames and qos_mode are already handled in the CREATE PUT above.
-            sea_update_needed = large_send is not None or p_ha_mode is not None or s_ha_mode is not None
-            if sea_update_needed and bridge_uuid:
+            # Step 2: apply large_send via follow-up POST (cannot be set at create time).
+            # high_availability_mode is only settable via state=update.
+            if large_send is not None and bridge_uuid:
                 single_bridge_dom = rest_conn.getNetworkBridge(system_uuid, bridge_uuid)
                 if single_bridge_dom is not None:
-                    rest_conn.updateNetworkBridgeSEAs(
+                    rest_conn.updateNetworkBridge(
                         system_uuid, bridge_uuid, single_bridge_dom,
-                        large_send, vios1_ha_mode=p_ha_mode, vios2_ha_mode=s_ha_mode)
+                        large_send=large_send)
 
             network_bridge_info = {
                 'port_vlan_id': port_vlan_id,
@@ -853,6 +852,15 @@ def ensure_update(module, params):
     qos_mode = nb.get('qos_mode')
     failover_enabled = nb.get('failover_enabled')  # optional override
     tagged_virtual_networks = nb.get('tagged_virtual_networks') or []
+
+    # high_availability_mode cannot be changed while enabling load_balancing
+    if load_balancing:
+        p_ha = primary_cfg.get('high_availability_mode') if primary_cfg else None
+        s_ha = (secondary_cfg.get('high_availability_mode')
+                if secondary_cfg else None)
+        if p_ha is not None or s_ha is not None:
+            module.fail_json(
+                msg="high_availability_mode cannot be set when load_balancing is being enabled")
 
     validate_parameters(params)
     system_name = _resolve_system_name(module, params, hmc_host, hmc_user, password)
