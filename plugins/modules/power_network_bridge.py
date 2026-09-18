@@ -69,7 +69,7 @@ options:
             - The network must have C(TaggedNetwork=false) on the HMC.
             - Its VLAN ID is used as the bridge Port VLAN ID (PVID).
         type: str
-    network_bridge:
+    shared_ethernet_adapter:
         description:
             - Configuration block for the Virtual Network Bridge.
             - Required when I(state=present) or I(state=update).
@@ -127,18 +127,6 @@ options:
                             - Required by the HMC — the SEA cannot be created without a backing device.
                             - Required when I(state=present).
                         type: str
-                    address_to_ping:
-                        description:
-                            - IP address the SEA pings for failover health-check probing.
-                        type: str
-                    ip_address:
-                        description:
-                            - IP address configured on the SEA interface.
-                        type: str
-                    netmask:
-                        description:
-                            - Subnet mask for the SEA interface IP address.
-                        type: str
                     high_availability_mode:
                         description:
                             - High-availability mode for the primary SEA.
@@ -165,18 +153,6 @@ options:
                               backing device (e.g. C(ent3)).
                             - Required by the HMC when I(secondary_vios) is configured.
                         type: str
-                    address_to_ping:
-                        description:
-                            - IP address the SEA pings for failover health-check probing.
-                        type: str
-                    ip_address:
-                        description:
-                            - IP address configured on the SEA interface.
-                        type: str
-                    netmask:
-                        description:
-                            - Subnet mask for the SEA interface IP address.
-                        type: str
                     high_availability_mode:
                         description:
                             - High-availability mode for the secondary SEA.
@@ -201,12 +177,11 @@ options:
             - C(facts) retrieves information about all Virtual Network Bridges.
             - C(present) creates the Virtual Network Bridge if it does not already exist.
             - C(update) modifies an existing Virtual Network Bridge identified by
-              I(port_vlan_id). Updatable fields are I(failover_enabled),
+              I(virtual_network_name). Updatable fields are I(failover_enabled),
               I(load_balancing), I(jumbo_frames), I(large_send), I(qos_mode),
               I(secondary_pvid) (when enabling load-sharing), per-VIOS
-              I(address_to_ping), I(ip_address), I(netmask), and
               I(high_availability_mode), and I(tagged_virtual_networks).
-            - C(absent) deletes the Virtual Network Bridge identified by I(port_vlan_id).
+            - C(absent) deletes the Virtual Network Bridge identified by I(virtual_network_name).
         required: true
         type: str
         choices: ['facts', 'present', 'update', 'absent']
@@ -230,7 +205,7 @@ EXAMPLES = '''
       password: <password>
     system_name: <managed_system_name>
     virtual_network_name: <virtual_network_name>
-    network_bridge:
+    shared_ethernet_adapter:
       load_balancing: false
       jumbo_frames: false
       large_send: false
@@ -238,13 +213,9 @@ EXAMPLES = '''
       primary_vios:
         name: <primary_vios_name>
         backing_device: <primary_backing_device>
-        address_to_ping: <primary_address_to_ping>
-        ip_address: <primary_ip_address>
-        netmask: <primary_netmask>
       secondary_vios:
         name: <secondary_vios_name>
         backing_device: <secondary_backing_device>
-        address_to_ping: <secondary_address_to_ping>
     state: present
 
 - name: Create a Virtual Network Bridge without failover (single VIOS)
@@ -255,7 +226,7 @@ EXAMPLES = '''
       password: <password>
     system_name: <managed_system_name>
     virtual_network_name: <virtual_network_name>
-    network_bridge:
+    shared_ethernet_adapter:
       primary_vios:
         name: <primary_vios_name>
         backing_device: <primary_backing_device>
@@ -268,20 +239,16 @@ EXAMPLES = '''
       username: <username>
       password: <password>
     system_name: <managed_system_name>
-    port_vlan_id: <port_vlan_id>
-    network_bridge:
+    virtual_network_name: <virtual_network_name>
+    shared_ethernet_adapter:
       load_balancing: true
       secondary_pvid: <secondary_pvid>
       jumbo_frames: false
       large_send: true
       qos_mode: loose
       primary_vios:
-        address_to_ping: <primary_address_to_ping>
-        ip_address: <primary_ip_address>
-        netmask: <primary_netmask>
         high_availability_mode: auto
       secondary_vios:
-        address_to_ping: <secondary_address_to_ping>
         high_availability_mode: standby
     state: update
 
@@ -292,8 +259,8 @@ EXAMPLES = '''
       username: <username>
       password: <password>
     system_name: <managed_system_name>
-    port_vlan_id: <port_vlan_id>
-    network_bridge:
+    virtual_network_name: <virtual_network_name>
+    shared_ethernet_adapter:
       tagged_virtual_networks:
         - <tagged_virtual_network_name_1>
         - <tagged_virtual_network_name_2>
@@ -306,7 +273,7 @@ EXAMPLES = '''
       username: <username>
       password: <password>
     system_name: <managed_system_name>
-    port_vlan_id: <port_vlan_id>
+    virtual_network_name: <virtual_network_name>
     state: absent
 '''
 
@@ -499,21 +466,21 @@ def validate_parameters(params):
 
     if state == 'present':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
-                     'virtual_network_name', 'network_bridge']
+                     'virtual_network_name', 'shared_ethernet_adapter']
         unsupported = ['port_vlan_id']
 
     elif state == 'update':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
-                     'port_vlan_id', 'network_bridge']
-        unsupported = ['virtual_network_name']
+                     'virtual_network_name', 'shared_ethernet_adapter']
+        unsupported = ['port_vlan_id']
 
     elif state == 'absent':
-        mandatory = ['hmc_host', 'hmc_auth', 'system_name', 'port_vlan_id']
-        unsupported = ['virtual_network_name', 'network_bridge']
+        mandatory = ['hmc_host', 'hmc_auth', 'system_name', 'virtual_network_name']
+        unsupported = ['port_vlan_id', 'shared_ethernet_adapter']
 
     elif state == 'facts':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name']
-        unsupported = ['port_vlan_id', 'virtual_network_name', 'network_bridge']
+        unsupported = ['port_vlan_id', 'virtual_network_name', 'shared_ethernet_adapter']
 
     else:
         mandatory = []
@@ -530,62 +497,72 @@ def validate_parameters(params):
         raise ParameterError(
             "port_vlan_id must be between 1 and 4094; got: %s" % pvid)
 
-    # network_bridge sub-field validation
+    # shared_ethernet_adapter sub-field validation
     if state in ('present', 'update'):
-        nb = params.get('network_bridge') or {}
+        nb = params.get('shared_ethernet_adapter') or {}
 
         # present-only: primary_vios.name and backing_device are mandatory
         if state == 'present':
             p_vios = nb.get('primary_vios') or {}
             if not p_vios.get('name'):
                 raise ParameterError(
-                    "network_bridge.primary_vios.name is required when state=present")
+                    "shared_ethernet_adapter.primary_vios.name is required when state=present")
             if not p_vios.get('backing_device'):
                 raise ParameterError(
-                    "network_bridge.primary_vios.backing_device is required when state=present")
+                    "shared_ethernet_adapter.primary_vios.backing_device is required when state=present")
             s_vios = nb.get('secondary_vios') or None
             if s_vios and not s_vios.get('name'):
                 raise ParameterError(
-                    "network_bridge.secondary_vios.name is required when secondary_vios is configured")
+                    "shared_ethernet_adapter.secondary_vios.name is required when secondary_vios is configured")
             if s_vios and not s_vios.get('backing_device'):
                 raise ParameterError(
-                    "network_bridge.secondary_vios.backing_device is required when secondary_vios is configured")
+                    "shared_ethernet_adapter.secondary_vios.backing_device is required when secondary_vios is configured")
 
         # shared: qos_mode choices
         qos = nb.get('qos_mode')
         if qos is not None and qos not in ('disabled', 'loose', 'strict'):
             raise ParameterError(
-                "network_bridge.qos_mode must be one of disabled, loose, strict; got: %s" % qos)
+                "shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: %s" % qos)
 
         # shared: secondary_pvid constraints
         secondary_pvid = nb.get('secondary_pvid')
+        if nb.get('load_balancing') and secondary_pvid is None:
+            raise ParameterError(
+                "shared_ethernet_adapter.secondary_pvid is required when shared_ethernet_adapter.load_balancing=true")
         if secondary_pvid is not None and not nb.get('load_balancing', False):
             raise ParameterError(
-                "network_bridge.secondary_pvid is only valid when network_bridge.load_balancing=true")
+                "shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
         if secondary_pvid is not None and not (1 <= secondary_pvid <= 4094):
             raise ParameterError(
-                "network_bridge.secondary_pvid must be between 1 and 4094; got: %s" % secondary_pvid)
+                "shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: %s" % secondary_pvid)
 
-        # shared: high_availability_mode choices
+        # shared: high_availability_mode choices and applicability
+        # high_availability_mode is only valid when secondary_vios is configured
+        # (i.e. a two-VIOS failover bridge). It has no meaning on a single-VIOS bridge.
         ha_choices = ('disabled', 'auto', 'standby')
+        has_secondary_vios = bool(nb.get('secondary_vios'))
         for vios_key in ('primary_vios', 'secondary_vios'):
             vios_cfg = nb.get(vios_key) or {}
             ha = vios_cfg.get('high_availability_mode')
+            if ha is not None and not has_secondary_vios:
+                raise ParameterError(
+                    "shared_ethernet_adapter.%s.high_availability_mode is only valid "
+                    "when secondary_vios is configured (two-VIOS bridge)" % vios_key)
             if ha is not None and ha not in ha_choices:
                 raise ParameterError(
-                    "network_bridge.%s.high_availability_mode must be one of %s; got: %s"
+                    "shared_ethernet_adapter.%s.high_availability_mode must be one of %s; got: %s"
                     % (vios_key, ', '.join(ha_choices), ha))
 
         # update-only: tagged_virtual_networks
         tagged_vns = nb.get('tagged_virtual_networks')
         if tagged_vns is not None and state != 'update':
             raise ParameterError(
-                "network_bridge.tagged_virtual_networks is only valid when state=update")
+                "shared_ethernet_adapter.tagged_virtual_networks is only valid when state=update")
         if tagged_vns is not None:
             if not isinstance(tagged_vns, list) or len(tagged_vns) == 0 or not all(
                     isinstance(n, str) and n.strip() for n in tagged_vns):
                 raise ParameterError(
-                    "network_bridge.tagged_virtual_networks must be a non-empty list of strings")
+                    "shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of strings")
 
     collate = []
     for k in unsupported:
@@ -733,7 +710,7 @@ def ensure_present(module, params):
     password = params['hmc_auth']['password']
     virtual_network_name = params['virtual_network_name']
 
-    nb = params.get('network_bridge') or {}
+    nb = params.get('shared_ethernet_adapter') or {}
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
     primary_vios_name = primary_cfg.get('name')
@@ -741,19 +718,15 @@ def ensure_present(module, params):
     load_balancing = nb.get('load_balancing') or False
     secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames') or False
-    large_send = nb.get('large_send') or False
+    large_send = nb.get('large_send')
     qos_mode = nb.get('qos_mode')
     # failover is automatically true when a secondary_vios is configured
     failover_enabled = secondary_vios_name is not None
     # per-VIOS optional fields
     p_backing = primary_cfg.get('backing_device')
-    p_addr_ping = primary_cfg.get('address_to_ping')
-    p_ip = primary_cfg.get('ip_address')
-    p_netmask = primary_cfg.get('netmask')
+    p_ha_mode = primary_cfg.get('high_availability_mode')
     s_backing = secondary_cfg.get('backing_device') if secondary_cfg else None
-    s_addr_ping = secondary_cfg.get('address_to_ping') if secondary_cfg else None
-    s_ip = secondary_cfg.get('ip_address') if secondary_cfg else None
-    s_netmask = secondary_cfg.get('netmask') if secondary_cfg else None
+    s_ha_mode = secondary_cfg.get('high_availability_mode') if secondary_cfg else None
 
     validate_parameters(params)
     system_name = _resolve_system_name(module, params, hmc_host, hmc_user, password)
@@ -768,11 +741,9 @@ def ensure_present(module, params):
             vios1_uuid = _resolve_vios_uuid(module, rest_conn, system_uuid, primary_vios_name)
             vios2_uuid = (_resolve_vios_uuid(module, rest_conn, system_uuid, secondary_vios_name)
                           if secondary_vios_name else None)
-            vios1_cfg = {'backing_device': p_backing, 'address_to_ping': p_addr_ping,
-                         'ip_address': p_ip, 'netmask': p_netmask}
-            vios2_cfg = ({'backing_device': s_backing, 'address_to_ping': s_addr_ping,
-                          'ip_address': s_ip, 'netmask': s_netmask}
-                         if vios2_uuid else None)
+            vios1_cfg = {'backing_device': p_backing, 'ha_mode': p_ha_mode}
+            vios2_cfg = ({'backing_device': s_backing, 'ha_mode': s_ha_mode}
+                          if vios2_uuid else None)
 
             # Resolve virtual network name to UUID, validate it is untagged,
             # and derive the bridge PVID from its VLAN ID.
@@ -796,21 +767,38 @@ def ensure_present(module, params):
                 module.fail_json(msg="Virtual network '{0}' not found on system '{1}'".format(
                     virtual_network_name, system_name))
 
-            # Idempotency: exit unchanged if a bridge already exists on the derived PVID
+            # Idempotency: if a bridge already exists on the derived PVID, still apply
+            # any SEA-level settings that can only be set on an existing bridge
+            # (large_send, high_availability_mode) before exiting unchanged.
+            bridge_uuid = None
             bridges_dom = rest_conn.getNetworkBridges(system_uuid)
             if bridges_dom is not None:
                 for bridge in bridges_dom.xpath("//NetworkBridge"):
                     pvlan = bridge.xpath('PortVLANID')
                     if pvlan and pvlan[0].text == str(port_vlan_id):
+                        atom_id_elem = bridge.xpath('Metadata/Atom/AtomID')
+                        if atom_id_elem:
+                            bridge_uuid = atom_id_elem[0].text
+                        sea_update_needed = (large_send is not None
+                                             or p_ha_mode is not None
+                                             or s_ha_mode is not None)
+                        if sea_update_needed and bridge_uuid:
+                            single_bridge_dom = rest_conn.getNetworkBridge(system_uuid, bridge_uuid)
+                            if single_bridge_dom is not None:
+                                rest_conn.updateNetworkBridgeSEAs(
+                                    system_uuid, bridge_uuid, single_bridge_dom,
+                                    large_send, vios1_ha_mode=p_ha_mode, vios2_ha_mode=s_ha_mode)
                         module.exit_json(
-                            changed=False,
+                            changed=sea_update_needed,
                             msg="Network bridge with port_vlan_id '{0}' already exists".format(port_vlan_id))
 
-            # Step 1: create the bridge
+            # Step 1: create the bridge — jumbo_frames and qos_mode are embedded
+            # directly in the CREATE payload at the correct XSD sequence positions.
             bridge_dom = rest_conn.createNetworkBridge(
                 system_uuid, port_vlan_id, virtual_network_id,
                 vios1_uuid, vios2_uuid, failover_enabled, load_balancing,
-                vios1_cfg, vios2_cfg, secondary_pvid=secondary_pvid)
+                vios1_cfg, vios2_cfg, secondary_pvid=secondary_pvid,
+                jumbo_frames=jumbo_frames, qos_mode=qos_mode)
             if not bridge_dom:
                 module.fail_json(msg="Failed to create network bridge")
 
@@ -820,21 +808,17 @@ def ensure_present(module, params):
                 bridge_uuid_elem = bridge_dom.xpath("//AtomID")
             bridge_uuid = bridge_uuid_elem[0].text if bridge_uuid_elem else None
 
-            # Step 2: apply SEA-level settings that cannot be set at creation time
-            # (jumbo_frames, large_send, qos_mode, ip_address, netmask, address_to_ping)
-            sea_update_needed = (
-                any(v is not None for v in [jumbo_frames, large_send, qos_mode])
-                or p_ip or p_addr_ping
-                or (secondary_cfg and (s_ip or s_addr_ping))
-            )
+            # Step 2: apply SEA-level settings that cannot be set at creation time:
+            #   - large_send (XSD requires IIDPService/ConfigurationState first)
+            #   - high_availability_mode (HMC only accepts it on an existing bridge)
+            #   jumbo_frames and qos_mode are already handled in the CREATE PUT above.
+            sea_update_needed = large_send is not None or p_ha_mode is not None or s_ha_mode is not None
             if sea_update_needed and bridge_uuid:
                 single_bridge_dom = rest_conn.getNetworkBridge(system_uuid, bridge_uuid)
                 if single_bridge_dom is not None:
                     rest_conn.updateNetworkBridgeSEAs(
                         system_uuid, bridge_uuid, single_bridge_dom,
-                        jumbo_frames, large_send, qos_mode,
-                        vios1_cfg=vios1_cfg,
-                        vios2_cfg=vios2_cfg)
+                        large_send, vios1_ha_mode=p_ha_mode, vios2_ha_mode=s_ha_mode)
 
             network_bridge_info = {
                 'port_vlan_id': port_vlan_id,
@@ -857,9 +841,9 @@ def ensure_update(module, params):
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
-    port_vlan_id = params['port_vlan_id']
+    virtual_network_name = params['virtual_network_name']
 
-    nb = params.get('network_bridge') or {}
+    nb = params.get('shared_ethernet_adapter') or {}
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
     load_balancing = nb.get('load_balancing')   # None = not specified
@@ -879,7 +863,21 @@ def ensure_update(module, params):
             if not system_uuid:
                 module.fail_json(msg="Managed system not found: {0}".format(system_name))
 
-            # Locate the bridge by PVID
+            # Resolve virtual_network_name to its PVID, then locate the bridge
+            port_vlan_id = None
+            vn_dom = rest_conn.getVirtualNetworks(system_uuid)
+            if vn_dom is not None:
+                for vn in vn_dom.xpath("//VirtualNetwork"):
+                    name_elem = vn.xpath(".//NetworkName")
+                    if name_elem and name_elem[0].text == virtual_network_name:
+                        vlan_elem = vn.xpath(".//NetworkVLANID")
+                        if vlan_elem:
+                            port_vlan_id = int(vlan_elem[0].text)
+                        break
+            if port_vlan_id is None:
+                module.fail_json(msg="Virtual network '{0}' not found on system '{1}'".format(
+                    virtual_network_name, system_name))
+
             bridge_uuid = None
             bridges_dom = rest_conn.getNetworkBridges(system_uuid)
             if bridges_dom is not None:
@@ -893,7 +891,7 @@ def ensure_update(module, params):
 
             if not bridge_uuid:
                 module.fail_json(
-                    msg="Network bridge with port_vlan_id '{0}' not found".format(port_vlan_id))
+                    msg="Network bridge for virtual_network '{0}' not found".format(virtual_network_name))
 
             # Fetch the full single-bridge DOM for mutation
             bridge_dom = rest_conn.getNetworkBridge(system_uuid, bridge_uuid)
@@ -958,7 +956,7 @@ def ensure_update(module, params):
             # If nothing at all has changed, skip the POST and report unchanged.
             if not has_non_vn_update and tagged_virtual_networks and not tagged_vn_ids:
                 return False, {
-                    'port_vlan_id': port_vlan_id,
+                    'virtual_network_name': virtual_network_name,
                     'tagged_virtual_networks_added': [],
                     'status': 'unchanged'
                 }, None
@@ -976,7 +974,7 @@ def ensure_update(module, params):
                 tagged_vn_ids=tagged_vn_ids)
 
             network_bridge_info = {
-                'port_vlan_id': port_vlan_id,
+                'virtual_network_name': virtual_network_name,
                 'load_balancing_enabled': load_balancing,
                 'jumbo_frames': jumbo_frames,
                 'large_send': large_send,
@@ -996,7 +994,7 @@ def ensure_absent(module, params):
     hmc_host = params['hmc_host']
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
-    port_vlan_id = params['port_vlan_id']
+    virtual_network_name = params['virtual_network_name']
 
     validate_parameters(params)
     system_name = _resolve_system_name(module, params, hmc_host, hmc_user, password)
@@ -1006,6 +1004,30 @@ def ensure_absent(module, params):
             system_uuid, server_dom = rest_conn.getManagedSystem(system_name)
             if not system_uuid:
                 module.fail_json(msg="Managed system not found: {0}".format(system_name))
+
+            # Resolve virtual_network_name to PVID to locate the bridge.
+            # Only untagged networks (TaggedNetwork=false) are valid — a tagged
+            # network is not a bridge PVID and cannot be used to identify or
+            # delete a NetworkBridge.
+            port_vlan_id = None
+            vn_dom = rest_conn.getVirtualNetworks(system_uuid)
+            if vn_dom is not None:
+                for vn in vn_dom.xpath("//VirtualNetwork"):
+                    name_elem = vn.xpath(".//NetworkName")
+                    if name_elem and name_elem[0].text == virtual_network_name:
+                        tagged_elem = vn.xpath(".//TaggedNetwork")
+                        if tagged_elem and tagged_elem[0].text.lower() == 'true':
+                            module.fail_json(
+                                msg="Virtual network '{0}' is a tagged network and cannot be used "
+                                    "to identify a Network Bridge. Only untagged networks are "
+                                    "valid for state=absent.".format(virtual_network_name))
+                        vlan_elem = vn.xpath(".//NetworkVLANID")
+                        if vlan_elem:
+                            port_vlan_id = int(vlan_elem[0].text)
+                        break
+            if port_vlan_id is None:
+                module.fail_json(msg="Virtual network '{0}' not found on system '{1}'".format(
+                    virtual_network_name, system_name))
 
             bridge_uuid = None
             bridges_dom = rest_conn.getNetworkBridges(system_uuid)
@@ -1021,7 +1043,7 @@ def ensure_absent(module, params):
             if not bridge_uuid:
                 module.exit_json(
                     changed=False,
-                    msg="Network bridge with port_vlan_id '{0}' not found".format(port_vlan_id))
+                    msg="Network bridge for virtual_network '{0}' not found".format(virtual_network_name))
 
             rest_conn.deleteNetworkBridge(system_uuid, bridge_uuid)
 
@@ -1054,9 +1076,6 @@ def run_module():
     vios_spec = dict(
         name=dict(type='str'),
         backing_device=dict(type='str'),
-        address_to_ping=dict(type='str'),
-        ip_address=dict(type='str'),
-        netmask=dict(type='str'),
         high_availability_mode=dict(type='str', choices=['disabled', 'auto', 'standby']),
     )
 
@@ -1072,7 +1091,7 @@ def run_module():
         system_name=dict(type='str', required=True),
         port_vlan_id=dict(type='int'),
         virtual_network_name=dict(type='str'),
-        network_bridge=dict(
+        shared_ethernet_adapter=dict(
             type='dict',
             options=dict(
                 load_balancing=dict(type='bool', default=None),
