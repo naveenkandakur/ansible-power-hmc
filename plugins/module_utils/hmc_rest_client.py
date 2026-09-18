@@ -3746,20 +3746,23 @@ class HmcRestClient:
             raise
 
     @staticmethod
-    def _sea_xml(vios_href, is_primary, cfg):
+    def _sea_xml(vios_href, is_primary, cfg, jumbo_frames=None, qos_mode=None):
         """Return the XML fragment list for one SharedEthernetAdapter block.
 
         Used only in the bridge CREATE (PUT) payload.  The HMC PUT schema does
-        not accept IPInterface; ip_address and netmask are applied via the
-        follow-up SEA POST-update (updateNetworkBridgeSEAs).
+        not accept IPInterface, LargeSend, or HighAvailabilityMode at create time;
+        those are applied via the follow-up SEA POST-update (updateNetworkBridgeSEAs).
 
-        Element order:
-          AssignedVirtualIOServer → BackingDeviceChoice → IsPrimary → AddressToPing
+        Element order matches the HMC GET response XSD sequence:
+          Metadata → AssignedVirtualIOServer → BackingDeviceChoice →
+          JumboFramesEnabled → QualityOfServiceMode →
+          TrunkAdapters (empty) → IsPrimary
 
         DeviceName inside EthernetBackingDevice must use kb="ROR" per HMC schema.
 
-        cfg is a dict with optional keys: backing_device, address_to_ping.
-        (ip_address and netmask are intentionally ignored here.)
+        cfg is a dict with optional key: backing_device.
+        (ip_address, netmask, address_to_ping, large_send, and
+        high_availability_mode are not accepted by the HMC PUT schema at create time.)
         """
         primary_str = 'true' if is_primary else 'false'
         parts = ['<SharedEthernetAdapter schemaVersion="V1_0">',
@@ -3776,25 +3779,35 @@ class HmcRestClient:
                       '<DeviceName kb="ROR" kxe="false">{0}</DeviceName>'.format(backing),
                       '</EthernetBackingDevice>',
                       '</BackingDeviceChoice>']
+        # JumboFramesEnabled — must come after BackingDeviceChoice, before TrunkAdapters
+        if jumbo_frames is not None:
+            jf_str = 'true' if jumbo_frames else 'false'
+            parts.append('<JumboFramesEnabled kb="UOD" kxe="false">{0}</JumboFramesEnabled>'.format(jf_str))
+        # QualityOfServiceMode — must come after JumboFramesEnabled, before TrunkAdapters
+        if qos_mode is not None:
+            parts.append('<QualityOfServiceMode kb="CUD" kxe="false">{0}</QualityOfServiceMode>'.format(qos_mode))
+        # Empty TrunkAdapters — HMC auto-assigns the slot
+        parts += ['<TrunkAdapters kb="CUD" kxe="false" schemaVersion="V1_0">',
+                  '<Metadata><Atom/></Metadata>',
+                  '</TrunkAdapters>']
         parts.append('<IsPrimary kxe="false" kb="CUD">{0}</IsPrimary>'.format(primary_str))
-        # AddressToPing (optional)
-        addr_ping = cfg.get('address_to_ping') if cfg else None
-        if addr_ping:
-            parts.append('<AddressToPing kxe="false" kb="CUD">{0}</AddressToPing>'.format(addr_ping))
         parts.append('</SharedEthernetAdapter>')
         return parts
 
     def createNetworkBridge(self, system_uuid, port_vlan_id, virtual_network_id,
                             vios_id, vios2_id, failover_enabled, load_balancing_enabled,
-                            vios1_cfg=None, vios2_cfg=None, secondary_pvid=None):
+                            vios1_cfg=None, vios2_cfg=None, secondary_pvid=None,
+                            jumbo_frames=None, qos_mode=None):
         """Create a NetworkBridge.
 
         vios2_id / vios2_cfg may be None for a single-VIOS bridge.
-        vios1_cfg / vios2_cfg are dicts with optional keys:
-          backing_device, address_to_ping, ip_address, netmask.
+        vios1_cfg / vios2_cfg are dicts with optional key: backing_device.
         secondary_pvid: when load_balancing_enabled is True the caller may supply
           an integer PVID for the secondary LoadGroup.  When None the secondary
           LoadGroup is omitted from the payload.
+        jumbo_frames / qos_mode: SEA-level settings embedded directly in the
+          CREATE payload at the correct XSD sequence positions.
+          (large_send cannot be set at create time — applied via follow-up POST.)
         """
         url = "https://{0}/rest/api/uom/ManagedSystem/{1}/NetworkBridge".format(self.hmc_ip, system_uuid)
         header = {'X-API-Session': self.session,
@@ -3836,15 +3849,22 @@ class HmcRestClient:
                           '<PortVLANID kb="COR" kxe="false">{0}</PortVLANID>'.format(port_vlan_id),
                           '<SharedEthernetAdapters kxe="false" kb="CUD" schemaVersion="V1_0">',
                           '<Metadata><Atom/></Metadata>']
-        payload_parts += self._sea_xml(vios_href, is_primary=True, cfg=vios1_cfg)
+        payload_parts += self._sea_xml(vios_href, is_primary=True, cfg=vios1_cfg,
+                                       jumbo_frames=jumbo_frames, qos_mode=qos_mode)
         if vios2_id:
             vios2_href = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualIOServer/{2}".format(
                 self.hmc_ip, system_uuid, vios2_id)
-            payload_parts += self._sea_xml(vios2_href, is_primary=False, cfg=vios2_cfg or {})
+            payload_parts += self._sea_xml(vios2_href, is_primary=False, cfg=vios2_cfg or {},
+                                           jumbo_frames=jumbo_frames, qos_mode=qos_mode)
         payload_parts += ['</SharedEthernetAdapters>',
                           '</NetworkBridge>']
         payload = ''.join(payload_parts)
         payload = payload.replace("NetworkBridge", NBRIDGE_NS, 1)
+        logger.debug("INSIDE CREATE")
+        logger.debug("URL being sent is :")
+        logger.debug(url)
+        logger.debug('data sent')
+        logger.debug(payload)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3882,53 +3902,62 @@ class HmcRestClient:
             raise
 
     def updateNetworkBridgeSEAs(self, system_uuid, bridge_uuid, bridge_dom,
-                                jumbo_frames_enabled, large_send, quality_of_service_mode,
-                                vios1_cfg=None, vios2_cfg=None):
-        """POST a full NetworkBridge DOM back after patching SEA-level attributes.
+                                large_send, vios1_ha_mode=None, vios2_ha_mode=None):
+        """POST a full NetworkBridge DOM back after patching per-SEA fields.
 
-        vios1_cfg / vios2_cfg are optional dicts with keys ip_address, netmask,
-        address_to_ping applied to the primary/secondary SEA respectively.
+        Called only from ensure_present (create). LargeSend and HighAvailabilityMode
+        cannot be set in the CREATE PUT payload:
+          - LargeSend requires IIDPService/ConfigurationState (HMC-generated, absent
+            at create time).
+          - HighAvailabilityMode is accepted by the HMC only on an already-created
+            bridge via a follow-up POST.
+        jumbo_frames and qos_mode are handled directly in the CREATE PUT.
+
+        vios1_ha_mode / vios2_ha_mode map to the primary (IsPrimary=true) and
+        secondary (IsPrimary=false) SEAs respectively.  The element is upserted —
+        created if absent, updated if already present.
         """
         url = "https://{0}/rest/api/uom/ManagedSystem/{1}/NetworkBridge/{2}".format(
             self.hmc_ip, system_uuid, bridge_uuid)
         header = {'X-API-Session': self.session,
                   'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=NetworkBridge',
                   'Accept': 'application/atom+xml'}
-        jumbo_str = 'true' if jumbo_frames_enabled else 'false'
-        large_send_str = 'true' if large_send else 'false'
-        qos_str = quality_of_service_mode if quality_of_service_mode else 'disabled'
         NS = "http://www.ibm.com/xmlns/systems/power/firmware/uom/mc/2012_10/"
         for sea in bridge_dom.xpath("//SharedEthernetAdapter"):
-            for tag, value in [('JumboFramesEnabled', jumbo_str),
-                               ('LargeSend', large_send_str),
-                               ('QualityOfServiceMode', qos_str)]:
-                elem = sea.find("{%s}%s" % (NS, tag))
+            # --- LargeSend ---
+            if large_send is not None:
+                large_send_str = 'true' if large_send else 'false'
+                elem = sea.find("{%s}LargeSend" % NS)
                 if elem is None:
-                    elem = sea.xpath(tag)
+                    elem = sea.xpath('LargeSend')
                     if elem:
-                        elem[0].text = value
+                        elem[0].text = large_send_str
                 else:
-                    elem.text = value
-            # Per-VIOS ip_address / netmask / address_to_ping via IPInterface
+                    elem.text = large_send_str
+
+            # --- HighAvailabilityMode (upsert) ---
             is_primary_elem = sea.xpath('IsPrimary')
             is_primary = (is_primary_elem[0].text.lower() == 'true') if is_primary_elem else True
-            cfg = (vios1_cfg or {}) if is_primary else (vios2_cfg or {})
-            ip_addr = cfg.get('ip_address')
-            netmask = cfg.get('netmask')
-            addr_ping = cfg.get('address_to_ping')
-            if addr_ping is not None:
-                self._set_text(sea, 'AddressToPing', addr_ping)
-            if ip_addr is not None:
-                ip_iface = sea.xpath('IPInterface')
-                if ip_iface:
-                    self._set_text(ip_iface[0], 'IPAddress', ip_addr)
-                    if netmask is not None:
-                        self._set_text(ip_iface[0], 'SubnetMask', netmask)
+            ha_mode = vios1_ha_mode if is_primary else vios2_ha_mode
+            if ha_mode is not None:
+                ha_elems = sea.xpath('HighAvailabilityMode')
+                if ha_elems:
+                    ha_elems[0].text = ha_mode
+                else:
+                    ha_el = etree.SubElement(sea, 'HighAvailabilityMode')
+                    ha_el.set('kb', 'CUD')
+                    ha_el.set('kxe', 'false')
+                    ha_el.text = ha_mode
         nb_elem = bridge_dom.xpath("//NetworkBridge")
         if not nb_elem:
             return None
         nb_xmlstr = etree.tostring(nb_elem[0]).decode("utf-8")
         nb_xmlstr = nb_xmlstr.replace("NetworkBridge", NBRIDGE_NS, 1)
+        logger.debug("INSIDE UPDATE")
+        logger.debug("URL being sent is :")
+        logger.debug(url)
+        logger.debug('data sent')
+        logger.debug(nb_xmlstr)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3962,8 +3991,8 @@ class HmcRestClient:
         All parameters are optional.  Only non-None values are applied to the
         live DOM; anything left as None keeps whatever the HMC already has.
 
-        primary_vios_cfg / secondary_vios_cfg are dicts with optional keys:
-          address_to_ping, ip_address, netmask, high_availability_mode.
+        primary_vios_cfg / secondary_vios_cfg are dicts with optional key:
+          high_availability_mode.
         secondary_pvid is the Port VLAN ID for the secondary LoadGroup (only
           relevant when load_balancing is being enabled).
         tagged_vn_ids is a list of (name, uuid) tuples for tagged Virtual Networks
@@ -4083,23 +4112,11 @@ class HmcRestClient:
             if not vios_cfg:
                 continue
 
-            # Per-VIOS mutable fields
-            addr_ping = vios_cfg.get('address_to_ping')
-            if addr_ping is not None:
-                self._set_text(sea, 'AddressToPing', addr_ping)
-
+            # Per-VIOS mutable fields — high_availability_mode is blocked when
+            # load_balancing is being changed (caller must validate before here).
             ha_mode = vios_cfg.get('high_availability_mode')
-            if ha_mode is not None:
+            if ha_mode is not None and not load_balancing:
                 self._set_text(sea, 'HighAvailabilityMode', ha_mode)
-
-            ip_addr = vios_cfg.get('ip_address')
-            netmask = vios_cfg.get('netmask')
-            if ip_addr is not None:
-                ip_iface = sea.xpath('IPInterface')
-                if ip_iface:
-                    self._set_text(ip_iface[0], 'IPAddress', ip_addr)
-                    if netmask is not None:
-                        self._set_text(ip_iface[0], 'SubnetMask', netmask)
 
         # POST the mutated DOM back
         nb_xmlstr = etree.tostring(nb).decode("utf-8")
