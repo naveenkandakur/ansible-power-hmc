@@ -3860,6 +3860,11 @@ class HmcRestClient:
                           '</NetworkBridge>']
         payload = ''.join(payload_parts)
         payload = payload.replace("NetworkBridge", NBRIDGE_NS, 1)
+        logger.debug("INSIDE CREATE")
+        logger.debug("URL being sent is :")
+        logger.debug(url)
+        logger.debug('data sent')
+        logger.debug(payload)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3948,6 +3953,11 @@ class HmcRestClient:
             return None
         nb_xmlstr = etree.tostring(nb_elem[0]).decode("utf-8")
         nb_xmlstr = nb_xmlstr.replace("NetworkBridge", NBRIDGE_NS, 1)
+        logger.debug("INSIDE UPDATE")
+        logger.debug("URL being sent is :")
+        logger.debug(url)
+        logger.debug('data sent')
+        logger.debug(nb_xmlstr)
         try:
             resp = open_url(url,
                             headers=header,
@@ -4102,9 +4112,10 @@ class HmcRestClient:
             if not vios_cfg:
                 continue
 
-            # Per-VIOS mutable fields
+            # Per-VIOS mutable fields — high_availability_mode is blocked when
+            # load_balancing is being changed (caller must validate before here).
             ha_mode = vios_cfg.get('high_availability_mode')
-            if ha_mode is not None:
+            if ha_mode is not None and not load_balancing:
                 self._set_text(sea, 'HighAvailabilityMode', ha_mode)
 
         # POST the mutated DOM back
