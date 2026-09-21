@@ -10,7 +10,7 @@ from ansible_collections.ibm.power_hmc.plugins.module_utils.hmc_exceptions impor
 
 hmc_auth = {'username': 'hscroot', 'password': 'password_value'}
 
-_NB_FULL = {
+_SEA_FULL = {
     'load_balancing': False,
     'secondary_pvid': None,
     'jumbo_frames': False,
@@ -20,9 +20,10 @@ _NB_FULL = {
                      'high_availability_mode': None},
     'secondary_vios': {'name': 'VIOS-02', 'backing_device': 'ent1',
                        'high_availability_mode': None},
+    'tagged_virtual_networks': None,
 }
 
-_NB_PRIMARY_ONLY = {
+_SEA_PRIMARY_ONLY = {
     'load_balancing': False,
     'secondary_pvid': None,
     'jumbo_frames': False,
@@ -31,10 +32,11 @@ _NB_PRIMARY_ONLY = {
     'primary_vios': {'name': 'VIOS-01', 'backing_device': 'ent0',
                      'high_availability_mode': None},
     'secondary_vios': None,
+    'tagged_virtual_networks': None,
 }
 
-# Minimal network_bridge dict for state=update (no name/backing_device required)
-_NB_UPDATE = {
+# Minimal shared_ethernet_adapter dict for state=update (no name/backing_device required)
+_SEA_UPDATE = {
     'load_balancing': False,
     'secondary_pvid': None,
     'jumbo_frames': False,
@@ -42,6 +44,7 @@ _NB_UPDATE = {
     'qos_mode': None,
     'primary_vios': {'high_availability_mode': None},
     'secondary_vios': None,
+    'tagged_virtual_networks': None,
 }
 
 
@@ -52,9 +55,8 @@ def _p(state, **kw):
         'hmc_auth': hmc_auth,
         'state': state,
         'system_name': 'system1',
-        'port_vlan_id': None,
         'virtual_network_name': None,
-        'network_bridge': None,
+        'shared_ethernet_adapter': None,
     }
     base.update(kw)
     return base
@@ -76,58 +78,55 @@ test_data_facts = [
     # virtual_network_name unsupported for facts
     (_p('facts', virtual_network_name=VN_NAME),
      "ParameterError: unsupported parameter: virtual_network_name"),
-    # network_bridge unsupported for facts
-    (_p('facts', network_bridge=_NB_PRIMARY_ONLY),
-     "ParameterError: unsupported parameter: network_bridge"),
+    # shared_ethernet_adapter unsupported for facts
+    (_p('facts', shared_ethernet_adapter=_SEA_PRIMARY_ONLY),
+     "ParameterError: unsupported parameter: shared_ethernet_adapter"),
 ]
 
 # ---------------------------------------------------------------------------
-# state=present  (port_vlan_id is NOT accepted — it is derived from the VN)
+# state=present
 # ---------------------------------------------------------------------------
 test_data_present = [
     # missing hmc_host
-    (_p('present', hmc_host=None, virtual_network_name=VN_NAME, network_bridge=_NB_FULL),
+    (_p('present', hmc_host=None, virtual_network_name=VN_NAME, shared_ethernet_adapter=_SEA_FULL),
      "ParameterError: mandatory parameter 'hmc_host' is missing"),
     # missing system_name
-    (_p('present', system_name=None, virtual_network_name=VN_NAME, network_bridge=_NB_FULL),
+    (_p('present', system_name=None, virtual_network_name=VN_NAME, shared_ethernet_adapter=_SEA_FULL),
      "ParameterError: mandatory parameter 'system_name' is missing"),
     # missing virtual_network_name
-    (_p('present', network_bridge=_NB_FULL),
+    (_p('present', shared_ethernet_adapter=_SEA_FULL),
      "ParameterError: mandatory parameter 'virtual_network_name' is missing"),
-    # missing network_bridge
+    # missing shared_ethernet_adapter
     (_p('present', virtual_network_name=VN_NAME),
-     "ParameterError: mandatory parameter 'network_bridge' is missing"),
-    # port_vlan_id is unsupported for present (computed from VN)
-    (_p('present', port_vlan_id=104, virtual_network_name=VN_NAME, network_bridge=_NB_FULL),
-     "ParameterError: unsupported parameter: port_vlan_id"),
-    # missing network_bridge.primary_vios.name
+     "ParameterError: mandatory parameter 'shared_ethernet_adapter' is missing"),
+    # missing shared_ethernet_adapter.primary_vios.name
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'primary_vios': None}),
-     "ParameterError: network_bridge.primary_vios.name is required when state=present"),
-    # missing network_bridge.primary_vios.backing_device
+        shared_ethernet_adapter={**_SEA_FULL, 'primary_vios': None}),
+     "ParameterError: shared_ethernet_adapter.primary_vios.name is required when state=present"),
+    # missing shared_ethernet_adapter.primary_vios.backing_device
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'primary_vios': {'name': 'VIOS-01'}}),
-     "ParameterError: network_bridge.primary_vios.backing_device is required when state=present"),
+        shared_ethernet_adapter={**_SEA_FULL, 'primary_vios': {'name': 'VIOS-01'}}),
+     "ParameterError: shared_ethernet_adapter.primary_vios.backing_device is required when state=present"),
     # missing secondary_vios.backing_device
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'secondary_vios': {'name': 'VIOS-02'}}),
-     "ParameterError: network_bridge.secondary_vios.backing_device is required when secondary_vios is configured"),
+        shared_ethernet_adapter={**_SEA_FULL, 'secondary_vios': {'name': 'VIOS-02'}}),
+     "ParameterError: shared_ethernet_adapter.secondary_vios.backing_device is required when secondary_vios is configured"),
     # invalid qos_mode
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'qos_mode': 'best-effort'}),
-     "ParameterError: network_bridge.qos_mode must be one of disabled, loose, strict; got: best-effort"),
+        shared_ethernet_adapter={**_SEA_FULL, 'qos_mode': 'best-effort'}),
+     "ParameterError: shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: best-effort"),
     # secondary_pvid requires load_balancing=True
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'load_balancing': False, 'secondary_pvid': 200}),
-     "ParameterError: network_bridge.secondary_pvid is only valid when network_bridge.load_balancing=true"),
+        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': False, 'secondary_pvid': 200}),
+     "ParameterError: shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
     # secondary_pvid out of range
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'load_balancing': True, 'secondary_pvid': 5000}),
-     "ParameterError: network_bridge.secondary_pvid must be between 1 and 4094; got: 5000"),
+        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'secondary_pvid': 5000}),
+     "ParameterError: shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: 5000"),
     # tagged_virtual_networks not allowed on state=present
     (_p('present', virtual_network_name=VN_NAME,
-        network_bridge={**_NB_FULL, 'tagged_virtual_networks': ['VLAN200-ETHERNET0']}),
-     "ParameterError: network_bridge.tagged_virtual_networks is only valid when state=update"),
+        shared_ethernet_adapter={**_SEA_FULL, 'tagged_virtual_networks': ['VLAN200-ETHERNET0']}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks is only valid when state=update"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -135,37 +134,35 @@ test_data_present = [
 # ---------------------------------------------------------------------------
 test_data_update = [
     # missing hmc_host
-    (_p('update', hmc_host=None, port_vlan_id=104, network_bridge=_NB_UPDATE),
+    (_p('update', hmc_host=None, virtual_network_name=VN_NAME, shared_ethernet_adapter=_SEA_UPDATE),
      "ParameterError: mandatory parameter 'hmc_host' is missing"),
     # missing system_name
-    (_p('update', system_name=None, port_vlan_id=104, network_bridge=_NB_UPDATE),
+    (_p('update', system_name=None, virtual_network_name=VN_NAME, shared_ethernet_adapter=_SEA_UPDATE),
      "ParameterError: mandatory parameter 'system_name' is missing"),
-    # missing port_vlan_id
-    (_p('update', network_bridge=_NB_UPDATE),
-     "ParameterError: mandatory parameter 'port_vlan_id' is missing"),
-    # missing network_bridge
-    (_p('update', port_vlan_id=104),
-     "ParameterError: mandatory parameter 'network_bridge' is missing"),
-    # virtual_network_name unsupported for update
-    (_p('update', port_vlan_id=104, virtual_network_name=VN_NAME, network_bridge=_NB_UPDATE),
-     "ParameterError: unsupported parameter: virtual_network_name"),
+    # missing virtual_network_name
+    (_p('update', shared_ethernet_adapter=_SEA_UPDATE),
+     "ParameterError: mandatory parameter 'virtual_network_name' is missing"),
+    # missing shared_ethernet_adapter
+    (_p('update', virtual_network_name=VN_NAME),
+     "ParameterError: mandatory parameter 'shared_ethernet_adapter' is missing"),
     # invalid qos_mode
-    (_p('update', port_vlan_id=104,
-        network_bridge={**_NB_UPDATE, 'qos_mode': 'best-effort'}),
-     "ParameterError: network_bridge.qos_mode must be one of disabled, loose, strict; got: best-effort"),
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'qos_mode': 'best-effort'}),
+     "ParameterError: shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: best-effort"),
     # secondary_pvid without load_balancing
-    (_p('update', port_vlan_id=104,
-        network_bridge={**_NB_UPDATE, 'load_balancing': False, 'secondary_pvid': 200}),
-     "ParameterError: network_bridge.secondary_pvid is only valid when network_bridge.load_balancing=true"),
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': False, 'secondary_pvid': 200}),
+     "ParameterError: shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
     # invalid high_availability_mode on primary_vios
-    (_p('update', port_vlan_id=104,
-        network_bridge={**_NB_UPDATE,
-                        'primary_vios': {'high_availability_mode': 'badmode'}}),
-     "ParameterError: network_bridge.primary_vios.high_availability_mode must be one of disabled, auto, standby; got: badmode"),
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE,
+                                 'secondary_vios': {'high_availability_mode': None},
+                                 'primary_vios': {'high_availability_mode': 'badmode'}}),
+     "ParameterError: shared_ethernet_adapter.primary_vios.high_availability_mode must be one of disabled, auto, standby; got: badmode"),
     # tagged_virtual_networks with non-string entries
-    (_p('update', port_vlan_id=104,
-        network_bridge={**_NB_UPDATE, 'tagged_virtual_networks': [42]}),
-     "ParameterError: network_bridge.tagged_virtual_networks must be a non-empty list of strings"),
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': [42]}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of strings"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -173,20 +170,17 @@ test_data_update = [
 # ---------------------------------------------------------------------------
 test_data_absent = [
     # missing hmc_host
-    (_p('absent', hmc_host=None, port_vlan_id=104),
+    (_p('absent', hmc_host=None, virtual_network_name=VN_NAME),
      "ParameterError: mandatory parameter 'hmc_host' is missing"),
     # missing system_name
-    (_p('absent', system_name=None, port_vlan_id=104),
+    (_p('absent', system_name=None, virtual_network_name=VN_NAME),
      "ParameterError: mandatory parameter 'system_name' is missing"),
-    # missing port_vlan_id
+    # missing virtual_network_name
     (_p('absent'),
-     "ParameterError: mandatory parameter 'port_vlan_id' is missing"),
-    # virtual_network_name unsupported for absent
-    (_p('absent', port_vlan_id=104, virtual_network_name=VN_NAME),
-     "ParameterError: unsupported parameter: virtual_network_name"),
-    # network_bridge unsupported for absent
-    (_p('absent', port_vlan_id=104, network_bridge=_NB_PRIMARY_ONLY),
-     "ParameterError: unsupported parameter: network_bridge"),
+     "ParameterError: mandatory parameter 'virtual_network_name' is missing"),
+    # shared_ethernet_adapter unsupported for absent
+    (_p('absent', virtual_network_name=VN_NAME, shared_ethernet_adapter=_SEA_PRIMARY_ONLY),
+     "ParameterError: unsupported parameter: shared_ethernet_adapter"),
 ]
 
 
