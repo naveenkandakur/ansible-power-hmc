@@ -882,21 +882,26 @@ def cleanup_entries(data, sriov=None, io=None):
                 ioAdapters = vios.get("io_adapter_update")
                 if ioAdapters and ioAdapters[0].get('all'):
                     repo = ioAdapters[0].get("repository", "")
+                    sftp_fields = {k: v for k, v in ioAdapters[0].items()
+                                   if k not in ('all', 'device', 'repository', 'sftp', 'Id', 'Device', 'Repository')}
                     vios["io_adapter_update"] = [
-                        {
-                            "Id": adapter_id,
-                            "Device": ",".join(devices),
-                            "Repository": repo
-                        }
+                        dict(
+                            {"Id": adapter_id, "Device": ",".join(devices), "Repository": repo},
+                            **sftp_fields
+                        )
                         for adapter_id, devices in io['IOAdapterUpdate'].items()
                     ]
                 elif ioAdapters:
                     vios["io_adapter_update"] = [
-                        {
-                            "Id": adapter.get("Id", ""),
-                            "Device": ",".join(adapter.get("device", [])),
-                            "Repository": adapter.get("repository")
-                        }
+                        dict(
+                            {
+                                "Id": adapter.get("Id", ""),
+                                "Device": ",".join(adapter.get("device", [])) if isinstance(adapter.get("device"), list) else adapter.get("device", ""),
+                                "Repository": adapter.get("repository")
+                            },
+                            **{k: v for k, v in adapter.items()
+                               if k not in ('id', 'Id', 'device', 'Device', 'repository', 'Repository', 'sftp', 'all')}
+                        )
                         for adapter in ioAdapters
                     ]
 
@@ -1169,7 +1174,7 @@ def platform_update(module):
                             if io_adapters:
                                 for adapter in io_adapters:
                                     adapter["Id"] = vios_details[2].zfill(3)
-                                    adapter['repository'] = adapter.get("repository").lower()
+                                    adapter['repository'] = (adapter.get("repository") or '').lower()
                 else:
                     module.fail_json(msg=f"The VIOS {vios} is not available in HMC")
 
@@ -1223,7 +1228,7 @@ def platform_update(module):
                     module.fail_json(msg=error_msg)
                 sriov_update = sysfirm_update.get('sriov_adapter_update')
                 if sriov_update:
-                    if 'No results' in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
+                    if 'No results' in (output.get("SRIOVAdapterUpdate", {}).get("AdapterID") or ''):
                         error_msg = f'No SRIOV Adapters are available for {system_name}'
                         module.fail_json(msg=error_msg)
 
@@ -1234,7 +1239,7 @@ def platform_update(module):
                             available_adapter_id = output.get("SRIOVAdapterUpdate", {}).get("AdapterID")
                         else:
                             adapter_id = adapter.get("adapter_id")
-                            if adapter_id not in output.get("SRIOVAdapterUpdate", {}).get("AdapterID"):
+                            if adapter_id not in (output.get("SRIOVAdapterUpdate", {}).get("AdapterID") or []):
                                 error_msg = f"SRIOVAdapter with ID {adapter_id} is not present for system {system_name}"
                                 module.fail_json(msg=error_msg)
                             adapter['adapter_id'] = str(adapter_id)
@@ -1248,7 +1253,7 @@ def platform_update(module):
                     module.fail_json(msg=error_msg)
 
                 for io_update in all_io_updates:
-                    if 'No results' in output.get("IOAdapterUpdate"):
+                    if 'No results' in (output.get("IOAdapterUpdate") or ''):
                         error_msg = f"No IO Adapters are available for VIOS '{io_update.get('vios_name')}'"
                         module.fail_json(msg=error_msg)
                     if io_update.get('all'):
@@ -1282,7 +1287,7 @@ def platform_update(module):
                 console_uuid = rest_conn.getManagementConsole()
                 for vios_info in attributes.get("vios_update", []):
                     updateType = vios_info['update_type'].lower()
-                    if updateType in 'update':
+                    if updateType == 'update':
                         vios_name = vios_info['vios_name']
                         source_file = vios_info['resource_type']
                         if _is_sftp(source_file):
@@ -1304,10 +1309,10 @@ def platform_update(module):
             # System Firmware Update Check — skip LICQueryRepository for SFTP
             sysfirm_update = attributes.get('system_firmware_update')
             if sysfirm_update:
-                updateType = sysfirm_update.get('update_type').lower()
+                updateType = (sysfirm_update.get('update_type') or '').lower()
                 if updateType in ['update', 'upgrade']:
                     firm_level = sysfirm_update.get('level')
-                    source_file = sysfirm_update.get('repository').lower()
+                    source_file = (sysfirm_update.get('repository') or '').lower()
                     if source_file:
                         sysfirm_update['repository'] = source_file
                     sysfirm_update['Type'] = 'sys'
@@ -1330,12 +1335,19 @@ def platform_update(module):
                             )
                             module.fail_json(msg=error_msg)
                         param_val = output.get('ParameterValue', '')
+                        logger.debug("SFTP LICQueryRepository ParameterValue raw: %s", repr(param_val))
+                        if not param_val or 'No results' in param_val:
+                            module.fail_json(msg=(
+                                f"No {updateType.upper()} firmware image found on SFTP server "
+                                f"{sftp_block.get('hostname')}:{sftp_block.get('directory', '')} "
+                                f"for the resource: {system_name}. "
+                                f"Verify the directory path and that firmware images are present."
+                            ))
                         available_levels = []
-                        if param_val:
-                            for line in param_val.splitlines():
-                                parts = line.split(",")
-                                if len(parts) >= 3:
-                                    available_levels.append(parts[2].strip())
+                        for line in param_val.splitlines():
+                            parts = line.split(",")
+                            if len(parts) >= 3:
+                                available_levels.append(parts[2].strip())
                         if firm_level != 'latest' and firm_level not in available_levels:
                             error_msg = (
                                 f"Update file {firm_level} for the resource {system_name} "
@@ -1343,28 +1355,19 @@ def platform_update(module):
                             )
                             module.fail_json(msg=error_msg)
                         else:
-                            if output.get('ParameterValue'):
-                                output = output.get('ParameterValue')
-                                lines = output.split("\n")
-                                sysfirm_update['IsDestruptive'] = False
-                                if firm_level != 'latest':
-                                    for line in lines:
-                                        parts = line.split(",")
-                                        if firm_level == parts[2]:
-                                            sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
-                                            break
-                                else:
-                                    latest_line = max(
-                                        (line for line in lines if line.strip()),
-                                        key=lambda line_data: int(line_data.split(",")[2])
-                                    )
-                                    parts = latest_line.split(",")
-                                    sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
+                            lines = param_val.split("\n")
+                            sysfirm_update['IsDestruptive'] = False
+                            if firm_level != 'latest':
+                                for line in lines:
+                                    parts = line.split(",")
+                                    if len(parts) > 4 and firm_level == parts[2]:
+                                        sysfirm_update['IsDestruptive'] = parts[4].strip().lower() == "disruptive"
+                                        break
                     else:
                         output = rest_conn.LICQueryRepository(system_uuid, system_name, source_file,
                                                               type="sys", level=updateType)
                         check_response_exception(output, module, 'LICQueryRepository')
-                        if "No results" in output.get('ParameterValue'):
+                        if "No results" in (output.get('ParameterValue') or ''):
                             error_msg = f"No {updateType.upper()} file found at the specified source: {source_file} for the resource: {system_name}."
                             module.fail_json(msg=error_msg)
                         if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
@@ -1418,7 +1421,7 @@ def platform_update(module):
             # IO Adapter Update check — skip LICQueryRepository for SFTP
             if all_io_updates:
                 for io_update in all_io_updates:
-                    source_file = io_update.get('repository').lower()
+                    source_file = (io_update.get('repository') or '').lower()
                     vios_id = io_update.get('vios_id')
                     if _is_sftp(source_file):
                         logger.info("Skipping LICQueryRepository for IO adapter update: sftp repository")
@@ -1430,8 +1433,10 @@ def platform_update(module):
                     else:
                         adp_ids = {io_update.get('id')}
                     if output.get('ParameterName') == 'JOBRESULT_KEY_ERRORMSG':
-                        f"Import operation failed for IO Adapter ID '{adp_ids}' "
-                        f"on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
+                        error_msg = (
+                            f"Import operation failed for IO Adapter ID '{adp_ids}' "
+                            f"on VIOS '{io_update.get('vios_name')}': {output.get('ParameterValue')}"
+                        )
                         module.fail_json(msg=error_msg)
 
             # Flatten nested sftp blocks into parent dicts before cleanup/mapping
@@ -1654,8 +1659,7 @@ def run_module():
         raise ParameterError("Unsupported Python version {0}, supported python version is 3 and above".format(py_ver))
 
     ok_count = 0
-    failed_count = 0
-    failed = 0
+    failed_messages = []
 
     if module.params.get('state'):
         changed, info, warning = facts(module)
@@ -1668,21 +1672,23 @@ def run_module():
                 if status == "COMPLETED_OK":
                     ok_count += 1
                 elif status == "COMPLETED_WITH_ERROR":
-                    failureMsg = data.get('FailureMessage')
+                    failureMsg = data.get('FailureMessage', '')
                     if failureMsg and "no updates" in failureMsg.lower():
                         ok_count += 1
                     else:
-                        failed_count += 1
+                        failed_messages.append(failureMsg or "Unknown error")
 
-            if failed_count > 0 and ok_count == 0:
-                failed = failed_count
+            if failed_messages and ok_count == 0:
+                result = {'changed': changed, 'command_output': info}
+                if warning:
+                    result['warning'] = warning
+                module.fail_json(msg='; '.join(failed_messages), **result)
 
         if compare_levels(before_update_level, after_update_level):
             changed = False
 
     result = {
         'changed': changed,
-        'failed': failed
     }
 
     if info:
