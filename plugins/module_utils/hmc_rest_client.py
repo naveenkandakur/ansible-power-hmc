@@ -3860,11 +3860,6 @@ class HmcRestClient:
                           '</NetworkBridge>']
         payload = ''.join(payload_parts)
         payload = payload.replace("NetworkBridge", NBRIDGE_NS, 1)
-        logger.debug("INSIDE CREATE")
-        logger.debug("URL being sent is :")
-        logger.debug(url)
-        logger.debug('data sent')
-        logger.debug(payload)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3953,11 +3948,6 @@ class HmcRestClient:
             return None
         nb_xmlstr = etree.tostring(nb_elem[0]).decode("utf-8")
         nb_xmlstr = nb_xmlstr.replace("NetworkBridge", NBRIDGE_NS, 1)
-        logger.debug("INSIDE UPDATE")
-        logger.debug("URL being sent is :")
-        logger.debug(url)
-        logger.debug('data sent')
-        logger.debug(nb_xmlstr)
         try:
             resp = open_url(url,
                             headers=header,
