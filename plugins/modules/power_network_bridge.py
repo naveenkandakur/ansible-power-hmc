@@ -464,20 +464,20 @@ def validate_parameters(params):
     if state == 'present':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
                      'virtual_network_name', 'shared_ethernet_adapter']
-        unsupported = ['port_vlan_id']
+        unsupported = []
 
     elif state == 'update':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
                      'virtual_network_name', 'shared_ethernet_adapter']
-        unsupported = ['port_vlan_id']
+        unsupported = []
 
     elif state == 'absent':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name', 'virtual_network_name']
-        unsupported = ['port_vlan_id', 'shared_ethernet_adapter']
+        unsupported = ['shared_ethernet_adapter']
 
     elif state == 'facts':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name']
-        unsupported = ['port_vlan_id', 'virtual_network_name', 'shared_ethernet_adapter']
+        unsupported = ['virtual_network_name', 'shared_ethernet_adapter']
 
     else:
         mandatory = []
@@ -488,11 +488,6 @@ def validate_parameters(params):
         if len(collate) == 1:
             raise ParameterError("mandatory parameter '%s' is missing" % collate[0])
         raise ParameterError("mandatory parameters '%s' are missing" % ', '.join(collate))
-
-    pvid = params.get('port_vlan_id')
-    if pvid is not None and not (1 <= pvid <= 4094):
-        raise ParameterError(
-            "port_vlan_id must be between 1 and 4094; got: %s" % pvid)
 
     # shared_ethernet_adapter sub-field validation
     if state in ('present', 'update'):
@@ -745,7 +740,7 @@ def ensure_present(module, params):
                           if secondary_vios_name else None)
             vios1_cfg = {'backing_device': p_backing}
             vios2_cfg = ({'backing_device': s_backing}
-                          if vios2_uuid else None)
+                         if vios2_uuid else None)
 
             # Resolve virtual network name to UUID, validate it is untagged,
             # and derive the bridge PVID from its VLAN ID.
@@ -1094,7 +1089,6 @@ def run_module():
                           password=dict(type='str', no_log=True),
                       )),
         system_name=dict(type='str', required=True),
-        port_vlan_id=dict(type='int'),
         virtual_network_name=dict(type='str'),
         shared_ethernet_adapter=dict(
             type='dict',
