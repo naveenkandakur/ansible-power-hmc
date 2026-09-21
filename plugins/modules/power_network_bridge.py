@@ -54,12 +54,6 @@ options:
             - Accepts an MTMS string (C(9009-42A*XXXXXXX)) as well.
         required: true
         type: str
-    port_vlan_id:
-        description:
-            - The Port VLAN ID of the Virtual Network Bridge.
-            - This value is derived automatically from the VLAN ID of the untagged
-              Virtual Network identified by I(virtual_network_name).
-        type: int
     virtual_network_name:
         description:
             - Name of an existing untagged Virtual Network on the managed system.
