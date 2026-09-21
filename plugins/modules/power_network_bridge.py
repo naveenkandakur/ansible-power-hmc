@@ -22,8 +22,8 @@ short_description: Manages a Virtual Network Bridge on an IBM Power HMC managed 
 description:
     - Retrieves information about all Virtual Network Bridges on the managed system.
     - Creates a Virtual Network Bridge backed by one or two Shared Ethernet Adapters.
-    - Updates an existing Virtual Network Bridge identified by I(port_vlan_id).
-    - Deletes a Virtual Network Bridge identified by its Port VLAN ID.
+    - Updates an existing Virtual Network Bridge identified by I(virtual_network_name).
+    - Deletes a Virtual Network Bridge identified by I(virtual_network_name).
 version_added: "1.0.0"
 requirements:
     - Python >= 3
@@ -57,15 +57,13 @@ options:
     port_vlan_id:
         description:
             - The Port VLAN ID of the Virtual Network Bridge.
-            - Required when I(state=absent) or I(state=update) to identify the bridge.
-            - Must be between 1 and 4094 inclusive.
-            - When I(state=present) this is derived automatically from the VLAN ID
-              of the untagged Virtual Network identified by I(virtual_network_name).
+            - This value is derived automatically from the VLAN ID of the untagged
+              Virtual Network identified by I(virtual_network_name).
         type: int
     virtual_network_name:
         description:
             - Name of an existing untagged Virtual Network on the managed system.
-            - Required when I(state=present).
+            - Required when I(state=present), I(state=update), or I(state=absent).
             - The network must have C(TaggedNetwork=false) on the HMC.
             - Its VLAN ID is used as the bridge Port VLAN ID (PVID).
         type: str
@@ -94,12 +92,12 @@ options:
             jumbo_frames:
                 description:
                     - Enable 9000-byte jumbo frames on the Shared Ethernet Adapter.
-                    - Applied via a POST update after bridge creation.
+                    - Valid only when I(state=present) or I(state=update).
                 type: bool
             large_send:
                 description:
                     - Enable TCP large-send offload on the Shared Ethernet Adapter.
-                    - Applied via a POST update after bridge creation.
+                    - Valid only when I(state=present) or I(state=update).
                 type: bool
             qos_mode:
                 description:
@@ -107,6 +105,7 @@ options:
                     - C(disabled) turns off QoS.
                     - C(loose) applies best-effort QoS prioritisation.
                     - C(strict) enforces strict priority queuing.
+                    - Valid only when I(state=present) or I(state=update).
                 type: str
                 choices: ['disabled', 'loose', 'strict']
             primary_vios:
@@ -133,6 +132,8 @@ options:
                             - C(disabled) turns off HA mode.
                             - C(auto) lets the HMC choose the active SEA automatically.
                             - C(standby) keeps this SEA in standby until the active fails.
+                            - Valid only when I(state=update).
+                            - Cannot be set when I(load_balancing=true) is being enabled.
                         type: str
                         choices: ['disabled', 'auto', 'standby']
             secondary_vios:
@@ -159,6 +160,8 @@ options:
                             - C(disabled) turns off HA mode.
                             - C(auto) lets the HMC choose the active SEA automatically.
                             - C(standby) keeps this SEA in standby until the active fails.
+                            - Valid only when I(state=update).
+                            - Cannot be set when I(load_balancing=true) is being enabled.
                         type: str
                         choices: ['disabled', 'auto', 'standby']
             tagged_virtual_networks:
