@@ -768,7 +768,6 @@ def ensure_present(module, params):
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
     virtual_network_name = params['virtual_network_name']
-
     nb = params.get('shared_ethernet_adapter') or {}
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
@@ -779,9 +778,7 @@ def ensure_present(module, params):
     jumbo_frames = nb.get('jumbo_frames') or False
     large_send = nb.get('large_send')
     qos_mode = nb.get('qos_mode')
-    # failover is automatically true when a secondary_vios is configured
     failover_enabled = secondary_vios_name is not None
-    # per-VIOS optional fields
     p_backing = primary_cfg.get('backing_device')
     s_backing = secondary_cfg.get('backing_device') if secondary_cfg else None
 
@@ -1003,17 +1000,9 @@ def ensure_update(module, params):
                             msg="high_availability_mode cannot be set: bridge '{0}' has only one "
                                 "VIOS/SEA configured (FailoverEnabled=false)".format(virtual_network_name))
 
-            # Resolve secondary VIOS UUID when name+backing_device are provided —
-            # needed to append a new SEA block for failover/load-balancing.
             vios2_uuid = None
             if secondary_cfg and secondary_cfg.get('name') and secondary_cfg.get('backing_device'):
                 vios2_uuid = _resolve_vios_uuid(module, rest_conn, system_uuid, secondary_cfg['name'])
-                logger.debug("[ensure_update] secondary VIOS '%s' → uuid=%s",
-                             secondary_cfg['name'], vios2_uuid)
-
-            # Determine whether any non-VN fields are being updated.
-            # None means "not specified by caller"; any explicit value (including
-            # False for load_balancing) counts as an intentional update.
             has_non_vn_update = any([
                 load_balancing is not None,
                 secondary_pvid is not None,
@@ -1025,14 +1014,10 @@ def ensure_update(module, params):
                 bool(secondary_cfg),
             ])
 
-            # Resolve tagged VN names to UUIDs per load group, pre-checking which
-            # are already linked so we can detect a true no-op.
-            # tagged_vn_ids_by_pvid: {pvid: [(vn_name, vn_uuid), ...]}
             tagged_vn_ids_by_pvid = {}
             if tagged_vns_by_pvid:
                 vn_dom = rest_conn.getVirtualNetworks(system_uuid)
 
-                # Build a map of LoadGroup PVID → existing VN hrefs from the live bridge DOM
                 nb_elem_list = bridge_dom.xpath("//NetworkBridge")
                 nb_el = nb_elem_list[0] if nb_elem_list else None
                 existing_hrefs_by_pvid = {}
@@ -1070,7 +1055,6 @@ def ensure_update(module, params):
                             module.fail_json(
                                 msg="Tagged virtual network '{0}' not found on system '{1}'".format(
                                     vn_name, system_name))
-                        # Skip if already linked to this LoadGroup
                         if not any(vn_uuid in h for h in existing_hrefs):
                             pairs.append((vn_name, vn_uuid))
                     if pairs:
