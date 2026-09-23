@@ -3860,11 +3860,6 @@ class HmcRestClient:
                           '</NetworkBridge>']
         payload = ''.join(payload_parts)
         payload = payload.replace("NetworkBridge", NBRIDGE_NS, 1)
-        logger.debug("INSIDE CREATE")
-        logger.debug("URL being sent is :")
-        logger.debug(url)
-        logger.debug('data sent')
-        logger.debug(payload)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3887,7 +3882,6 @@ class HmcRestClient:
             self.hmc_ip, system_uuid, bridge_uuid)
         header = {'X-API-Session': self.session,
                   'Accept': 'application/vnd.ibm.powervm.uom+xml; type=NetworkBridge'}
-        logger.debug("[getNetworkBridge] GET URL: %s", url)
         try:
             resp = open_url(url,
                             headers=header,
@@ -3896,8 +3890,6 @@ class HmcRestClient:
                             force_basic_auth=True,
                             timeout=300)
             response = resp.read()
-            logger.debug("[getNetworkBridge] GET response:\n%s",
-                         response.decode("utf-8") if response else "<empty>")
             if not response:
                 return None
             return xml_strip_namespace(response)
@@ -3956,11 +3948,6 @@ class HmcRestClient:
             return None
         nb_xmlstr = etree.tostring(nb_elem[0]).decode("utf-8")
         nb_xmlstr = nb_xmlstr.replace("NetworkBridge", NBRIDGE_NS, 1)
-        logger.debug("INSIDE UPDATE")
-        logger.debug("URL being sent is :")
-        logger.debug(url)
-        logger.debug('data sent')
-        logger.debug(nb_xmlstr)
         try:
             resp = open_url(url,
                             headers=header,
@@ -4010,11 +3997,6 @@ class HmcRestClient:
         header = {'X-API-Session': self.session,
                   'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=NetworkBridge',
                   'Accept': 'application/atom+xml'}
-
-        logger.debug("[updateNetworkBridge] POST URL: %s", url)
-        logger.debug("[updateNetworkBridge] params — load_balancing=%s failover_enabled=%s "
-                     "secondary_pvid=%s jumbo_frames=%s large_send=%s qos_mode=%s "
-                     "tagged_vn_ids_by_pvid=%s",
                      load_balancing, failover_enabled, secondary_pvid,
                      jumbo_frames, large_send, qos_mode, tagged_vn_ids_by_pvid)
 
@@ -4092,15 +4074,11 @@ class HmcRestClient:
                     existing_hrefs = {
                         link.get('href', '') for link in vn_read_el.xpath('link')
                     }
-                    logger.debug("[updateNetworkBridge] LoadGroup PVID=%s existing hrefs: %s",
-                                 lg_pvid, existing_hrefs)
                     existing_links = list(vn_read_el.xpath('link'))
 
                     # Normalise tag name to <VirtualNetworks> if the HMC returned
                     # <AssociatedInternalNetwork> — POST requires <VirtualNetworks>.
                     if vn_read_el.tag != 'VirtualNetworks':
-                        logger.debug("[updateNetworkBridge] Renaming <%s> → <VirtualNetworks> "
-                                     "for LoadGroup PVID=%s", vn_read_el.tag, lg_pvid)
                         new_vn_el = etree.Element('VirtualNetworks')
                         new_vn_el.set('kb', 'CUD')
                         new_vn_el.set('kxe', 'false')
@@ -4118,8 +4096,6 @@ class HmcRestClient:
                     alt_href = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualNetwork/{2}".format(
                         self.hmc_ip, system_uuid, vn_uuid)
                     if new_href not in existing_hrefs and alt_href not in existing_hrefs:
-                        logger.debug("[updateNetworkBridge] Adding VN '%s' (uuid=%s) to LoadGroup PVID=%s",
-                                     vn_name, vn_uuid, lg_pvid)
                         link_elem = etree.SubElement(vn_el, 'link')
                         link_elem.set('href', new_href)
                         link_elem.set('rel', 'related')
@@ -4131,16 +4107,12 @@ class HmcRestClient:
                 if added_names:
                     newly_added_by_pvid[str(lg_pvid)] = added_names
 
-            logger.debug("[updateNetworkBridge] newly_added_by_pvid: %s", newly_added_by_pvid)
-
         # --- Append new secondary SEA when adding a second VIOS ---
         if secondary_vios_uuid and secondary_vios_cfg:
             vios2_href = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualIOServer/{2}".format(
                 self.hmc_ip, system_uuid, secondary_vios_uuid)
             sea_parts = self._sea_xml(vios2_href, is_primary=False, cfg=secondary_vios_cfg)
             new_sea_elem = etree.fromstring(''.join(sea_parts))
-            logger.debug("[updateNetworkBridge] Appending secondary SEA for VIOS uuid=%s backing=%s",
-                         secondary_vios_uuid, secondary_vios_cfg.get('backing_device'))
             sea_container = nb.xpath('SharedEthernetAdapters')
             if sea_container:
                 sea_container[0].append(new_sea_elem)
@@ -4182,10 +4154,8 @@ class HmcRestClient:
             if ha_mode is not None and not load_balancing:
                 self._set_text(sea, 'HighAvailabilityMode', ha_mode)
 
-        # POST the mutated DOM back
         nb_xmlstr = etree.tostring(nb).decode("utf-8")
         nb_xmlstr = nb_xmlstr.replace("NetworkBridge", NBRIDGE_NS, 1)
-        logger.debug("[updateNetworkBridge] POST payload:\n%s", nb_xmlstr)
         try:
             resp = open_url(url,
                             headers=header,
@@ -4195,8 +4165,6 @@ class HmcRestClient:
                             force_basic_auth=True,
                             timeout=300)
             response = resp.read()
-            logger.debug("[updateNetworkBridge] POST response:\n%s",
-                         response.decode("utf-8") if response else "<empty>")
             if not response:
                 return None, newly_added_by_pvid
             return xml_strip_namespace(response), newly_added_by_pvid
