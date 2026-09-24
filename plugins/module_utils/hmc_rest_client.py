@@ -3796,13 +3796,13 @@ class HmcRestClient:
 
     def createNetworkBridge(self, system_uuid, port_vlan_id, virtual_network_id,
                             vios_id, vios2_id, failover_enabled, load_balancing_enabled,
-                            vios1_cfg=None, vios2_cfg=None, secondary_pvid=None,
+                            vios1_cfg=None, vios2_cfg=None, addition_pvid=None,
                             jumbo_frames=None, qos_mode=None):
         """Create a NetworkBridge.
 
         vios2_id / vios2_cfg may be None for a single-VIOS bridge.
         vios1_cfg / vios2_cfg are dicts with optional key: backing_device.
-        secondary_pvid: when load_balancing_enabled is True the caller may supply
+        addition_pvid: when load_balancing_enabled is True the caller may supply
           an integer PVID for the secondary LoadGroup.  When None the secondary
           LoadGroup is omitted from the payload.
         jumbo_frames / qos_mode: SEA-level settings embedded directly in the
@@ -3835,12 +3835,12 @@ class HmcRestClient:
                          '<link href="{0}" rel="related"/>'.format(vn_href),
                          '</VirtualNetworks>',
                          '</LoadGroup>']
-        # Secondary LoadGroup — only emitted when load-balancing is on and a
-        # secondary PVID has been supplied by the caller.
-        if load_balancing_enabled and secondary_pvid is not None:
+        # Secondary LoadGroup — only emitted when load-balancing is on and an
+        # addition PVID has been supplied by the caller.
+        if load_balancing_enabled and addition_pvid is not None:
             payload_parts += ['<LoadGroup schemaVersion="V1_0">',
                               '<Metadata><Atom/></Metadata>',
-                              '<PortVLANID kxe="false" kb="CUR">{0}</PortVLANID>'.format(secondary_pvid),
+                              '<PortVLANID kxe="false" kb="CUR">{0}</PortVLANID>'.format(addition_pvid),
                               '<TrunkAdapters kb="CUD" kxe="false" schemaVersion="V1_0">',
                               '<Metadata><Atom/></Metadata>',
                               '</TrunkAdapters>',
@@ -3971,7 +3971,7 @@ class HmcRestClient:
             nodes[0].text = value
 
     def updateNetworkBridge(self, system_uuid, bridge_uuid, bridge_dom,
-                            load_balancing=None, secondary_pvid=None,
+                            load_balancing=None, addition_pvid=None,
                             failover_enabled=None,
                             jumbo_frames=None, large_send=None, qos_mode=None,
                             primary_vios_cfg=None, secondary_vios_cfg=None,
@@ -3986,7 +3986,7 @@ class HmcRestClient:
           backing_device, high_availability_mode.
         secondary_vios_uuid: when provided, a new secondary SharedEthernetAdapter
           block is appended to the DOM for the new VIOS (failover/load-balancing).
-        secondary_pvid is the Port VLAN ID for the secondary LoadGroup (only
+        addition_pvid is the Port VLAN ID for the secondary LoadGroup (only
           relevant when load_balancing is being enabled).
         tagged_vn_ids_by_pvid is a dict mapping LoadGroup PVID (int) to a list
           of (vn_name, vn_uuid) tuples to add to that LoadGroup's VirtualNetworks
@@ -4009,15 +4009,15 @@ class HmcRestClient:
             self._set_text(nb, 'FailoverEnabled', 'true' if failover_enabled else 'false')
 
         # --- Secondary LoadGroup PVID ---
-        # When load-sharing is being enabled the caller supplies a secondary_pvid.
+        # When load-sharing is being enabled the caller supplies an addition_pvid.
         # The HMC requires a new LoadGroup entry with that PVID to be present in the
         # POST body.  If a LoadGroup with that PVID already exists we leave it alone;
         # if it does not exist we append a minimal one.
-        if load_balancing and secondary_pvid is not None:
+        if load_balancing and addition_pvid is not None:
             existing_pvids = [
                 e.text for e in nb.xpath('.//LoadGroup/PortVLANID')
             ]
-            if str(secondary_pvid) not in existing_pvids:
+            if str(addition_pvid) not in existing_pvids:
                 lg_container = nb.xpath('LoadGroups')
                 if lg_container:
                     new_lg_xml = (
@@ -4028,7 +4028,7 @@ class HmcRestClient:
                         '<Metadata><Atom/></Metadata>'
                         '</TrunkAdapters>'
                         '</LoadGroup>'
-                    ).format(secondary_pvid)
+                    ).format(addition_pvid)
                     new_lg_elem = etree.fromstring(new_lg_xml)
                     lg_container[0].append(new_lg_elem)
 
