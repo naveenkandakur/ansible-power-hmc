@@ -123,7 +123,7 @@ test_data_present = [
     (_p('present', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'addition_pvid': 5000}),
      "ParameterError: shared_ethernet_adapter.addition_pvid must be between 1 and 4094; got: 5000"),
-     # load_balancing requires secondary_vios with name and backing_device on present
+    # load_balancing requires secondary_vios with name and backing_device on present
     (_p('present', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'addition_pvid': 200, 'secondary_vios': None}),
      "ParameterError: shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true"),
