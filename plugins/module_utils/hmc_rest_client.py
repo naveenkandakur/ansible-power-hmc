@@ -3997,9 +3997,6 @@ class HmcRestClient:
         header = {'X-API-Session': self.session,
                   'Content-Type': 'application/vnd.ibm.powervm.uom+xml; type=NetworkBridge',
                   'Accept': 'application/atom+xml'}
-                     load_balancing, failover_enabled, secondary_pvid,
-                     jumbo_frames, large_send, qos_mode, tagged_vn_ids_by_pvid)
-
         nb_elem_list = bridge_dom.xpath("//NetworkBridge")
         if not nb_elem_list:
             raise ValueError("NetworkBridge element not found in DOM")
