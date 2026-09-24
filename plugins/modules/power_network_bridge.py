@@ -22,8 +22,8 @@ short_description: Manages a Virtual Network Bridge on an IBM Power HMC managed 
 description:
     - Retrieves information about all Virtual Network Bridges on the managed system.
     - Creates a Virtual Network Bridge backed by one or two Shared Ethernet Adapters.
-    - Updates an existing Virtual Network Bridge identified by I(port_vlan_id).
-    - Deletes a Virtual Network Bridge identified by its Port VLAN ID.
+    - Updates an existing Virtual Network Bridge identified by I(virtual_network_name).
+    - Deletes a Virtual Network Bridge identified by I(virtual_network_name).
 version_added: "1.0.0"
 requirements:
     - Python >= 3
@@ -54,18 +54,10 @@ options:
             - Accepts an MTMS string (C(9009-42A*XXXXXXX)) as well.
         required: true
         type: str
-    port_vlan_id:
-        description:
-            - The Port VLAN ID of the Virtual Network Bridge.
-            - Required when I(state=absent) or I(state=update) to identify the bridge.
-            - Must be between 1 and 4094 inclusive.
-            - When I(state=present) this is derived automatically from the VLAN ID
-              of the untagged Virtual Network identified by I(virtual_network_name).
-        type: int
     virtual_network_name:
         description:
             - Name of an existing untagged Virtual Network on the managed system.
-            - Required when I(state=present).
+            - Required when I(state=present), I(state=update), or I(state=absent).
             - The network must have C(TaggedNetwork=false) on the HMC.
             - Its VLAN ID is used as the bridge Port VLAN ID (PVID).
         type: str
@@ -95,11 +87,13 @@ options:
                 description:
                     - Enable 9000-byte jumbo frames on the Shared Ethernet Adapter.
                     - Applied via a POST update after bridge creation.
+                    - Valid only when I(state=present)
                 type: bool
             large_send:
                 description:
                     - Enable TCP large-send offload on the Shared Ethernet Adapter.
                     - Applied via a POST update after bridge creation.
+                    - Valid only when I(state=present) or I(state=update).
                 type: bool
             qos_mode:
                 description:
@@ -484,20 +478,20 @@ def validate_parameters(params):
     if state == 'present':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
                      'virtual_network_name', 'shared_ethernet_adapter']
-        unsupported = ['port_vlan_id']
+        unsupported = []
 
     elif state == 'update':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name',
                      'virtual_network_name', 'shared_ethernet_adapter']
-        unsupported = ['port_vlan_id']
+        unsupported = []
 
     elif state == 'absent':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name', 'virtual_network_name']
-        unsupported = ['port_vlan_id', 'shared_ethernet_adapter']
+        unsupported = ['shared_ethernet_adapter']
 
     elif state == 'facts':
         mandatory = ['hmc_host', 'hmc_auth', 'system_name']
-        unsupported = ['port_vlan_id', 'virtual_network_name', 'shared_ethernet_adapter']
+        unsupported = ['virtual_network_name', 'shared_ethernet_adapter']
 
     else:
         mandatory = []
@@ -508,11 +502,6 @@ def validate_parameters(params):
         if len(collate) == 1:
             raise ParameterError("mandatory parameter '%s' is missing" % collate[0])
         raise ParameterError("mandatory parameters '%s' are missing" % ', '.join(collate))
-
-    pvid = params.get('port_vlan_id')
-    if pvid is not None and not (1 <= pvid <= 4094):
-        raise ParameterError(
-            "port_vlan_id must be between 1 and 4094; got: %s" % pvid)
 
     # shared_ethernet_adapter sub-field validation
     if state in ('present', 'update'):
@@ -1199,7 +1188,6 @@ def run_module():
                           password=dict(type='str', no_log=True),
                       )),
         system_name=dict(type='str', required=True),
-        port_vlan_id=dict(type='int'),
         virtual_network_name=dict(type='str'),
         shared_ethernet_adapter=dict(
             type='dict',
