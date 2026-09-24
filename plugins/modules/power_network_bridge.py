@@ -840,7 +840,7 @@ def ensure_present(module, params):
             bridge_dom = rest_conn.createNetworkBridge(
                 system_uuid, port_vlan_id, virtual_network_id,
                 vios1_uuid, vios2_uuid, failover_enabled, load_balancing,
-                vios1_cfg, vios2_cfg, secondary_pvid=addition_pvid,
+                vios1_cfg, vios2_cfg, addition_pvid=addition_pvid,
                 jumbo_frames=jumbo_frames, qos_mode=qos_mode)
             if not bridge_dom:
                 module.fail_json(msg="Failed to create network bridge")
@@ -1069,7 +1069,7 @@ def ensure_update(module, params):
             _resp, newly_added_by_pvid = rest_conn.updateNetworkBridge(
                 system_uuid, bridge_uuid, bridge_dom,
                 load_balancing=load_balancing,
-                secondary_pvid=addition_pvid,
+                addition_pvid=addition_pvid,
                 failover_enabled=failover_enabled,
                 jumbo_frames=jumbo_frames,
                 large_send=large_send,
