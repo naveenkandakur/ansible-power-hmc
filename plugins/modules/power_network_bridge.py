@@ -532,9 +532,14 @@ def validate_parameters(params):
 
         # shared: secondary_pvid constraints
         secondary_pvid = nb.get('secondary_pvid')
-        if nb.get('load_balancing') and secondary_pvid is None:
-            raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid is required when shared_ethernet_adapter.load_balancing=true")
+        if nb.get('load_balancing'):
+            if secondary_pvid is None:
+                raise ParameterError(
+                    "shared_ethernet_adapter.secondary_pvid is required when shared_ethernet_adapter.load_balancing=true")
+            s_vios = nb.get('secondary_vios')
+            if not s_vios or not s_vios.get('name') or not s_vios.get('backing_device'):
+                raise ParameterError(
+                    "shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true")
         if secondary_pvid is not None and not nb.get('load_balancing', False):
             raise ParameterError(
                 "shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
@@ -765,7 +770,7 @@ def ensure_present(module, params):
     load_balancing = nb.get('load_balancing') or False
     secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames') or False
-    large_send = nb.get('large_send')
+    large_send = nb.get('large_send') if nb.get('large_send') is not None else False
     qos_mode = nb.get('qos_mode')
     failover_enabled = secondary_vios_name is not None
     p_backing = primary_cfg.get('backing_device')
@@ -973,15 +978,21 @@ def ensure_update(module, params):
             if bridge_dom is None:
                 module.fail_json(msg="Failed to retrieve bridge for update")
 
-            # Runtime guard: high_availability_mode requires a two-VIOS (failover)
-            # bridge on the HMC.  Check the live FailoverEnabled flag regardless of
-            # what the caller passed as secondary_vios — the bridge may be single-VIOS
-            # even if secondary_vios was not included in params.
+            # Runtime guard: check whether the bridge is a two-VIOS bridge (FailoverEnabled=true)
             nb_elem = bridge_dom.xpath("//NetworkBridge")
             live_nb = nb_elem[0] if nb_elem else None
             live_failover_elem = live_nb.xpath('FailoverEnabled') if live_nb is not None else []
             live_failover = (live_failover_elem[0].text.lower() == 'true') if live_failover_elem else False
-            if not live_failover:
+
+            has_valid_secondary_vios = bool(secondary_cfg and secondary_cfg.get('name') and secondary_cfg.get('backing_device'))
+
+            # If load_balancing is being enabled on a single-VIOS bridge, secondary_vios details are required
+            if load_balancing and not live_failover and not has_valid_secondary_vios:
+                module.fail_json(
+                    msg="shared_ethernet_adapter.secondary_vios (name and backing_device) is required when "
+                        "enabling load_balancing on a single-VIOS bridge '{0}'".format(virtual_network_name))
+
+            if not live_failover and not has_valid_secondary_vios:
                 # Cannot set HA mode on a single-VIOS bridge
                 for vios_key in ('primary_vios', 'secondary_vios'):
                     if (nb.get(vios_key) or {}).get('high_availability_mode') is not None:
