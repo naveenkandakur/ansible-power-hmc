@@ -55,7 +55,6 @@ def _p(state, **kw):
         'hmc_auth': hmc_auth,
         'state': state,
         'system_name': 'system1',
-        'port_vlan_id': None,
         'virtual_network_name': None,
         'shared_ethernet_adapter': None,
     }
@@ -85,7 +84,7 @@ test_data_facts = [
 ]
 
 # ---------------------------------------------------------------------------
-# state=present  (port_vlan_id is NOT accepted — it is derived from the VN)
+# state=present
 # ---------------------------------------------------------------------------
 test_data_present = [
     # missing hmc_host
@@ -100,9 +99,6 @@ test_data_present = [
     # missing shared_ethernet_adapter
     (_p('present', virtual_network_name=VN_NAME),
      "ParameterError: mandatory parameter 'shared_ethernet_adapter' is missing"),
-    # port_vlan_id is unsupported for present (computed from VN)
-    (_p('present', port_vlan_id=104, virtual_network_name=VN_NAME, shared_ethernet_adapter=_NB_FULL),
-     "ParameterError: unsupported parameter: port_vlan_id"),
     # missing shared_ethernet_adapter.primary_vios.name
     (_p('present', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_NB_FULL, 'primary_vios': None}),
