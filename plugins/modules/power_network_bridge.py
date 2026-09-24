@@ -72,7 +72,7 @@ options:
                     - Enable load-balancing across VIOSes.
                     - Requires I(secondary_vios) to be configured.
                 type: bool
-            secondary_pvid:
+            addition_pvid:
                 description:
                     - The Port VLAN ID for the secondary load group, used when
                       I(load_balancing=true).
@@ -86,13 +86,11 @@ options:
             jumbo_frames:
                 description:
                     - Enable 9000-byte jumbo frames on the Shared Ethernet Adapter.
-                    - Applied via a POST update after bridge creation.
                     - Valid only when I(state=present)
                 type: bool
             large_send:
                 description:
                     - Enable TCP large-send offload on the Shared Ethernet Adapter.
-                    - Applied via a POST update after bridge creation.
                     - Valid only when I(state=present) or I(state=update).
                 type: bool
             qos_mode:
@@ -187,7 +185,7 @@ options:
             - C(update) modifies an existing Virtual Network Bridge identified by
               I(virtual_network_name). Updatable fields are I(failover_enabled),
               I(load_balancing), I(jumbo_frames), I(large_send), I(qos_mode),
-              I(secondary_pvid) (when enabling load-sharing), per-VIOS
+              I(addition_pvid) (when enabling load-sharing), per-VIOS
               I(high_availability_mode), and I(tagged_virtual_networks) (per
               LoadGroup, keyed by PVID).
             - C(absent) deletes the Virtual Network Bridge identified by I(virtual_network_name).
@@ -251,7 +249,7 @@ EXAMPLES = '''
     virtual_network_name: <virtual_network_name>
     shared_ethernet_adapter:
       load_balancing: true
-      secondary_pvid: <secondary_pvid>
+      addition_pvid: <addition_pvid>
       jumbo_frames: false
       large_send: true
       qos_mode: loose
@@ -530,22 +528,22 @@ def validate_parameters(params):
             raise ParameterError(
                 "shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: %s" % qos)
 
-        # shared: secondary_pvid constraints
-        secondary_pvid = nb.get('secondary_pvid')
+        # shared: addition_pvid constraints
+        addition_pvid = nb.get('addition_pvid')
         if nb.get('load_balancing'):
-            if secondary_pvid is None:
+            if addition_pvid is None:
                 raise ParameterError(
-                    "shared_ethernet_adapter.secondary_pvid is required when shared_ethernet_adapter.load_balancing=true")
+                    "shared_ethernet_adapter.addition_pvid is required when shared_ethernet_adapter.load_balancing=true")
             s_vios = nb.get('secondary_vios')
             if not s_vios or not s_vios.get('name') or not s_vios.get('backing_device'):
                 raise ParameterError(
                     "shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true")
-        if secondary_pvid is not None and not nb.get('load_balancing', False):
+        if addition_pvid is not None and not nb.get('load_balancing', False):
             raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
-        if secondary_pvid is not None and not (1 <= secondary_pvid <= 4094):
+                "shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
+        if addition_pvid is not None and not (1 <= addition_pvid <= 4094):
             raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: %s" % secondary_pvid)
+                "shared_ethernet_adapter.addition_pvid must be between 1 and 4094; got: %s" % addition_pvid)
 
         # high_availability_mode is unsupported for state=present
         if state == 'present':
@@ -768,7 +766,7 @@ def ensure_present(module, params):
     primary_vios_name = primary_cfg.get('name')
     secondary_vios_name = secondary_cfg.get('name') if secondary_cfg else None
     load_balancing = nb.get('load_balancing') or False
-    secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
+    addition_pvid = nb.get('addition_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames') or False
     large_send = nb.get('large_send') if nb.get('large_send') is not None else False
     qos_mode = nb.get('qos_mode')
@@ -842,7 +840,7 @@ def ensure_present(module, params):
             bridge_dom = rest_conn.createNetworkBridge(
                 system_uuid, port_vlan_id, virtual_network_id,
                 vios1_uuid, vios2_uuid, failover_enabled, load_balancing,
-                vios1_cfg, vios2_cfg, secondary_pvid=secondary_pvid,
+                vios1_cfg, vios2_cfg, secondary_pvid=addition_pvid,
                 jumbo_frames=jumbo_frames, qos_mode=qos_mode)
             if not bridge_dom:
                 module.fail_json(msg="Failed to create network bridge")
@@ -889,7 +887,7 @@ def ensure_update(module, params):
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
     load_balancing = nb.get('load_balancing')   # None = not specified
-    secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
+    addition_pvid = nb.get('addition_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames')       # None = not specified
     large_send = nb.get('large_send')           # None = not specified
     qos_mode = nb.get('qos_mode')
@@ -1005,7 +1003,7 @@ def ensure_update(module, params):
                 vios2_uuid = _resolve_vios_uuid(module, rest_conn, system_uuid, secondary_cfg['name'])
             has_non_vn_update = any([
                 load_balancing is not None,
-                secondary_pvid is not None,
+                addition_pvid is not None,
                 failover_enabled is not None,
                 jumbo_frames is not None,
                 large_send is not None,
@@ -1071,7 +1069,7 @@ def ensure_update(module, params):
             _resp, newly_added_by_pvid = rest_conn.updateNetworkBridge(
                 system_uuid, bridge_uuid, bridge_dom,
                 load_balancing=load_balancing,
-                secondary_pvid=secondary_pvid,
+                secondary_pvid=addition_pvid,
                 failover_enabled=failover_enabled,
                 jumbo_frames=jumbo_frames,
                 large_send=large_send,
@@ -1204,7 +1202,7 @@ def run_module():
             type='dict',
             options=dict(
                 load_balancing=dict(type='bool', default=None),
-                secondary_pvid=dict(type='int'),
+                addition_pvid=dict(type='int'),
                 jumbo_frames=dict(type='bool', default=None),
                 large_send=dict(type='bool', default=None),
                 qos_mode=dict(type='str', choices=['disabled', 'loose', 'strict']),
