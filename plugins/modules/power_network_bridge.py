@@ -170,10 +170,10 @@ options:
                     - List of load-group assignments, each mapping a LoadGroup PVID
                       to the Virtual Network names that should be linked to it.
                     - Only valid when I(state=update).
-                    - Each list entry is a single-key dict where the key is the
+                    - "Each list entry is a single-key dict where the key is the
                       LoadGroup Port VLAN ID (integer) and the value is a list of
                       existing tagged Virtual Network names, e.g.
-                      C([{72: ['vn1', 'vn2']}, {75: ['vn3']}]).
+                      C([{72: ['vn1', 'vn2']}, {75: ['vn3']}])."
                     - Networks already linked to the target LoadGroup are silently
                       skipped (idempotent).
                     - Each Virtual Network must already exist on the managed system
@@ -786,7 +786,7 @@ def ensure_present(module, params):
                           if secondary_vios_name else None)
             vios1_cfg = {'backing_device': p_backing}
             vios2_cfg = ({'backing_device': s_backing}
-                          if vios2_uuid else None)
+                         if vios2_uuid else None)
 
             # Resolve virtual network name to UUID, validate it is untagged,
             # and derive the bridge PVID from its VLAN ID.
