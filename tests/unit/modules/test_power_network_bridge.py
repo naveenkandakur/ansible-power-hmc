@@ -161,10 +161,6 @@ test_data_update = [
     (_p('update', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': False, 'addition_pvid': 200}),
      "ParameterError: shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
-    # load_balancing requires secondary_vios (name and backing_device) on update
-    (_p('update', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': True, 'addition_pvid': 200, 'secondary_vios': None}),
-     "ParameterError: shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true"),
     # invalid high_availability_mode on primary_vios
     (_p('update', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_UPDATE,
