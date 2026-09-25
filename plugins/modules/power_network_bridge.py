@@ -72,7 +72,7 @@ options:
                     - Enable load-balancing across VIOSes.
                     - Requires I(secondary_vios) to be configured.
                 type: bool
-            secondary_pvid:
+            addition_pvid:
                 description:
                     - The Port VLAN ID for the secondary load group, used when
                       I(load_balancing=true).
@@ -86,7 +86,7 @@ options:
             jumbo_frames:
                 description:
                     - Enable 9000-byte jumbo frames on the Shared Ethernet Adapter.
-                    - Valid only when I(state=present) or I(state=update).
+                    - Valid only when I(state=present)
                 type: bool
             large_send:
                 description:
@@ -99,7 +99,6 @@ options:
                     - C(disabled) turns off QoS.
                     - C(loose) applies best-effort QoS prioritisation.
                     - C(strict) enforces strict priority queuing.
-                    - Valid only when I(state=present) or I(state=update).
                 type: str
                 choices: ['disabled', 'loose', 'strict']
             primary_vios:
@@ -112,13 +111,15 @@ options:
                         description:
                             - Name of the primary VIOS partition (e.g. C(VIOS-test-02)).
                             - Required when I(state=present).
+                            - Not allowed when I(state=update) — the primary VIOS cannot
+                              be changed after bridge creation.
                         type: str
                     backing_device:
                         description:
                             - Physical Ethernet adapter on the VIOS used as the SEA backing device
                               (e.g. C(ent2)).
                             - Required by the HMC — the SEA cannot be created without a backing device.
-                            - Required when I(state=present).
+                            - Required when I(state=present). Can be changed via I(state=update).
                         type: str
                     high_availability_mode:
                         description:
@@ -126,27 +127,31 @@ options:
                             - C(disabled) turns off HA mode.
                             - C(auto) lets the HMC choose the active SEA automatically.
                             - C(standby) keeps this SEA in standby until the active fails.
-                            - Valid only when I(state=update).
-                            - Cannot be set when I(load_balancing=true) is being enabled.
+                            - Only valid when I(state=update) and the live bridge has two VIOSes
+                              (C(FailoverEnabled=true)).
                         type: str
                         choices: ['disabled', 'auto', 'standby']
             secondary_vios:
                 description:
                     - Secondary VIOS for SEA failover.
-                    - When present, failover is automatically enabled on the bridge.
-                    - When omitted, the bridge is created without failover.
+                    - When present on I(state=present), failover is automatically enabled.
+                    - When omitted on I(state=present), the bridge is created without failover.
+                    - On I(state=update), can be used to add a second VIOS to a single-VIOS bridge.
                 type: dict
                 suboptions:
                     name:
                         description:
                             - Name of the secondary VIOS partition (e.g. C(VIOS-test-01)).
-                            - Required when I(secondary_vios) is configured.
+                            - Required when I(secondary_vios) is configured for I(state=present).
+                            - Required when I(state=update) while enabling load balancing or
+                              adding a new secondary VIOS to an existing single-VIOS bridge.
                         type: str
                     backing_device:
                         description:
                             - Physical Ethernet adapter on the VIOS used as the secondary SEA
                               backing device (e.g. C(ent3)).
                             - Required by the HMC when I(secondary_vios) is configured.
+                            - Can be changed via I(state=update).
                         type: str
                     high_availability_mode:
                         description:
@@ -154,21 +159,25 @@ options:
                             - C(disabled) turns off HA mode.
                             - C(auto) lets the HMC choose the active SEA automatically.
                             - C(standby) keeps this SEA in standby until the active fails.
-                            - Valid only when I(state=update).
-                            - Cannot be set when I(load_balancing=true) is being enabled.
+                            - Only valid when I(state=update) and the live bridge has two VIOSes
+                              (C(FailoverEnabled=true)).
                         type: str
                         choices: ['disabled', 'auto', 'standby']
             tagged_virtual_networks:
                 description:
-                    - List of existing tagged Virtual Network names to add to the
-                      bridge's primary LoadGroup.
+                    - List of load-group assignments, each mapping a LoadGroup PVID
+                      to the Virtual Network names that should be linked to it.
                     - Only valid when I(state=update).
-                    - Networks already linked to the LoadGroup are silently skipped
-                      (idempotent).
-                    - The Virtual Network must already exist on the managed system
+                    - "Each list entry is a single-key dict where the key is the
+                      LoadGroup Port VLAN ID (integer) and the value is a list of
+                      existing tagged Virtual Network names, e.g.
+                      C([{72: ['vn1', 'vn2']}, {75: ['vn3']}])."
+                    - Networks already linked to the target LoadGroup are silently
+                      skipped (idempotent).
+                    - Each Virtual Network must already exist on the managed system
                       and must have C(TaggedNetwork=true).
                 type: list
-                elements: str
+                elements: dict
     state:
         description:
             - C(facts) retrieves information about all Virtual Network Bridges.
@@ -176,8 +185,9 @@ options:
             - C(update) modifies an existing Virtual Network Bridge identified by
               I(virtual_network_name). Updatable fields are I(failover_enabled),
               I(load_balancing), I(jumbo_frames), I(large_send), I(qos_mode),
-              I(secondary_pvid) (when enabling load-sharing), per-VIOS
-              I(high_availability_mode), and I(tagged_virtual_networks).
+              I(addition_pvid) (when enabling load-sharing), per-VIOS
+              I(high_availability_mode), and I(tagged_virtual_networks) (per
+              LoadGroup, keyed by PVID).
             - C(absent) deletes the Virtual Network Bridge identified by I(virtual_network_name).
         required: true
         type: str
@@ -239,7 +249,7 @@ EXAMPLES = '''
     virtual_network_name: <virtual_network_name>
     shared_ethernet_adapter:
       load_balancing: true
-      secondary_pvid: <secondary_pvid>
+      addition_pvid: <addition_pvid>
       jumbo_frames: false
       large_send: true
       qos_mode: loose
@@ -249,7 +259,7 @@ EXAMPLES = '''
         high_availability_mode: standby
     state: update
 
-- name: Add tagged Virtual Networks to an existing bridge's primary LoadGroup
+- name: Add tagged Virtual Networks to specific LoadGroups of an existing bridge
   ibm.power_hmc.power_network_bridge:
     hmc_host: "{{ inventory_hostname }}"
     hmc_auth:
@@ -259,8 +269,8 @@ EXAMPLES = '''
     virtual_network_name: <virtual_network_name>
     shared_ethernet_adapter:
       tagged_virtual_networks:
-        - <tagged_virtual_network_name_1>
-        - <tagged_virtual_network_name_2>
+        - 72: [<tagged_vn_name_1>, <tagged_vn_name_2>]
+        - 75: [<tagged_vn_name_3>]
     state: update
 
 - name: Delete a Virtual Network Bridge
@@ -424,9 +434,11 @@ network_bridge_info:
             description: Quality of service mode set on the SEA. Returned on C(present) and C(update).
             type: str
         tagged_virtual_networks_added:
-            description: Names of tagged Virtual Networks newly linked to the primary LoadGroup. Returned on C(update).
-            type: list
-            elements: str
+            description: >
+                Dict mapping each LoadGroup PVID (as string) to the list of
+                Virtual Network names newly linked to that LoadGroup during the
+                update. Returned on C(update).
+            type: dict
 '''
 
 import logging
@@ -516,17 +528,22 @@ def validate_parameters(params):
             raise ParameterError(
                 "shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: %s" % qos)
 
-        # shared: secondary_pvid constraints
-        secondary_pvid = nb.get('secondary_pvid')
-        if nb.get('load_balancing') and secondary_pvid is None:
+        # shared: addition_pvid constraints
+        addition_pvid = nb.get('addition_pvid')
+        if nb.get('load_balancing'):
+            if addition_pvid is None:
+                raise ParameterError(
+                    "shared_ethernet_adapter.addition_pvid is required when shared_ethernet_adapter.load_balancing=true")
+            s_vios = nb.get('secondary_vios')
+            if not s_vios or not s_vios.get('name') or not s_vios.get('backing_device'):
+                raise ParameterError(
+                    "shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true")
+        if addition_pvid is not None and not nb.get('load_balancing', False):
             raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid is required when shared_ethernet_adapter.load_balancing=true")
-        if secondary_pvid is not None and not nb.get('load_balancing', False):
+                "shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
+        if addition_pvid is not None and not (1 <= addition_pvid <= 4094):
             raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
-        if secondary_pvid is not None and not (1 <= secondary_pvid <= 4094):
-            raise ParameterError(
-                "shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: %s" % secondary_pvid)
+                "shared_ethernet_adapter.addition_pvid must be between 1 and 4094; got: %s" % addition_pvid)
 
         # high_availability_mode is unsupported for state=present
         if state == 'present':
@@ -536,8 +553,22 @@ def validate_parameters(params):
                     raise ParameterError(
                         "unsupported parameter: shared_ethernet_adapter.%s.high_availability_mode" % vios_key)
 
-        # high_availability_mode is only valid for state=update with secondary_vios
+        # update-only sub-field checks
         if state == 'update':
+            # jumbo_frames cannot be changed after bridge creation
+            if nb.get('jumbo_frames') is not None:
+                raise ParameterError(
+                    "shared_ethernet_adapter.jumbo_frames cannot be updated after bridge creation")
+
+            # primary_vios.name is fixed at creation and cannot be changed
+            primary_cfg_upd = nb.get('primary_vios') or {}
+            if primary_cfg_upd.get('name') is not None:
+                raise ParameterError(
+                    "shared_ethernet_adapter.primary_vios.name cannot be changed after bridge creation")
+            # secondary_vios.name is allowed — it is required when adding a new
+            # secondary VIOS to an existing single-VIOS bridge
+
+            # high_availability_mode choices + single-VIOS static guard
             ha_choices = ('disabled', 'auto', 'standby')
             has_secondary_vios = bool(nb.get('secondary_vios'))
             for vios_key in ('primary_vios', 'secondary_vios'):
@@ -558,10 +589,31 @@ def validate_parameters(params):
             raise ParameterError(
                 "shared_ethernet_adapter.tagged_virtual_networks is only valid when state=update")
         if tagged_vns is not None:
-            if not isinstance(tagged_vns, list) or len(tagged_vns) == 0 or not all(
-                    isinstance(n, str) and n.strip() for n in tagged_vns):
+            if not isinstance(tagged_vns, list) or len(tagged_vns) == 0:
                 raise ParameterError(
-                    "shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of strings")
+                    "shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of "
+                    "single-key dicts, e.g. [{72: ['vn1', 'vn2']}, {75: ['vn3']}]")
+            for entry in tagged_vns:
+                if not isinstance(entry, dict) or len(entry) != 1:
+                    raise ParameterError(
+                        "shared_ethernet_adapter.tagged_virtual_networks entries must each be a "
+                        "single-key dict mapping a LoadGroup PVID to a list of VN names, "
+                        "e.g. {72: ['vn1', 'vn2']}")
+                pvid_key, vn_names = next(iter(entry.items()))
+                # Ansible passes YAML integer keys as strings — coerce before validating
+                try:
+                    pvid_int = int(pvid_key)
+                except (ValueError, TypeError):
+                    pvid_int = None
+                if pvid_int is None or not (1 <= pvid_int <= 4094):
+                    raise ParameterError(
+                        "shared_ethernet_adapter.tagged_virtual_networks LoadGroup PVID must be "
+                        "an integer between 1 and 4094; got: %s" % pvid_key)
+                if not isinstance(vn_names, list) or len(vn_names) == 0 or not all(
+                        isinstance(n, str) and n.strip() for n in vn_names):
+                    raise ParameterError(
+                        "shared_ethernet_adapter.tagged_virtual_networks[%s] must be a "
+                        "non-empty list of VN name strings" % pvid_int)
 
     collate = []
     for k in unsupported:
@@ -708,20 +760,17 @@ def ensure_present(module, params):
     hmc_user = params['hmc_auth']['username']
     password = params['hmc_auth']['password']
     virtual_network_name = params['virtual_network_name']
-
     nb = params.get('shared_ethernet_adapter') or {}
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
     primary_vios_name = primary_cfg.get('name')
     secondary_vios_name = secondary_cfg.get('name') if secondary_cfg else None
     load_balancing = nb.get('load_balancing') or False
-    secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
+    addition_pvid = nb.get('addition_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames') or False
-    large_send = nb.get('large_send')
+    large_send = nb.get('large_send') if nb.get('large_send') is not None else False
     qos_mode = nb.get('qos_mode')
-    # failover is automatically true when a secondary_vios is configured
     failover_enabled = secondary_vios_name is not None
-    # per-VIOS optional fields
     p_backing = primary_cfg.get('backing_device')
     s_backing = secondary_cfg.get('backing_device') if secondary_cfg else None
 
@@ -791,7 +840,7 @@ def ensure_present(module, params):
             bridge_dom = rest_conn.createNetworkBridge(
                 system_uuid, port_vlan_id, virtual_network_id,
                 vios1_uuid, vios2_uuid, failover_enabled, load_balancing,
-                vios1_cfg, vios2_cfg, secondary_pvid=secondary_pvid,
+                vios1_cfg, vios2_cfg, addition_pvid=addition_pvid,
                 jumbo_frames=jumbo_frames, qos_mode=qos_mode)
             if not bridge_dom:
                 module.fail_json(msg="Failed to create network bridge")
@@ -838,12 +887,22 @@ def ensure_update(module, params):
     primary_cfg = nb.get('primary_vios') or {}
     secondary_cfg = nb.get('secondary_vios') or None
     load_balancing = nb.get('load_balancing')   # None = not specified
-    secondary_pvid = nb.get('secondary_pvid') if load_balancing else None
+    addition_pvid = nb.get('addition_pvid') if load_balancing else None
     jumbo_frames = nb.get('jumbo_frames')       # None = not specified
     large_send = nb.get('large_send')           # None = not specified
     qos_mode = nb.get('qos_mode')
-    failover_enabled = nb.get('failover_enabled')  # optional override
+    # Auto-enable failover when secondary_vios name+backing_device are supplied,
+    # mirroring state=present behaviour.  No user input needed or accepted.
+    failover_enabled = (True if (secondary_cfg and secondary_cfg.get('name')
+                                 and secondary_cfg.get('backing_device')) else None)
     tagged_virtual_networks = nb.get('tagged_virtual_networks') or []
+    # Normalise: [{pvid: [names]}] → dict {int(pvid): [names]}
+    # Keys may arrive as strings from YAML — coerce to int here so all
+    # downstream code (DOM lookup, result dict keys) works uniformly.
+    tagged_vns_by_pvid = {}
+    for entry in tagged_virtual_networks:
+        pvid_key, vn_names = next(iter(entry.items()))
+        tagged_vns_by_pvid[int(pvid_key)] = list(vn_names)
 
     # high_availability_mode cannot be changed while enabling load_balancing
     if load_balancing:
@@ -863,9 +922,14 @@ def ensure_update(module, params):
             if not system_uuid:
                 module.fail_json(msg="Managed system not found: {0}".format(system_name))
 
-            # Resolve virtual_network_name to its PVID, then locate the bridge
-            port_vlan_id = None
+            # Resolve virtual_network_name → UUID + VLAN ID, then find the bridge.
+            # Strategy: first try matching by bridge PortVLANID (works when an
+            # untagged VN is supplied).  If that finds nothing, fall back to
+            # scanning each bridge's VirtualNetworks link list for the VN UUID
+            # (works when a tagged VN already assigned to a bridge is supplied).
             vn_dom = rest_conn.getVirtualNetworks(system_uuid)
+            vn_uuid = None
+            port_vlan_id = None
             if vn_dom is not None:
                 for vn in vn_dom.xpath("//VirtualNetwork"):
                     name_elem = vn.xpath(".//NetworkName")
@@ -873,20 +937,34 @@ def ensure_update(module, params):
                         vlan_elem = vn.xpath(".//NetworkVLANID")
                         if vlan_elem:
                             port_vlan_id = int(vlan_elem[0].text)
+                        atom_elem = vn.xpath(".//Metadata/Atom/AtomID")
+                        if atom_elem:
+                            vn_uuid = atom_elem[0].text
                         break
-            if port_vlan_id is None:
+            if vn_uuid is None:
                 module.fail_json(msg="Virtual network '{0}' not found on system '{1}'".format(
                     virtual_network_name, system_name))
 
             bridge_uuid = None
             bridges_dom = rest_conn.getNetworkBridges(system_uuid)
             if bridges_dom is not None:
+                # Pass 1: match by primary PortVLANID (untagged VN case)
                 for bridge in bridges_dom.xpath("//NetworkBridge"):
                     pvlan = bridge.xpath('PortVLANID')
-                    if pvlan and pvlan[0].text == str(port_vlan_id):
+                    if pvlan and port_vlan_id is not None and pvlan[0].text == str(port_vlan_id):
                         atom_id_elem = bridge.xpath('Metadata/Atom/AtomID')
                         if atom_id_elem:
                             bridge_uuid = atom_id_elem[0].text
+                        break
+                # Pass 2: match by VN UUID in any bridge's VirtualNetworks links
+                # (tagged VN case — the VN is already assigned to a LoadGroup)
+                if bridge_uuid is None:
+                    for bridge in bridges_dom.xpath("//NetworkBridge"):
+                        vn_links = bridge.xpath('.//VirtualNetworks/link')
+                        if any(vn_uuid in lnk.get('href', '') for lnk in vn_links):
+                            atom_id_elem = bridge.xpath('Metadata/Atom/AtomID')
+                            if atom_id_elem:
+                                bridge_uuid = atom_id_elem[0].text
                             break
 
             if not bridge_uuid:
@@ -898,12 +976,34 @@ def ensure_update(module, params):
             if bridge_dom is None:
                 module.fail_json(msg="Failed to retrieve bridge for update")
 
-            # Determine whether any non-VN fields are being updated.
-            # None means "not specified by caller"; any explicit value (including
-            # False for load_balancing) counts as an intentional update.
+            # Runtime guard: check whether the bridge is a two-VIOS bridge (FailoverEnabled=true)
+            nb_elem = bridge_dom.xpath("//NetworkBridge")
+            live_nb = nb_elem[0] if nb_elem else None
+            live_failover_elem = live_nb.xpath('FailoverEnabled') if live_nb is not None else []
+            live_failover = (live_failover_elem[0].text.lower() == 'true') if live_failover_elem else False
+
+            has_valid_secondary_vios = bool(secondary_cfg and secondary_cfg.get('name') and secondary_cfg.get('backing_device'))
+
+            # If load_balancing is being enabled on a single-VIOS bridge, secondary_vios details are required
+            if load_balancing and not live_failover and not has_valid_secondary_vios:
+                module.fail_json(
+                    msg="shared_ethernet_adapter.secondary_vios (name and backing_device) is required when "
+                        "enabling load_balancing on a single-VIOS bridge '{0}'".format(virtual_network_name))
+
+            if not live_failover and not has_valid_secondary_vios:
+                # Cannot set HA mode on a single-VIOS bridge
+                for vios_key in ('primary_vios', 'secondary_vios'):
+                    if (nb.get(vios_key) or {}).get('high_availability_mode') is not None:
+                        module.fail_json(
+                            msg="high_availability_mode cannot be set: bridge '{0}' has only one "
+                                "VIOS/SEA configured (FailoverEnabled=false)".format(virtual_network_name))
+
+            vios2_uuid = None
+            if secondary_cfg and secondary_cfg.get('name') and secondary_cfg.get('backing_device'):
+                vios2_uuid = _resolve_vios_uuid(module, rest_conn, system_uuid, secondary_cfg['name'])
             has_non_vn_update = any([
                 load_balancing is not None,
-                secondary_pvid is not None,
+                addition_pvid is not None,
                 failover_enabled is not None,
                 jumbo_frames is not None,
                 large_send is not None,
@@ -912,66 +1012,72 @@ def ensure_update(module, params):
                 bool(secondary_cfg),
             ])
 
-            # Resolve tagged VN names to UUIDs and pre-check which ones are
-            # already linked to the primary LoadGroup.
-            tagged_vn_ids = []
-            vns_already_present = []
-            if tagged_virtual_networks:
+            tagged_vn_ids_by_pvid = {}
+            if tagged_vns_by_pvid:
                 vn_dom = rest_conn.getVirtualNetworks(system_uuid)
+
                 nb_elem_list = bridge_dom.xpath("//NetworkBridge")
                 nb_el = nb_elem_list[0] if nb_elem_list else None
-                existing_hrefs = set()
+                existing_hrefs_by_pvid = {}
                 if nb_el is not None:
-                    load_groups = nb_el.xpath('LoadGroups/LoadGroup')
-                    if load_groups:
-                        # HMC may return VN links under either element name
-                        vn_container = (load_groups[0].xpath('VirtualNetworks')
-                                        or load_groups[0].xpath('AssociatedInternalNetwork'))
+                    for lg in nb_el.xpath('LoadGroups/LoadGroup'):
+                        pvid_el = lg.xpath('PortVLANID')
+                        lg_pvid = int(pvid_el[0].text) if pvid_el else None
+                        if lg_pvid is None:
+                            continue
+                        vn_container = (lg.xpath('VirtualNetworks')
+                                        or lg.xpath('AssociatedInternalNetwork'))
                         if vn_container:
-                            existing_hrefs = {
+                            existing_hrefs_by_pvid[lg_pvid] = {
                                 link.get('href', '')
                                 for link in vn_container[0].xpath('link')
                             }
+                        else:
+                            existing_hrefs_by_pvid[lg_pvid] = set()
+
+                # Build a global VN-name → UUID lookup from the single VN DOM fetch
+                vn_name_to_uuid = {}
                 if vn_dom is not None:
-                    for vn_name in tagged_virtual_networks:
-                        vn_uuid = None
-                        for vn in vn_dom.xpath("//VirtualNetwork"):
-                            name_elem = vn.xpath(".//NetworkName")
-                            if name_elem and name_elem[0].text == vn_name:
-                                atom_elem = vn.xpath(".//Metadata/Atom/AtomID")
-                                if atom_elem:
-                                    vn_uuid = atom_elem[0].text
-                                break
+                    for vn in vn_dom.xpath("//VirtualNetwork"):
+                        name_elem = vn.xpath(".//NetworkName")
+                        atom_elem = vn.xpath(".//Metadata/Atom/AtomID")
+                        if name_elem and atom_elem:
+                            vn_name_to_uuid[name_elem[0].text] = atom_elem[0].text
+
+                for lg_pvid, vn_names in tagged_vns_by_pvid.items():
+                    existing_hrefs = existing_hrefs_by_pvid.get(lg_pvid, set())
+                    pairs = []
+                    for vn_name in vn_names:
+                        vn_uuid = vn_name_to_uuid.get(vn_name)
                         if vn_uuid is None:
                             module.fail_json(
                                 msg="Tagged virtual network '{0}' not found on system '{1}'".format(
                                     vn_name, system_name))
-                        # Check if this VN UUID is already referenced in the LoadGroup
-                        # (compare by UUID only to avoid http/https and port differences)
-                        if any(vn_uuid in h for h in existing_hrefs):
-                            vns_already_present.append(vn_name)
-                        else:
-                            tagged_vn_ids.append((vn_name, vn_uuid))
+                        if not any(vn_uuid in h for h in existing_hrefs):
+                            pairs.append((vn_name, vn_uuid))
+                    if pairs:
+                        tagged_vn_ids_by_pvid[lg_pvid] = pairs
 
             # If nothing at all has changed, skip the POST and report unchanged.
-            if not has_non_vn_update and tagged_virtual_networks and not tagged_vn_ids:
+            if not has_non_vn_update and tagged_vns_by_pvid and not tagged_vn_ids_by_pvid:
                 return False, {
                     'virtual_network_name': virtual_network_name,
-                    'tagged_virtual_networks_added': [],
+                    'tagged_virtual_networks_added': {},
                     'status': 'unchanged'
                 }, None
 
-            _resp, newly_added_vn_names = rest_conn.updateNetworkBridge(
+            _resp, newly_added_by_pvid = rest_conn.updateNetworkBridge(
                 system_uuid, bridge_uuid, bridge_dom,
                 load_balancing=load_balancing,
-                secondary_pvid=secondary_pvid,
+                addition_pvid=addition_pvid,
                 failover_enabled=failover_enabled,
                 jumbo_frames=jumbo_frames,
                 large_send=large_send,
                 qos_mode=qos_mode,
                 primary_vios_cfg=primary_cfg,
                 secondary_vios_cfg=secondary_cfg,
-                tagged_vn_ids=tagged_vn_ids)
+                secondary_vios_uuid=vios2_uuid,
+                tagged_vn_ids_by_pvid=tagged_vn_ids_by_pvid)
 
             network_bridge_info = {
                 'virtual_network_name': virtual_network_name,
@@ -979,7 +1085,9 @@ def ensure_update(module, params):
                 'jumbo_frames': jumbo_frames,
                 'large_send': large_send,
                 'qos_mode': qos_mode,
-                'tagged_virtual_networks_added': newly_added_vn_names,
+                'primary_vios': primary_cfg,
+                'secondary_vios': secondary_cfg,
+                'tagged_virtual_networks_added': newly_added_by_pvid,
                 'status': 'updated'
             }
 
@@ -1094,13 +1202,13 @@ def run_module():
             type='dict',
             options=dict(
                 load_balancing=dict(type='bool', default=None),
-                secondary_pvid=dict(type='int'),
+                addition_pvid=dict(type='int'),
                 jumbo_frames=dict(type='bool', default=None),
                 large_send=dict(type='bool', default=None),
                 qos_mode=dict(type='str', choices=['disabled', 'loose', 'strict']),
                 primary_vios=dict(type='dict', options=vios_spec),
                 secondary_vios=dict(type='dict', options=vios_spec),
-                tagged_virtual_networks=dict(type='list', elements='str'),
+                tagged_virtual_networks=dict(type='list', elements='dict'),
             ),
         ),
         state=dict(type='str', required=True, choices=['facts', 'present', 'update', 'absent']),

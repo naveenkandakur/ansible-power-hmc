@@ -12,7 +12,7 @@ hmc_auth = {'username': 'hscroot', 'password': 'password_value'}
 
 _SEA_FULL = {
     'load_balancing': False,
-    'secondary_pvid': None,
+    'addition_pvid': None,
     'jumbo_frames': False,
     'large_send': False,
     'qos_mode': None,
@@ -25,7 +25,7 @@ _SEA_FULL = {
 
 _SEA_PRIMARY_ONLY = {
     'load_balancing': False,
-    'secondary_pvid': None,
+    'addition_pvid': None,
     'jumbo_frames': False,
     'large_send': False,
     'qos_mode': None,
@@ -35,11 +35,11 @@ _SEA_PRIMARY_ONLY = {
     'tagged_virtual_networks': None,
 }
 
-# Minimal shared_ethernet_adapter dict for state=update (no name/backing_device required)
+# Minimal network_bridge dict for state=update (no name/backing_device required)
 _SEA_UPDATE = {
     'load_balancing': False,
-    'secondary_pvid': None,
-    'jumbo_frames': False,
+    'addition_pvid': None,
+    'jumbo_frames': None,    # not valid for update — must stay None
     'large_send': False,
     'qos_mode': None,
     'primary_vios': {'high_availability_mode': None},
@@ -115,17 +115,21 @@ test_data_present = [
     (_p('present', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_FULL, 'qos_mode': 'best-effort'}),
      "ParameterError: shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: best-effort"),
-    # secondary_pvid requires load_balancing=True
+    # addition_pvid requires load_balancing=True
     (_p('present', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': False, 'secondary_pvid': 200}),
-     "ParameterError: shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
-    # secondary_pvid out of range
+        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': False, 'addition_pvid': 200}),
+     "ParameterError: shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
+    # addition_pvid out of range
     (_p('present', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'secondary_pvid': 5000}),
-     "ParameterError: shared_ethernet_adapter.secondary_pvid must be between 1 and 4094; got: 5000"),
+        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'addition_pvid': 5000}),
+     "ParameterError: shared_ethernet_adapter.addition_pvid must be between 1 and 4094; got: 5000"),
+    # load_balancing requires secondary_vios with name and backing_device on present
+    (_p('present', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_FULL, 'load_balancing': True, 'addition_pvid': 200, 'secondary_vios': None}),
+     "ParameterError: shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true"),
     # tagged_virtual_networks not allowed on state=present
     (_p('present', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_FULL, 'tagged_virtual_networks': ['VLAN200-ETHERNET0']}),
+        shared_ethernet_adapter={**_SEA_FULL, 'tagged_virtual_networks': [{72: ['VLAN200-ETHERNET0']}]}),
      "ParameterError: shared_ethernet_adapter.tagged_virtual_networks is only valid when state=update"),
 ]
 
@@ -149,20 +153,45 @@ test_data_update = [
     (_p('update', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_UPDATE, 'qos_mode': 'best-effort'}),
      "ParameterError: shared_ethernet_adapter.qos_mode must be one of disabled, loose, strict; got: best-effort"),
-    # secondary_pvid without load_balancing
+    # primary_vios.name not allowed on update
     (_p('update', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': False, 'secondary_pvid': 200}),
-     "ParameterError: shared_ethernet_adapter.secondary_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
+        shared_ethernet_adapter={**_SEA_UPDATE, 'primary_vios': {'name': 'VIOS-01'}}),
+     "ParameterError: shared_ethernet_adapter.primary_vios.name cannot be changed after bridge creation"),
+    # addition_pvid without load_balancing
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': False, 'addition_pvid': 200}),
+     "ParameterError: shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true"),
+    # load_balancing requires secondary_vios (name and backing_device) on update
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'load_balancing': True, 'addition_pvid': 200, 'secondary_vios': None}),
+     "ParameterError: shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true"),
     # invalid high_availability_mode on primary_vios
     (_p('update', virtual_network_name=VN_NAME,
         shared_ethernet_adapter={**_SEA_UPDATE,
                                  'secondary_vios': {'high_availability_mode': None},
                                  'primary_vios': {'high_availability_mode': 'badmode'}}),
      "ParameterError: shared_ethernet_adapter.primary_vios.high_availability_mode must be one of disabled, auto, standby; got: badmode"),
-    # tagged_virtual_networks with non-string entries
+    # tagged_virtual_networks: not a list
     (_p('update', virtual_network_name=VN_NAME,
-        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': [42]}),
-     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of strings"),
+        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': 'not-a-list'}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks must be a non-empty list of "
+     "single-key dicts, e.g. [{72: ['vn1', 'vn2']}, {75: ['vn3']}]"),
+    # tagged_virtual_networks: entry is not a single-key dict
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': [['vn1', 'vn2']]}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks entries must each be a "
+     "single-key dict mapping a LoadGroup PVID to a list of VN names, "
+     "e.g. {72: ['vn1', 'vn2']}"),
+    # tagged_virtual_networks: PVID out of range
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': [{5000: ['vn1']}]}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks LoadGroup PVID must be "
+     "an integer between 1 and 4094; got: 5000"),
+    # tagged_virtual_networks: VN names list contains non-string
+    (_p('update', virtual_network_name=VN_NAME,
+        shared_ethernet_adapter={**_SEA_UPDATE, 'tagged_virtual_networks': [{72: [42]}]}),
+     "ParameterError: shared_ethernet_adapter.tagged_virtual_networks[72] must be a "
+     "non-empty list of VN name strings"),
 ]
 
 # ---------------------------------------------------------------------------
