@@ -3746,23 +3746,24 @@ class HmcRestClient:
             raise
 
     @staticmethod
-    def _sea_xml(vios_href, is_primary, cfg, jumbo_frames=None, qos_mode=None):
+    def _sea_xml(vios_href, is_primary, cfg, jumbo_frames=None, qos_mode=None, large_send=None):
         """Return the XML fragment list for one SharedEthernetAdapter block.
 
-        Used only in the bridge CREATE (PUT) payload.  The HMC PUT schema does
-        not accept IPInterface, LargeSend, or HighAvailabilityMode at create time;
-        those are applied via the follow-up SEA POST-update (updateNetworkBridgeSEAs).
+        Used in the bridge CREATE (PUT) payload and when appending a new secondary
+        SEA during a state=update load-balancing enable.
 
         Element order matches the HMC GET response XSD sequence:
           Metadata → AssignedVirtualIOServer → BackingDeviceChoice →
-          JumboFramesEnabled → QualityOfServiceMode →
+          JumboFramesEnabled → LargeSend → QualityOfServiceMode →
           TrunkAdapters (empty) → IsPrimary
 
         DeviceName inside EthernetBackingDevice must use kb="ROR" per HMC schema.
 
         cfg is a dict with optional key: backing_device.
-        (ip_address, netmask, address_to_ping, large_send, and
-        high_availability_mode are not accepted by the HMC PUT schema at create time.)
+        large_send: when not None, emits a <LargeSend> element — pass the inherited
+          value from the primary SEA to prevent the HMC defaulting to true.
+        (ip_address, netmask, address_to_ping, and high_availability_mode are not
+        accepted by the HMC PUT schema at create time.)
         """
         primary_str = 'true' if is_primary else 'false'
         parts = ['<SharedEthernetAdapter schemaVersion="V1_0">',
@@ -3791,6 +3792,10 @@ class HmcRestClient:
                   '<Metadata><Atom/></Metadata>',
                   '</TrunkAdapters>']
         parts.append('<IsPrimary kxe="false" kb="CUD">{0}</IsPrimary>'.format(primary_str))
+        # LargeSend — must come after IsPrimary (HMC XSD sequence for POST update)
+        if large_send is not None:
+            ls_str = 'true' if large_send else 'false'
+            parts.append('<LargeSend kb="CUD" kxe="false">{0}</LargeSend>'.format(ls_str))
         parts.append('</SharedEthernetAdapter>')
         return parts
 
@@ -4105,14 +4110,35 @@ class HmcRestClient:
                     newly_added_by_pvid[str(lg_pvid)] = added_names
 
         # --- Append new secondary SEA when adding a second VIOS ---
+        # Only append if the secondary VIOS is not already present in the DOM.
+        # If it is already there the SEA-level loop below handles attribute
+        # updates without duplicating the SEA block.
         if secondary_vios_uuid and secondary_vios_cfg:
             vios2_href = "https://{0}/rest/api/uom/ManagedSystem/{1}/VirtualIOServer/{2}".format(
                 self.hmc_ip, system_uuid, secondary_vios_uuid)
-            sea_parts = self._sea_xml(vios2_href, is_primary=False, cfg=secondary_vios_cfg)
-            new_sea_elem = etree.fromstring(''.join(sea_parts))
-            sea_container = nb.xpath('SharedEthernetAdapters')
-            if sea_container:
-                sea_container[0].append(new_sea_elem)
+            already_present = any(
+                vios2_href in (sea.xpath('AssignedVirtualIOServer/@href') or [])
+                for sea in nb.xpath('SharedEthernetAdapters/SharedEthernetAdapter')
+            )
+            if not already_present:
+                # Inherit the primary SEA's current LargeSend value so the HMC
+                # does not default the new SEA to LargeSend=true.
+                primary_large_send = None
+                for _sea in nb.xpath('SharedEthernetAdapters/SharedEthernetAdapter'):
+                    _is_p = _sea.xpath('IsPrimary')
+                    if _is_p and _is_p[0].text.lower() == 'true':
+                        _ls = _sea.xpath('LargeSend')
+                        if _ls:
+                            primary_large_send = _ls[0].text.lower() == 'true'
+                        break
+                sea_parts = self._sea_xml(vios2_href, is_primary=False, cfg=secondary_vios_cfg,
+                                          large_send=primary_large_send)
+                new_sea_elem = etree.fromstring(''.join(sea_parts))
+                sea_container = nb.xpath('SharedEthernetAdapters')
+                if sea_container:
+                    sea_container[0].append(new_sea_elem)
+            else:
+                pass
 
         # --- SEA-level attributes (applied to every SharedEthernetAdapter) ---
         for sea in nb.xpath('SharedEthernetAdapters/SharedEthernetAdapter'):

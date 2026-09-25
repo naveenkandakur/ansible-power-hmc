@@ -530,7 +530,9 @@ def validate_parameters(params):
 
         # shared: addition_pvid constraints
         addition_pvid = nb.get('addition_pvid')
-        if nb.get('load_balancing'):
+        if nb.get('load_balancing') and state == 'present':
+            # For state=present the bridge does not exist yet so there is no
+            # pre-existing failover/secondary VIOS — both fields are always required.
             if addition_pvid is None:
                 raise ParameterError(
                     "shared_ethernet_adapter.addition_pvid is required when shared_ethernet_adapter.load_balancing=true")
@@ -538,6 +540,9 @@ def validate_parameters(params):
             if not s_vios or not s_vios.get('name') or not s_vios.get('backing_device'):
                 raise ParameterError(
                     "shared_ethernet_adapter.secondary_vios (name and backing_device) is required when shared_ethernet_adapter.load_balancing=true")
+        # For state=update these are checked at runtime in ensure_update after
+        # reading the live bridge state — a bridge with failover already enabled
+        # does not need secondary_vios or addition_pvid to re-enable load_balancing.
         if addition_pvid is not None and not nb.get('load_balancing', False):
             raise ParameterError(
                 "shared_ethernet_adapter.addition_pvid is only valid when shared_ethernet_adapter.load_balancing=true")
@@ -984,11 +989,21 @@ def ensure_update(module, params):
 
             has_valid_secondary_vios = bool(secondary_cfg and secondary_cfg.get('name') and secondary_cfg.get('backing_device'))
 
-            # If load_balancing is being enabled on a single-VIOS bridge, secondary_vios details are required
+            # Check if a secondary LoadGroup already exists in the live bridge DOM
+            live_load_groups = live_nb.xpath('LoadGroups/LoadGroup/PortVLANID') if live_nb is not None else []
+            live_has_secondary_lg = len(live_load_groups) > 1
+
+            # If load_balancing is being enabled:
+            # - On a single-VIOS bridge: secondary_vios and addition_pvid are required
+            # - On a bridge that already has failover (two VIOSes): neither is needed
             if load_balancing and not live_failover and not has_valid_secondary_vios:
                 module.fail_json(
                     msg="shared_ethernet_adapter.secondary_vios (name and backing_device) is required when "
                         "enabling load_balancing on a single-VIOS bridge '{0}'".format(virtual_network_name))
+            if load_balancing and not live_has_secondary_lg and addition_pvid is None:
+                module.fail_json(
+                    msg="shared_ethernet_adapter.addition_pvid is required when enabling load_balancing "
+                        "on bridge '{0}' (no secondary LoadGroup exists yet)".format(virtual_network_name))
 
             if not live_failover and not has_valid_secondary_vios:
                 # Cannot set HA mode on a single-VIOS bridge
